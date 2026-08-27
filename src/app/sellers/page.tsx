@@ -95,6 +95,7 @@ export default function SellersPage() {
           <Link className="nav-item" href="/"><span className="icon">⌂</span> Overview</Link>
           <Link className="nav-item" href="/products"><span className="icon">▣</span> Products</Link>
           <Link className="nav-item active" href="/sellers"><span className="icon">♙</span> Sellers</Link>
+          <Link className="nav-item" href="/messages"><span className="icon">✉</span> Messages</Link>
           <a className="nav-item" href="#marketplaces"><span className="icon">◫</span> Marketplaces</a>
         </nav>
         <div className="sidebar-bottom"><a className="nav-item" href="#settings"><span className="icon">⚙</span> Settings</a></div>
