@@ -22,6 +22,7 @@ export default function Home() {
           <a className="nav-item active" href="#overview"><Icon>⌂</Icon> Overview</a>
           <Link className="nav-item" href="/products"><Icon>▣</Icon> Products</Link>
           <Link className="nav-item" href="/sellers"><Icon>♙</Icon> Sellers</Link>
+          <Link className="nav-item" href="/messages"><Icon>✉</Icon> Messages</Link>
           <a className="nav-item" href="#marketplaces"><Icon>◫</Icon> Marketplaces</a>
         </nav>
         <div className="sidebar-bottom">
