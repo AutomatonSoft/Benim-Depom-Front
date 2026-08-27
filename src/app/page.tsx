@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect } from "react";
+
 const products = [
   {
     seller: "Nikita Gribanovsky",
@@ -33,6 +37,12 @@ function Icon({ children }: { children: React.ReactNode }) {
 }
 
 export default function Home() {
+  useEffect(() => {
+    if (!window.localStorage.getItem("benim_access_token")) {
+      window.location.replace("/login");
+    }
+  }, []);
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
