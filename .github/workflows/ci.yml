@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - local
+      - stage
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-branch-flow:
+    name: Validate branch flow
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate allowed Pull Request direction
+        shell: bash
+        run: |
+          if [[ "${{ github.base_ref }}" == "local" && "${{ github.head_ref }}" != feature/* ]]; then
+            echo "Only Pull Requests feature/* -> local are allowed."
+            exit 1
+          fi
+
+          if [[ "${{ github.base_ref }}" == "stage" && "${{ github.head_ref }}" != "local" ]]; then
+            echo "Only Pull Requests local -> stage are allowed."
+            exit 1
+          fi
+
+          if [[ "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" != "stage" ]]; then
+            echo "Only Pull Requests stage -> main are allowed."
+            exit 1
+          fi
+
+  test-and-lint:
+    name: Test and lint
+    needs: validate-branch-flow
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Build Next.js application
+        run: npm run build
+
+  build-production-image:
+    name: Build production image
+    needs: test-and-lint
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build --tag benim-depom-front-ci:${{ github.sha }} .
