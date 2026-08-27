@@ -43,7 +43,7 @@ function Sidebar() {
       <nav aria-label="Main navigation">
         <Link className="nav-item" href="/"><span className="icon">⌂</span> Overview</Link>
         <Link className="nav-item active" href="/products"><span className="icon">▣</span> Products</Link>
-        <a className="nav-item" href="#sellers"><span className="icon">♙</span> Sellers</a>
+        <Link className="nav-item" href="/sellers"><span className="icon">♙</span> Sellers</Link>
         <a className="nav-item" href="#marketplaces"><span className="icon">◫</span> Marketplaces</a>
       </nav>
       <div className="sidebar-bottom"><a className="nav-item" href="#settings"><span className="icon">⚙</span> Settings</a></div>
