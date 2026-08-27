@@ -21,7 +21,7 @@ export default function Home() {
         <nav aria-label="Main navigation">
           <a className="nav-item active" href="#overview"><Icon>⌂</Icon> Overview</a>
           <Link className="nav-item" href="/products"><Icon>▣</Icon> Products</Link>
-          <a className="nav-item" href="#sellers"><Icon>♙</Icon> Sellers</a>
+          <Link className="nav-item" href="/sellers"><Icon>♙</Icon> Sellers</Link>
           <a className="nav-item" href="#marketplaces"><Icon>◫</Icon> Marketplaces</a>
         </nav>
         <div className="sidebar-bottom">
