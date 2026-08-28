@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
 type Ean = { id: number; code: string; account: "jv" | "xl"; product_id: number | null; imported_at: string };
@@ -18,14 +19,14 @@ export default function EansPage() {
     const params = new URLSearchParams({ page: String(page) }); if (account) params.set("account", account); if (assigned) params.set("is_assigned", assigned);
     async function load() {
       setLoading(true); setError("");
-      try { const [listResponse, summaryResponse] = await Promise.all([fetch(`/api/v1/manager/eans/?${params}`, { headers: { Authorization: `Bearer ${token}` } }), fetch("/api/v1/manager/eans/summary/", { headers: { Authorization: `Bearer ${token}` } })]); if (listResponse.status === 401 || summaryResponse.status === 401) return void window.location.replace("/login"); if (!listResponse.ok || !summaryResponse.ok) throw new Error(); const list = await listResponse.json() as EanList; setItems(list.results); setNext(Boolean(list.next)); setPrevious(Boolean(list.previous)); setSummary(await summaryResponse.json() as Summary); } catch { setError("Unable to load EAN data. Please try again."); } finally { setLoading(false); }
+      try { const [listResponse, summaryResponse] = await Promise.all([authorizedFetch(`/api/v1/manager/eans/?${params}`), authorizedFetch("/api/v1/manager/eans/summary/")]); if (listResponse.status === 401 || summaryResponse.status === 401) return void window.location.replace("/login"); if (!listResponse.ok || !summaryResponse.ok) throw new Error(); const list = await listResponse.json() as EanList; setItems(list.results); setNext(Boolean(list.next)); setPrevious(Boolean(list.previous)); setSummary(await summaryResponse.json() as Summary); } catch { setError("Unable to load EAN data. Please try again."); } finally { setLoading(false); }
     }
     void load();
   }, [page, account, assigned, refresh]);
 
   async function importCodes(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const token = localStorage.getItem("benim_access_token"); if (!token) return; setSaving(true); setResult(null); setError("");
-    try { const response = await fetch("/api/v1/manager/eans/import/", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ account: importAccount, codes }) }); if (!response.ok) { const data = await response.json(); throw new Error(data.codes?.[0] || "Import failed."); } setResult(await response.json() as ImportResult); setCodes(""); setRefresh((value) => value + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Import failed."); } finally { setSaving(false); }
+    try { const response = await authorizedFetch("/api/v1/manager/eans/import/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ account: importAccount, codes }) }); if (!response.ok) { const data = await response.json(); throw new Error(data.codes?.[0] || "Import failed."); } setResult(await response.json() as ImportResult); setCodes(""); setRefresh((value) => value + 1); } catch (reason) { setError(reason instanceof Error ? reason.message : "Import failed."); } finally { setSaving(false); }
   }
 
   return <main className="app-shell"><Sidebar active="eans" /><section className="content products-page"><header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>EAN</h1><p className="products-subtitle">Import and monitor marketplace EAN pools</p></div></header>

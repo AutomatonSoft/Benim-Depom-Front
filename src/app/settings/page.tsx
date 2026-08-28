@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
 import { TIMEZONE_STORAGE_KEY } from "@/lib/date";
 
 type Profile = {
@@ -39,9 +40,7 @@ export default function SettingsPage() {
     async function loadProfile() {
       setTimezone(localStorage.getItem(TIMEZONE_STORAGE_KEY) || "UTC");
       try {
-        const response = await fetch("/api/v1/auth/me/", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await authorizedFetch("/api/v1/auth/me/");
         if (response.status === 401) return void window.location.replace("/login");
         if (!response.ok) throw new Error();
         setProfile((await response.json()) as Profile);
@@ -69,9 +68,9 @@ export default function SettingsPage() {
 
     setSubmitting(true);
     try {
-      const response = await fetch("/api/v1/auth/password/change/", {
+      const response = await authorizedFetch("/api/v1/auth/password/change/", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           current_password: form.get("current_password"),
           new_password: form.get("new_password"),

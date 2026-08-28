@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -66,9 +67,7 @@ export default function ProductsPage() {
       setError("");
 
       try {
-        const response = await fetch(`/api/v1/manager/products/?${params}`, {
-          headers: { Authorization: `Bearer ${access}` },
-        });
+        const response = await authorizedFetch(`/api/v1/manager/products/?${params}`);
 
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
