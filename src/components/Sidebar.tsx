@@ -8,9 +8,10 @@ type ActivePage =
   | "sellers"
   | "messages"
   | "eans"
+  | "marketplaces"
   | "settings";
 
-type IconName = ActivePage | "marketplaces";
+type IconName = ActivePage;
 
 const links: { id: Exclude<ActivePage, "settings">; href: string; label: string }[] = [
   { id: "overview", href: "/", label: "Overview" },
@@ -45,7 +46,7 @@ export default function Sidebar({ active }: { active: ActivePage }) {
             {link.label}
           </Link>
         ))}
-        <Link className="nav-item" href="/#marketplaces"><SidebarIcon name="marketplaces" />Marketplaces</Link>
+        <Link className={`nav-item ${active === "marketplaces" ? "active" : ""}`} href="/marketplaces"><SidebarIcon name="marketplaces" />Marketplaces</Link>
       </nav>
       <div className="sidebar-bottom">
         <Link className={`nav-item ${active === "settings" ? "active" : ""}`} href="/settings"><SidebarIcon name="settings" />Settings</Link>
