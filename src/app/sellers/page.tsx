@@ -93,7 +93,7 @@ export default function SellersPage() {
     <main className="app-shell"><Sidebar active="sellers" />
 
       <section className="content products-page">
-        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="back-link" href="/">← Overview</Link></header>
+        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="primary-link" href="/managers/new">+ Create manager</Link></header>
 
         <section className="products-panel">
           <form className="products-toolbar" onSubmit={applySearch}>
