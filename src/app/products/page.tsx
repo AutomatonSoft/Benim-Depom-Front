@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
+import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
 
 type ProductImage = {
@@ -36,21 +39,6 @@ const statusLabels: Record<string, string> = {
   deactivated: "Deactivated",
 };
 
-function Sidebar() {
-  return (
-    <aside className="sidebar">
-      <Link className="brand" href="/">Benim<span>Depom</span></Link>
-      <nav aria-label="Main navigation">
-        <Link className="nav-item" href="/"><span className="icon">⌂</span> Overview</Link>
-        <Link className="nav-item active" href="/products"><span className="icon">▣</span> Products</Link>
-        <a className="nav-item" href="#sellers"><span className="icon">♙</span> Sellers</a>
-        <a className="nav-item" href="#marketplaces"><span className="icon">◫</span> Marketplaces</a>
-      </nav>
-      <div className="sidebar-bottom"><a className="nav-item" href="#settings"><span className="icon">⚙</span> Settings</a></div>
-    </aside>
-  );
-}
-
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [count, setCount] = useState(0);
@@ -79,9 +67,7 @@ export default function ProductsPage() {
       setError("");
 
       try {
-        const response = await fetch(`/api/v1/manager/products/?${params}`, {
-          headers: { Authorization: `Bearer ${access}` },
-        });
+        const response = await authorizedFetch(`/api/v1/manager/products/?${params}`);
 
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
@@ -122,7 +108,7 @@ export default function ProductsPage() {
 
   return (
     <main className="app-shell">
-      <Sidebar />
+      <Sidebar active="products" />
       <section className="content products-page">
         <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Products</h1><p className="products-subtitle">{count} products in your workspace</p></div><Link className="back-link" href="/">← Overview</Link></header>
 
@@ -152,7 +138,7 @@ export default function ProductsPage() {
                 <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
                 <strong>{product.total_quantity} pcs</strong>
                 <strong>{formatPrice(product)}</strong>
-                <time dateTime={product.created_at}>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(product.created_at))}</time>
+                <time dateTime={product.created_at}>{formatDate(product.created_at)}</time>
               </article>;
             })}
           </div>}

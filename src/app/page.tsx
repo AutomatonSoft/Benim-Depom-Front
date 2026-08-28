@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
 import { useEffect } from "react";
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -15,20 +16,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <a className="brand" href="#overview">Benim<span>Depom</span></a>
-        <nav aria-label="Main navigation">
-          <a className="nav-item active" href="#overview"><Icon>⌂</Icon> Overview</a>
-          <Link className="nav-item" href="/products"><Icon>▣</Icon> Products</Link>
-          <a className="nav-item" href="#sellers"><Icon>♙</Icon> Sellers</a>
-          <a className="nav-item" href="#marketplaces"><Icon>◫</Icon> Marketplaces</a>
-        </nav>
-        <div className="sidebar-bottom">
-          <a className="nav-item" href="#settings"><Icon>⚙</Icon> Settings</a>
-          <div className="profile"><span>AK</span><div><strong>Alikhan</strong><small>Manager</small></div></div>
-        </div>
-      </aside>
+    <main className="app-shell"><Sidebar active="overview" />
 
       <section className="content" id="overview">
         <header className="topbar">
