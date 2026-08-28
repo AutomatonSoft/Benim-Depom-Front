@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
+import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
 
 type ProductImage = {
@@ -138,7 +139,7 @@ export default function ProductsPage() {
                 <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
                 <strong>{product.total_quantity} pcs</strong>
                 <strong>{formatPrice(product)}</strong>
-                <time dateTime={product.created_at}>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(product.created_at))}</time>
+                <time dateTime={product.created_at}>{formatDate(product.created_at)}</time>
               </article>;
             })}
           </div>}
