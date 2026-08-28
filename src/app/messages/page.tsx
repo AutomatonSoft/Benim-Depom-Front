@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
 type Notification = { id: number; title: string; body: string; notification_type: string; product_id: number | null; is_read: boolean; created_at: string };
@@ -23,7 +24,7 @@ export default function MessagesPage() {
     async function load() {
       setLoading(true); setError("");
       try {
-        const response = await fetch(`/api/v1/notifications/?page=${page}`, { headers: { Authorization: `Bearer ${token}` } });
+        const response = await authorizedFetch(`/api/v1/notifications/?page=${page}`);
         if (response.status === 401) return void window.location.replace("/login");
         if (!response.ok) throw new Error();
         const data = await response.json() as NotificationList;
@@ -36,14 +37,14 @@ export default function MessagesPage() {
   async function read(id: number) {
     const token = localStorage.getItem("benim_access_token");
     if (!token) return;
-    const response = await fetch(`/api/v1/notifications/${id}/read/`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const response = await authorizedFetch(`/api/v1/notifications/${id}/read/`, { method: "POST" });
     if (response.ok) setMessages((items) => items.map((item) => item.id === id ? { ...item, is_read: true } : item));
   }
 
   async function readAll() {
     const token = localStorage.getItem("benim_access_token");
     if (!token) return;
-    const response = await fetch("/api/v1/notifications/read-all/", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const response = await authorizedFetch("/api/v1/notifications/read-all/", { method: "POST" });
     if (response.ok) setMessages((items) => items.map((item) => ({ ...item, is_read: true })));
   }
 

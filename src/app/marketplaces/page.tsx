@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
 type Marketplace = "hood" | "otto" | "kaufland";
@@ -51,8 +52,8 @@ export default function MarketplacesPage() {
 
       try {
         const [publicationResponse, productResponse] = await Promise.all([
-          fetch(`/api/v1/orchestrator/publications/?${publicationParams}`, { headers: { Authorization: `Bearer ${access}` } }),
-          fetch("/api/v1/manager/products/?status=approved&page=1", { headers: { Authorization: `Bearer ${access}` } }),
+          authorizedFetch(`/api/v1/orchestrator/publications/?${publicationParams}`),
+          authorizedFetch("/api/v1/manager/products/?status=approved&page=1"),
         ]);
         if (publicationResponse.status === 401 || productResponse.status === 401) {
           window.localStorage.removeItem("benim_access_token");
@@ -87,9 +88,9 @@ export default function MarketplacesPage() {
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/v1/orchestrator/products/${selectedProductId}/publish/`, {
+      const response = await authorizedFetch(`/api/v1/orchestrator/products/${selectedProductId}/publish/`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({ targets: targets.filter((target) => selectedTargets.includes(targetKey(target))) }),
       });
       if (response.status === 401) {
