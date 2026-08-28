@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
+import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
 
 type Seller = {
@@ -115,7 +116,7 @@ export default function SellersPage() {
               <div className="seller-name"><span>{fullName(seller).slice(0, 1).toUpperCase()}</span><div><h2>{fullName(seller)}</h2><small>@{seller.username}</small></div></div>
               <div className="seller-contact"><strong>{seller.email || "No email"}</strong><small>{seller.phone || "No phone"}</small></div>
               <span className={`verification ${seller.is_email_verified ? "verified" : "unverified"}`}>{seller.is_email_verified ? "Verified" : "Unverified"}</span>
-              <time dateTime={seller.date_joined}>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(seller.date_joined))}</time>
+              <time dateTime={seller.date_joined}>{formatDate(seller.date_joined)}</time>
             </article>)}
           </div>}
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
+import { formatDate } from "@/lib/date";
 
 type Notification = { id: number; title: string; body: string; notification_type: string; product_id: number | null; is_read: boolean; created_at: string };
 type NotificationList = { next: string | null; previous: string | null; results: Notification[] };
@@ -53,7 +54,7 @@ export default function MessagesPage() {
     <section className="messages-panel"><div className="messages-toolbar"><button className={!unreadOnly ? "active" : ""} onClick={() => setUnreadOnly(false)}>All</button><button className={unreadOnly ? "active" : ""} onClick={() => setUnreadOnly(true)}>Unread {unread ? `(${unread})` : ""}</button></div>
       {loading && <p className="products-message">Loading messages...</p>}{error && <p className="products-message error">{error}</p>}
       {!loading && !error && !visible.length && <p className="products-message">No {unreadOnly ? "unread " : ""}messages.</p>}
-      {!loading && !error && visible.map((message) => <article className={`message-row ${message.is_read ? "read" : "unread"}`} key={message.id}><button className="message-content" onClick={() => !message.is_read && void read(message.id)}><span className="message-dot" /><span><strong>{message.title || message.notification_type.replaceAll("_", " ")}</strong><small>{message.body || "No details provided."}</small>{message.product_id && <em>Product #{message.product_id}</em>}</span></button><time>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(message.created_at))}</time></article>)}
+      {!loading && !error && visible.map((message) => <article className={`message-row ${message.is_read ? "read" : "unread"}`} key={message.id}><button className="message-content" onClick={() => !message.is_read && void read(message.id)}><span className="message-dot" /><span><strong>{message.title || message.notification_type.replaceAll("_", " ")}</strong><small>{message.body || "No details provided."}</small>{message.product_id && <em>Product #{message.product_id}</em>}</span></button><time>{formatDate(message.created_at, true)}</time></article>)}
       <footer className="pagination"><button disabled={!previous || loading} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page}</span><button disabled={!next || loading} onClick={() => setPage((value) => value + 1)}>Next</button></footer>
     </section></section></main>;
 }
