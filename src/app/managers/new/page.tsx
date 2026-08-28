@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
+import { authorizedFetch } from "@/lib/api";
 
 type FormValues = {
   username: string;
@@ -61,10 +62,9 @@ export default function CreateManagerPage() {
     );
 
     try {
-      const response = await fetch("/api/v1/manager/users/", {
+      const response = await authorizedFetch("/api/v1/manager/users/", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${access}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
