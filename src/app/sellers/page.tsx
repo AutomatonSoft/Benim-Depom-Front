@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
+import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
 
 type Seller = {
@@ -88,18 +90,7 @@ export default function SellersPage() {
   }
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <Link className="brand" href="/">Benim<span>Depom</span></Link>
-        <nav aria-label="Main navigation">
-          <Link className="nav-item" href="/"><span className="icon">⌂</span> Overview</Link>
-          <Link className="nav-item" href="/products"><span className="icon">▣</span> Products</Link>
-          <Link className="nav-item active" href="/sellers"><span className="icon">♙</span> Sellers</Link>
-          <Link className="nav-item" href="/messages"><span className="icon">✉</span> Messages</Link>
-          <a className="nav-item" href="#marketplaces"><span className="icon">◫</span> Marketplaces</a>
-        </nav>
-        <div className="sidebar-bottom"><a className="nav-item" href="#settings"><span className="icon">⚙</span> Settings</a></div>
-      </aside>
+    <main className="app-shell"><Sidebar active="sellers" />
 
       <section className="content products-page">
         <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="back-link" href="/">← Overview</Link></header>
@@ -125,7 +116,7 @@ export default function SellersPage() {
               <div className="seller-name"><span>{fullName(seller).slice(0, 1).toUpperCase()}</span><div><h2>{fullName(seller)}</h2><small>@{seller.username}</small></div></div>
               <div className="seller-contact"><strong>{seller.email || "No email"}</strong><small>{seller.phone || "No phone"}</small></div>
               <span className={`verification ${seller.is_email_verified ? "verified" : "unverified"}`}>{seller.is_email_verified ? "Verified" : "Unverified"}</span>
-              <time dateTime={seller.date_joined}>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(seller.date_joined))}</time>
+              <time dateTime={seller.date_joined}>{formatDate(seller.date_joined)}</time>
             </article>)}
           </div>}
 
