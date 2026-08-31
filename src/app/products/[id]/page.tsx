@@ -56,7 +56,22 @@ type FormState = {
   variants: Variant[];
 };
 
-type Generation = { id: string; status: string; result: Record<string, unknown>; error: Record<string, unknown> };
+type GenerationContent = { title?: string; description?: string; bullet_points?: string[] };
+
+type Generation = {
+  id: string;
+  status: string;
+  result: { universal?: { model?: string; content?: GenerationContent } } | null;
+  error: { code?: string; detail?: string } | null;
+};
+
+type GalleryItem = { key: string; url: string; label: string };
+
+const generatedModeLabels: Record<string, string> = {
+  white: "White background",
+  interior: "Interior",
+  human: "Human",
+};
 
 const statusLabels: Record<string, string> = {
   draft: "Draft", submitted: "Awaiting review", under_review: "Under review",
@@ -129,6 +144,7 @@ export default function ProductWorkspacePage() {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [rejectComment, setRejectComment] = useState("");
+  const [selectedImageKey, setSelectedImageKey] = useState<string | null>(null);
 
   const canModerate = product?.status === "submitted" || product?.status === "under_review";
   const totalQuantity = useMemo(
@@ -141,6 +157,28 @@ export default function ProductWorkspacePage() {
   );
   const activeImageGenerationStatus = product?.images.find((image) => isImageGenerationInProgress(image.processing_status))?.processing_status;
   const descriptionGenerationInProgress = isGenerationInProgress(generation?.status);
+  const generationContent = generation?.status === "succeeded" ? generation.result?.universal?.content : undefined;
+
+  const galleryItems = useMemo<GalleryItem[]>(() => {
+    if (!product) return [];
+    const items: GalleryItem[] = [];
+    for (const image of product.images) {
+      items.push({ key: `source-${image.id}`, url: image.image, label: image.is_primary ? "Primary image" : "Source image" });
+      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: "Processed image" });
+      for (const generated of image.generated_images) {
+        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}` });
+      }
+    }
+    return items;
+  }, [product]);
+  const selectedImageIndex = Math.max(0, galleryItems.findIndex((item) => item.key === selectedImageKey));
+  const selectedGalleryItem: GalleryItem | undefined = galleryItems[selectedImageIndex];
+
+  function stepGallery(offset: number) {
+    if (galleryItems.length < 2) return;
+    const nextIndex = (selectedImageIndex + offset + galleryItems.length) % galleryItems.length;
+    setSelectedImageKey(galleryItems[nextIndex].key);
+  }
 
   async function loadProduct(options?: { silent?: boolean }) {
     if (!Number.isInteger(productId) || productId < 1) return;
@@ -198,7 +236,8 @@ export default function ProductWorkspacePage() {
         }
         const data = await response.json() as Generation;
         setGeneration(data);
-        if (!isGenerationInProgress(data.status)) window.localStorage.removeItem(generationStorageKey(productId));
+        // Keep succeeded generations saved so the draft stays visible after reloads.
+        if (data.status === "failed") window.localStorage.removeItem(generationStorageKey(productId));
       } catch {
         // The task itself continues on the server; the next poll or page visit retries this request.
       }
@@ -301,10 +340,10 @@ export default function ProductWorkspacePage() {
       if (!response.ok) throw new Error(data.detail || "Unable to check generation status.");
       const updatedGeneration = data as Generation;
       setGeneration(updatedGeneration);
-      if (!isGenerationInProgress(updatedGeneration.status)) {
+      if (updatedGeneration.status === "failed") {
         window.localStorage.removeItem(generationStorageKey(productId));
       }
-      if (data.status === "succeeded") setFeedback("AI draft is ready. Open Marketplaces to review and apply it to listings.");
+      if (data.status === "succeeded") setFeedback("AI draft is ready. Review it below or open Marketplaces to apply it to listings.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to check generation status."); }
     finally { setGenerating(false); }
   }
@@ -332,7 +371,66 @@ export default function ProductWorkspacePage() {
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
     <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>EAN JV / XL</span><strong>{product.ean_jv || "—"} / {product.ean_xl || "—"}</strong></article><article><span>OTTO category</span><strong>{product.otto_category_name || "Not selected"}</strong></article></section>
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
+    <section className="workspace-card image-gallery-card">
+      <div className="image-gallery-heading">
+        <div>
+          <p className="eyebrow">Images</p>
+          <h2>Images & generation</h2>
+          <p>Source and AI-generated images live here. Click a thumbnail to preview it, browse with the arrows, or open the full-size file in a new tab.</p>
+        </div>
+        <label className="upload-image-button">Add image<input accept="image/jpeg,image/png,image/webp" disabled={saving} type="file" onChange={(event) => void uploadImage(event)} /></label>
+      </div>
+      <div className="image-gallery-layout">
+        <div className="image-gallery-viewer">
+          <div className="image-gallery-stage">
+            {selectedGalleryItem ? <>
+              <img src={selectedGalleryItem.url} alt={selectedGalleryItem.label} />
+              {galleryItems.length > 1 && <>
+                <button type="button" className="image-gallery-nav prev" aria-label="Previous image" onClick={() => stepGallery(-1)}>‹</button>
+                <button type="button" className="image-gallery-nav next" aria-label="Next image" onClick={() => stepGallery(1)}>›</button>
+              </>}
+            </> : <p className="image-gallery-empty">No images yet. Upload the first image to start.</p>}
+          </div>
+          {selectedGalleryItem && <div className="image-gallery-meta">
+            <strong>{selectedGalleryItem.label}</strong>
+            <span>{selectedImageIndex + 1} / {galleryItems.length}</span>
+            <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">Open in new tab ↗</a>
+          </div>}
+          {galleryItems.length > 1 && <div className="image-gallery-thumbs">
+            {galleryItems.map((item, index) => <button key={item.key} type="button" className={index === selectedImageIndex ? "is-active" : ""} title={item.label} onClick={() => setSelectedImageKey(item.key)}><img src={item.url} alt={item.label} /></button>)}
+          </div>}
+        </div>
+        <div className="image-workspace-list">
+          {product.images.length === 0 && <p>No source images uploaded yet.</p>}
+          {product.images.map((image) => <article key={image.id}>
+            <img src={image.image} alt="Product" onClick={() => setSelectedImageKey(`source-${image.id}`)} />
+            <div>
+              <strong>{image.is_primary ? "Primary image" : "Source image"}</strong>
+              <small>{image.processing_status.replaceAll("_", " ")}</small>
+              {image.processing_error && <small className="image-error">{image.processing_error}</small>}
+              {image.generated_images.length > 0 && <div className="generated-thumbs">
+                {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /></button>)}
+              </div>}
+              <button disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image.processing_status) ? "Generating..." : image.generated_images.length ? "Generate again" : "Generate image"}</button>
+            </div>
+          </article>)}
+        </div>
+      </div>
+    </section>
     <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">Product data</p><h2>Edit product</h2><p>Changes are saved locally. Published listings are updated separately from Marketplaces.</p></div><label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Product type<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-two-columns"><label>Unit price<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label></div><h3>Variants · {totalQuantity} pcs total</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>Colour<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>Materials<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Length cm<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>Width cm<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>Height cm<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>Quantity<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save changes"}</button></form>
-      <aside className="workspace-side"><section className="workspace-card"><p className="eyebrow">Images</p><h2>Images & generation</h2><p>Managers can add source images at any product stage, including after publication.</p><label className="upload-image-button">Add image<input accept="image/jpeg,image/png,image/webp" disabled={saving} type="file" onChange={(event) => void uploadImage(event)} /></label><div className="image-workspace-list">{product.images.map((image) => <article key={image.id}><img src={image.processed_image || image.image} alt="Product" /><div><strong>{image.is_primary ? "Primary image" : "Source image"}</strong><small>{image.processing_status.replaceAll("_", " ")}</small>{image.processing_error && <small className="image-error">{image.processing_error}</small>}<button disabled={saving || image.processing_status === "processing"} onClick={() => void generateImage(image.id)}>{image.processing_status === "processing" ? "Generating..." : "Generate image"}</button></div></article>)}</div></section><section className="workspace-card"><p className="eyebrow">AI content</p><h2>Descriptions for marketplaces</h2><p>Generates a reviewable draft for OTTO, Hood and Kaufland. It never overwrites listing text automatically.</p><button className="ai-button" disabled={generating} onClick={() => void generateDescription()}>{generating ? "Starting..." : "Generate description"}</button>{generation && <div className="generation-status"><strong>Generation: {generation.status}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>Refresh status</button>{generation.status === "succeeded" && <Link href="/marketplaces">Review in Marketplaces →</Link>}</div>}</section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/marketplaces">Open Marketplaces</Link></section></aside></div>
+      <aside className="workspace-side"><section className="workspace-card">
+        <p className="eyebrow">AI content</p>
+        <h2>Descriptions for marketplaces</h2>
+        <p>Generates a reviewable draft for OTTO, Hood and Kaufland. It never overwrites listing text automatically.</p>
+        <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? "Starting..." : descriptionGenerationInProgress ? "Generating..." : "Generate description"}</button>
+        {generation && <div className="generation-status"><strong>Generation: {generation.status.replaceAll("_", " ")}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>Refresh status</button>{generation.status === "succeeded" && <Link href="/marketplaces">Review in Marketplaces →</Link>}</div>}
+        {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || "Generation failed. Try again."}</p>}
+        {generationContent && <div className="ai-draft">
+          <span className="ai-draft-heading">AI draft (German)</span>
+          <div className="ai-draft-field"><span>Title</span><div>{generationContent.title}</div></div>
+          <div className="ai-draft-field"><span>Description</span><div>{generationContent.description}</div></div>
+          {generationContent.bullet_points && generationContent.bullet_points.length > 0 && <div className="ai-draft-field"><span>Bullet points</span><ul>{generationContent.bullet_points.map((point, index) => <li key={index}>{point}</li>)}</ul></div>}
+        </div>}
+      </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/marketplaces">Open Marketplaces</Link></section></aside></div>
   </section></main>;
 }
