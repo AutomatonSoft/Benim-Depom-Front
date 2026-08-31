@@ -65,7 +65,9 @@ type Generation = {
   error: { code?: string; detail?: string } | null;
 };
 
-type GalleryItem = { key: string; url: string; label: string };
+type GalleryItem = { key: string; url: string; label: string; generated: boolean };
+
+type DraftForm = { title: string; description: string; bullets: string };
 
 const generatedModeLabels: Record<string, string> = {
   white: "White background",
@@ -145,6 +147,9 @@ export default function ProductWorkspacePage() {
   const [error, setError] = useState("");
   const [rejectComment, setRejectComment] = useState("");
   const [selectedImageKey, setSelectedImageKey] = useState<string | null>(null);
+  const [draftForm, setDraftForm] = useState<DraftForm | null>(null);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [draftSaving, setDraftSaving] = useState(false);
 
   const canModerate = product?.status === "submitted" || product?.status === "under_review";
   const totalQuantity = useMemo(
@@ -163,10 +168,10 @@ export default function ProductWorkspacePage() {
     if (!product) return [];
     const items: GalleryItem[] = [];
     for (const image of product.images) {
-      items.push({ key: `source-${image.id}`, url: image.image, label: image.is_primary ? "Primary image" : "Source image" });
-      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: "Processed image" });
+      items.push({ key: `source-${image.id}`, url: image.image, label: image.is_primary ? "Primary image" : "Source image", generated: false });
+      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: "Processed image", generated: true });
       for (const generated of image.generated_images) {
-        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}` });
+        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`, generated: true });
       }
     }
     return items;
@@ -178,6 +183,52 @@ export default function ProductWorkspacePage() {
     if (galleryItems.length < 2) return;
     const nextIndex = (selectedImageIndex + offset + galleryItems.length) % galleryItems.length;
     setSelectedImageKey(galleryItems[nextIndex].key);
+  }
+
+  // Sync the editable draft with the latest generation result during render,
+  // per https://react.dev/learn/you-might-not-need-an-effect
+  const [syncedContent, setSyncedContent] = useState<GenerationContent | undefined>(undefined);
+  if (generationContent !== syncedContent) {
+    setSyncedContent(generationContent);
+    if (!generationContent) {
+      setDraftForm(null);
+    } else if (!draftDirty) {
+      setDraftForm({
+        title: generationContent.title ?? "",
+        description: generationContent.description ?? "",
+        bullets: (generationContent.bullet_points ?? []).join("\n"),
+      });
+    }
+  }
+
+  function updateDraft(field: keyof DraftForm, value: string) {
+    setDraftDirty(true);
+    setDraftForm((current) => current && { ...current, [field]: value });
+  }
+
+  async function saveDraft(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!generation || !draftForm) return;
+    setDraftSaving(true); setError(""); setFeedback("");
+    try {
+      const payload = {
+        title: draftForm.title.trim(),
+        description: draftForm.description.trim(),
+        bullet_points: draftForm.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
+      };
+      const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${generation.id}/`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const fieldErrors = [data.title, data.description, data.bullet_points].flat().filter(Boolean).join(" ");
+        throw new Error(data.detail || fieldErrors || "Draft could not be saved.");
+      }
+      setGeneration(data as Generation);
+      setDraftDirty(false);
+      setFeedback("AI draft saved. Applying it from Marketplaces will use your edited text.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Draft could not be saved."); }
+    finally { setDraftSaving(false); }
   }
 
   async function loadProduct(options?: { silent?: boolean }) {
@@ -301,6 +352,20 @@ export default function ProductWorkspacePage() {
     finally { setSaving(false); event.target.value = ""; }
   }
 
+  async function deleteImage(imageId: number) {
+    if (!window.confirm("Delete this image together with all its AI-generated variants?")) return;
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/products/${productId}/images/${imageId}/`, { method: "DELETE" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Image could not be deleted.");
+      }
+      setFeedback("Image deleted."); await loadProduct({ silent: true });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Image could not be deleted."); }
+    finally { setSaving(false); }
+  }
+
   async function generateImage(imageId: number) {
     const image = product?.images.find((item) => item.id === imageId);
     if (isImageGenerationInProgress(image?.processing_status)) return;
@@ -385,6 +450,7 @@ export default function ProductWorkspacePage() {
           <div className="image-gallery-stage">
             {selectedGalleryItem ? <>
               <img src={selectedGalleryItem.url} alt={selectedGalleryItem.label} />
+              {selectedGalleryItem.generated && <span className="ai-badge">AI generated</span>}
               {galleryItems.length > 1 && <>
                 <button type="button" className="image-gallery-nav prev" aria-label="Previous image" onClick={() => stepGallery(-1)}>‹</button>
                 <button type="button" className="image-gallery-nav next" aria-label="Next image" onClick={() => stepGallery(1)}>›</button>
@@ -397,7 +463,7 @@ export default function ProductWorkspacePage() {
             <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">Open in new tab ↗</a>
           </div>}
           {galleryItems.length > 1 && <div className="image-gallery-thumbs">
-            {galleryItems.map((item, index) => <button key={item.key} type="button" className={index === selectedImageIndex ? "is-active" : ""} title={item.label} onClick={() => setSelectedImageKey(item.key)}><img src={item.url} alt={item.label} /></button>)}
+            {galleryItems.map((item, index) => <button key={item.key} type="button" className={index === selectedImageIndex ? "is-active" : ""} title={item.label} onClick={() => setSelectedImageKey(item.key)}><img src={item.url} alt={item.label} />{item.generated && <span className="ai-badge">AI</span>}</button>)}
           </div>}
         </div>
         <div className="image-workspace-list">
@@ -409,9 +475,12 @@ export default function ProductWorkspacePage() {
               <small>{image.processing_status.replaceAll("_", " ")}</small>
               {image.processing_error && <small className="image-error">{image.processing_error}</small>}
               {image.generated_images.length > 0 && <div className="generated-thumbs">
-                {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /></button>)}
+                {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
               </div>}
-              <button disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image.processing_status) ? "Generating..." : image.generated_images.length ? "Generate again" : "Generate image"}</button>
+              <div className="image-row-actions">
+                <button disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image.processing_status) ? "Generating..." : image.generated_images.length ? "Generate again" : "Generate image"}</button>
+                <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void deleteImage(image.id)}>Delete</button>
+              </div>
             </div>
           </article>)}
         </div>
@@ -425,12 +494,14 @@ export default function ProductWorkspacePage() {
         <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? "Starting..." : descriptionGenerationInProgress ? "Generating..." : "Generate description"}</button>
         {generation && <div className="generation-status"><strong>Generation: {generation.status.replaceAll("_", " ")}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>Refresh status</button>{generation.status === "succeeded" && <Link href="/marketplaces">Review in Marketplaces →</Link>}</div>}
         {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || "Generation failed. Try again."}</p>}
-        {generationContent && <div className="ai-draft">
-          <span className="ai-draft-heading">AI draft (German)</span>
-          <div className="ai-draft-field"><span>Title</span><div>{generationContent.title}</div></div>
-          <div className="ai-draft-field"><span>Description</span><div>{generationContent.description}</div></div>
-          {generationContent.bullet_points && generationContent.bullet_points.length > 0 && <div className="ai-draft-field"><span>Bullet points</span><ul>{generationContent.bullet_points.map((point, index) => <li key={index}>{point}</li>)}</ul></div>}
-        </div>}
+        {generationContent && draftForm && <form className="ai-draft" onSubmit={saveDraft}>
+          <span className="ai-draft-heading">AI draft (German) · editable</span>
+          <label className="ai-draft-field"><span>Title</span><input required maxLength={100} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
+          <label className="ai-draft-field"><span>Description</span><textarea required rows={9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} /></label>
+          <label className="ai-draft-field"><span>Bullet points · one per line</span><textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} /></label>
+          <small className="ai-draft-hint">Title up to 100 characters. Description: two or three paragraphs separated by an empty line. Bullet points: three to five.</small>
+          <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? "Saving..." : draftDirty ? "Save draft" : "Draft saved"}</button>
+        </form>}
       </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/marketplaces">Open Marketplaces</Link></section></aside></div>
   </section></main>;
 }
