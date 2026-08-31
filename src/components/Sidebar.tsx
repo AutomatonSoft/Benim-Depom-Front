@@ -14,11 +14,11 @@ type ActivePage =
 type IconName = ActivePage;
 
 const links: { id: Exclude<ActivePage, "settings">; href: string; label: string }[] = [
-  { id: "overview", href: "/", label: "Overview" },
-  { id: "products", href: "/products", label: "Products" },
-  { id: "sellers", href: "/sellers", label: "Sellers" },
-  { id: "messages", href: "/messages", label: "Messages" },
-  { id: "eans", href: "/eans", label: "EAN" },
+  { id: "overview", href: "/manager", label: "Overview" },
+  { id: "products", href: "/manager/products", label: "Products" },
+  { id: "sellers", href: "/manager/sellers", label: "Sellers" },
+  { id: "messages", href: "/manager/messages", label: "Messages" },
+  { id: "eans", href: "/manager/eans", label: "EAN" },
 ];
 
 function SidebarIcon({ name }: { name: IconName }) {
@@ -38,7 +38,7 @@ function SidebarIcon({ name }: { name: IconName }) {
 export default function Sidebar({ active }: { active: ActivePage }) {
   return (
     <aside className="sidebar">
-      <Link className="brand" href="/">Benim<span>Depom</span></Link>
+      <Link className="brand" href="/manager">Benim<span>Depom</span></Link>
       <nav aria-label="Main navigation">
         {links.map((link) => (
           <Link className={`nav-item ${active === link.id ? "active" : ""}`} href={link.href} key={link.id}>
@@ -46,10 +46,10 @@ export default function Sidebar({ active }: { active: ActivePage }) {
             {link.label}
           </Link>
         ))}
-        <Link className={`nav-item ${active === "marketplaces" ? "active" : ""}`} href="/marketplaces"><SidebarIcon name="marketplaces" />Marketplaces</Link>
+        <Link className={`nav-item ${active === "marketplaces" ? "active" : ""}`} href="/manager/marketplaces"><SidebarIcon name="marketplaces" />Marketplaces</Link>
       </nav>
       <div className="sidebar-bottom">
-        <Link className={`nav-item ${active === "settings" ? "active" : ""}`} href="/settings"><SidebarIcon name="settings" />Settings</Link>
+        <Link className={`nav-item ${active === "settings" ? "active" : ""}`} href="/manager/settings"><SidebarIcon name="settings" />Settings</Link>
         <div className="profile"><span>AK</span><div><strong>Alikhan</strong><small>Manager</small></div></div>
       </div>
     </aside>

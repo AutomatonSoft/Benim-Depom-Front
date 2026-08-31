@@ -54,7 +54,7 @@ export default function ProductsPage() {
   useEffect(() => {
     const access = window.localStorage.getItem("benim_access_token");
     if (!access) {
-      window.location.replace("/login");
+      window.location.replace("/manager/login");
       return;
     }
 
@@ -72,7 +72,7 @@ export default function ProductsPage() {
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
           window.localStorage.removeItem("benim_refresh_token");
-          window.location.replace("/login");
+          window.location.replace("/manager/login");
           return;
         }
 
@@ -110,7 +110,7 @@ export default function ProductsPage() {
     <main className="app-shell">
       <Sidebar active="products" />
       <section className="content products-page">
-        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Products</h1><p className="products-subtitle">{count} products in your workspace</p></div><Link className="back-link" href="/">← Overview</Link></header>
+        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Products</h1><p className="products-subtitle">{count} products in your workspace</p></div><Link className="back-link" href="/manager">← Overview</Link></header>
 
         <section className="products-panel">
           <form className="products-toolbar" onSubmit={applySearch}>
@@ -130,7 +130,7 @@ export default function ProductsPage() {
             <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Price</span><span>Created</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
-              return <Link className="manager-product" href={`/products/${product.id}`} key={product.id}>
+              return <Link className="manager-product" href={`/manager/products/${product.id}`} key={product.id}>
                 <div className="manager-product-name">
                   <div className="manager-product-image">{primaryImage ? <img src={primaryImage.image} alt="" /> : <span>▣</span>}</div>
                   <div><p>{product.product_type}</p><h2>{product.title}</h2><small>#{product.id}</small></div>

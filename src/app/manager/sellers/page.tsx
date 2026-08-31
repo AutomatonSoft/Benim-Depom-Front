@@ -43,7 +43,7 @@ export default function SellersPage() {
   useEffect(() => {
     const access = window.localStorage.getItem("benim_access_token");
     if (!access) {
-      window.location.replace("/login");
+      window.location.replace("/manager/login");
       return;
     }
 
@@ -61,7 +61,7 @@ export default function SellersPage() {
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
           window.localStorage.removeItem("benim_refresh_token");
-          window.location.replace("/login");
+          window.location.replace("/manager/login");
           return;
         }
 
@@ -92,7 +92,7 @@ export default function SellersPage() {
     <main className="app-shell"><Sidebar active="sellers" />
 
       <section className="content products-page">
-        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="primary-link" href="/managers/new">+ Create manager</Link></header>
+        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="primary-link" href="/manager/managers/new">+ Create manager</Link></header>
 
         <section className="products-panel">
           <form className="products-toolbar" onSubmit={applySearch}>

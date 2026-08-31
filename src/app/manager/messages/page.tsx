@@ -22,12 +22,12 @@ export default function MessagesPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("benim_access_token");
-    if (!token) return void window.location.replace("/login");
+    if (!token) return void window.location.replace("/manager/login");
     async function load() {
       setLoading(true); setError("");
       try {
         const response = await authorizedFetch(`/api/v1/notifications/?page=${page}`);
-        if (response.status === 401) return void window.location.replace("/login");
+        if (response.status === 401) return void window.location.replace("/manager/login");
         if (!response.ok) throw new Error();
         const data = await response.json() as NotificationList;
         setMessages(data.results); setNext(Boolean(data.next)); setPrevious(Boolean(data.previous));
@@ -43,7 +43,7 @@ export default function MessagesPage() {
       const response = await authorizedFetch(`/api/v1/notifications/${message.id}/read/`, { method: "POST" });
       if (response.ok) setMessages((items) => items.map((item) => item.id === message.id ? { ...item, is_read: true } : item));
     }
-    if (message.product_id) router.push(`/products/${message.product_id}`);
+    if (message.product_id) router.push(`/manager/products/${message.product_id}`);
   }
 
   async function readAll() {

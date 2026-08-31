@@ -35,13 +35,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("benim_access_token");
-    if (!token) return void window.location.replace("/login");
+    if (!token) return void window.location.replace("/manager/login");
 
     async function loadProfile() {
       setTimezone(localStorage.getItem(TIMEZONE_STORAGE_KEY) || "UTC");
       try {
         const response = await authorizedFetch("/api/v1/auth/me/");
-        if (response.status === 401) return void window.location.replace("/login");
+        if (response.status === 401) return void window.location.replace("/manager/login");
         if (!response.ok) throw new Error();
         setProfile((await response.json()) as Profile);
       } catch {
@@ -64,7 +64,7 @@ export default function SettingsPage() {
 
     const form = new FormData(event.currentTarget);
     const token = localStorage.getItem("benim_access_token");
-    if (!token) return void window.location.replace("/login");
+    if (!token) return void window.location.replace("/manager/login");
 
     setSubmitting(true);
     try {
@@ -81,7 +81,7 @@ export default function SettingsPage() {
       if (response.status === 401) {
         localStorage.removeItem("benim_access_token");
         localStorage.removeItem("benim_refresh_token");
-        window.location.replace("/login");
+        window.location.replace("/manager/login");
         return;
       }
 
@@ -94,7 +94,7 @@ export default function SettingsPage() {
       setPasswordSuccess("Password changed. Please sign in again.");
       localStorage.removeItem("benim_access_token");
       localStorage.removeItem("benim_refresh_token");
-      window.setTimeout(() => window.location.replace("/login"), 1000);
+      window.setTimeout(() => window.location.replace("/manager/login"), 1000);
     } catch {
       setPasswordError("Unable to reach the API. Please try again.");
     } finally {
