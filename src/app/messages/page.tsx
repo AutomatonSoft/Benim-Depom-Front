@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
@@ -10,6 +11,7 @@ type Notification = { id: number; title: string; body: string; notification_type
 type NotificationList = { next: string | null; previous: string | null; results: Notification[] };
 
 export default function MessagesPage() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Notification[]>([]);
   const [page, setPage] = useState(1);
   const [next, setNext] = useState(false);
@@ -34,11 +36,14 @@ export default function MessagesPage() {
     void load();
   }, [page]);
 
-  async function read(id: number) {
+  async function openMessage(message: Notification) {
     const token = localStorage.getItem("benim_access_token");
     if (!token) return;
-    const response = await authorizedFetch(`/api/v1/notifications/${id}/read/`, { method: "POST" });
-    if (response.ok) setMessages((items) => items.map((item) => item.id === id ? { ...item, is_read: true } : item));
+    if (!message.is_read) {
+      const response = await authorizedFetch(`/api/v1/notifications/${message.id}/read/`, { method: "POST" });
+      if (response.ok) setMessages((items) => items.map((item) => item.id === message.id ? { ...item, is_read: true } : item));
+    }
+    if (message.product_id) router.push(`/products/${message.product_id}`);
   }
 
   async function readAll() {
@@ -55,7 +60,7 @@ export default function MessagesPage() {
     <section className="messages-panel"><div className="messages-toolbar"><button className={!unreadOnly ? "active" : ""} onClick={() => setUnreadOnly(false)}>All</button><button className={unreadOnly ? "active" : ""} onClick={() => setUnreadOnly(true)}>Unread {unread ? `(${unread})` : ""}</button></div>
       {loading && <p className="products-message">Loading messages...</p>}{error && <p className="products-message error">{error}</p>}
       {!loading && !error && !visible.length && <p className="products-message">No {unreadOnly ? "unread " : ""}messages.</p>}
-      {!loading && !error && visible.map((message) => <article className={`message-row ${message.is_read ? "read" : "unread"}`} key={message.id}><button className="message-content" onClick={() => !message.is_read && void read(message.id)}><span className="message-dot" /><span><strong>{message.title || message.notification_type.replaceAll("_", " ")}</strong><small>{message.body || "No details provided."}</small>{message.product_id && <em>Product #{message.product_id}</em>}</span></button><time>{formatDate(message.created_at, true)}</time></article>)}
+      {!loading && !error && visible.map((message) => <article className={`message-row ${message.is_read ? "read" : "unread"}`} key={message.id}><button className="message-content" onClick={() => void openMessage(message)}><span className="message-dot" /><span><strong>{message.title || message.notification_type.replaceAll("_", " ")}</strong><small>{message.body || "No details provided."}</small>{message.product_id && <em>Open product #{message.product_id}</em>}</span></button><time>{formatDate(message.created_at, true)}</time></article>)}
       <footer className="pagination"><button disabled={!previous || loading} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page}</span><button disabled={!next || loading} onClick={() => setPage((value) => value + 1)}>Next</button></footer>
     </section></section></main>;
 }
