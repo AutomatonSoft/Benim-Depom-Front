@@ -130,7 +130,7 @@ export default function ProductsPage() {
             <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Price</span><span>Created</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
-              return <article className="manager-product" key={product.id}>
+              return <Link className="manager-product" href={`/products/${product.id}`} key={product.id}>
                 <div className="manager-product-name">
                   <div className="manager-product-image">{primaryImage ? <img src={primaryImage.image} alt="" /> : <span>▣</span>}</div>
                   <div><p>{product.product_type}</p><h2>{product.title}</h2><small>#{product.id}</small></div>
@@ -139,7 +139,7 @@ export default function ProductsPage() {
                 <strong>{product.total_quantity} pcs</strong>
                 <strong>{formatPrice(product)}</strong>
                 <time dateTime={product.created_at}>{formatDate(product.created_at)}</time>
-              </article>;
+              </Link>;
             })}
           </div>}
 
