@@ -185,15 +185,21 @@ export default function ProductWorkspacePage() {
     setSelectedImageKey(galleryItems[nextIndex].key);
   }
 
-  useEffect(() => {
-    if (!generationContent) return void setDraftForm(null);
-    if (draftDirty) return;
-    setDraftForm({
-      title: generationContent.title ?? "",
-      description: generationContent.description ?? "",
-      bullets: (generationContent.bullet_points ?? []).join("\n"),
-    });
-  }, [generationContent, draftDirty]);
+  // Sync the editable draft with the latest generation result during render,
+  // per https://react.dev/learn/you-might-not-need-an-effect
+  const [syncedContent, setSyncedContent] = useState<GenerationContent | undefined>(undefined);
+  if (generationContent !== syncedContent) {
+    setSyncedContent(generationContent);
+    if (!generationContent) {
+      setDraftForm(null);
+    } else if (!draftDirty) {
+      setDraftForm({
+        title: generationContent.title ?? "",
+        description: generationContent.description ?? "",
+        bullets: (generationContent.bullet_points ?? []).join("\n"),
+      });
+    }
+  }
 
   function updateDraft(field: keyof DraftForm, value: string) {
     setDraftDirty(true);
