@@ -52,7 +52,7 @@ export default function LoginPage() {
 
       window.localStorage.setItem("benim_access_token", tokens.access);
       window.localStorage.setItem("benim_refresh_token", tokens.refresh);
-      window.location.replace("/");
+      window.location.replace("/manager");
     } catch {
       setError("Unable to reach the API. Please try again.");
     } finally {

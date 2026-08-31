@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Benim Depom | Manager",
-  description: "Benim Depom manager panel",
+  title: "Benim Depom | Türkiye'den Avrupa'ya Mobilya Satışı",
+  description:
+    "Benim Depom, Türkiye'deki mobilya üreticilerinin stoklarını mobil ürün girişi, AI görselleri, pazaryerleri ve lojistik desteği ile Avrupa pazarına sunmalarını kolaylaştırır.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

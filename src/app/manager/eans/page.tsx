@@ -15,11 +15,11 @@ export default function EansPage() {
   const [items, setItems] = useState<Ean[]>([]); const [summary, setSummary] = useState<Summary | null>(null); const [page, setPage] = useState(1); const [next, setNext] = useState(false); const [previous, setPrevious] = useState(false); const [account, setAccount] = useState(""); const [assigned, setAssigned] = useState(""); const [codes, setCodes] = useState(""); const [importAccount, setImportAccount] = useState("jv"); const [result, setResult] = useState<ImportResult | null>(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
-    const token = localStorage.getItem("benim_access_token"); if (!token) return void window.location.replace("/login");
+    const token = localStorage.getItem("benim_access_token"); if (!token) return void window.location.replace("/manager/login");
     const params = new URLSearchParams({ page: String(page) }); if (account) params.set("account", account); if (assigned) params.set("is_assigned", assigned);
     async function load() {
       setLoading(true); setError("");
-      try { const [listResponse, summaryResponse] = await Promise.all([authorizedFetch(`/api/v1/manager/eans/?${params}`), authorizedFetch("/api/v1/manager/eans/summary/")]); if (listResponse.status === 401 || summaryResponse.status === 401) return void window.location.replace("/login"); if (!listResponse.ok || !summaryResponse.ok) throw new Error(); const list = await listResponse.json() as EanList; setItems(list.results); setNext(Boolean(list.next)); setPrevious(Boolean(list.previous)); setSummary(await summaryResponse.json() as Summary); } catch { setError("Unable to load EAN data. Please try again."); } finally { setLoading(false); }
+      try { const [listResponse, summaryResponse] = await Promise.all([authorizedFetch(`/api/v1/manager/eans/?${params}`), authorizedFetch("/api/v1/manager/eans/summary/")]); if (listResponse.status === 401 || summaryResponse.status === 401) return void window.location.replace("/manager/login"); if (!listResponse.ok || !summaryResponse.ok) throw new Error(); const list = await listResponse.json() as EanList; setItems(list.results); setNext(Boolean(list.next)); setPrevious(Boolean(list.previous)); setSummary(await summaryResponse.json() as Summary); } catch { setError("Unable to load EAN data. Please try again."); } finally { setLoading(false); }
     }
     void load();
   }, [page, account, assigned, refresh]);

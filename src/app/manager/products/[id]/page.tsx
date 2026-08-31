@@ -239,7 +239,7 @@ export default function ProductWorkspacePage() {
     }
     try {
       const response = await authorizedFetch(`/api/v1/products/${productId}/`);
-      if (response.status === 401) return void router.replace("/login");
+      if (response.status === 401) return void router.replace("/manager/login");
       if (response.status === 404) throw new Error("Product was not found.");
       if (!response.ok) throw new Error("Unable to load product.");
       const data = await response.json() as Product;
@@ -253,12 +253,12 @@ export default function ProductWorkspacePage() {
   }
 
   useEffect(() => {
-    if (!localStorage.getItem("benim_access_token")) return void router.replace("/login");
+    if (!localStorage.getItem("benim_access_token")) return void router.replace("/manager/login");
 
     async function loadInitialProduct() {
       try {
         const response = await authorizedFetch(`/api/v1/products/${productId}/`);
-        if (response.status === 401) return void router.replace("/login");
+        if (response.status === 401) return void router.replace("/manager/login");
         if (response.status === 404) throw new Error("Product was not found.");
         if (!response.ok) throw new Error("Unable to load product.");
         const data = await response.json() as Product;
@@ -427,11 +427,11 @@ export default function ProductWorkspacePage() {
   }, [descriptionGenerationInProgress, imageGenerationInProgress, generation?.id]);
 
   if (loading) return <main className="app-shell"><Sidebar active="products" /><section className="content products-page"><p className="products-message">Loading product...</p></section></main>;
-  if (error && !product) return <main className="app-shell"><Sidebar active="products" /><section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/products">← Back to products</Link></section></main>;
+  if (error && !product) return <main className="app-shell"><Sidebar active="products" /><section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">← Back to products</Link></section></main>;
   if (!product || !form) return null;
 
   return <main className="app-shell"><Sidebar active="products" /><section className="content product-workspace">
-    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p></div><Link className="back-link" href="/products">← Products</Link></header>
+    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p></div><Link className="back-link" href="/manager/products">← Products</Link></header>
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
     <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>EAN JV / XL</span><strong>{product.ean_jv || "—"} / {product.ean_xl || "—"}</strong></article><article><span>OTTO category</span><strong>{product.otto_category_name || "Not selected"}</strong></article></section>
@@ -492,7 +492,7 @@ export default function ProductWorkspacePage() {
         <h2>Descriptions for marketplaces</h2>
         <p>Generates a reviewable draft for OTTO, Hood and Kaufland. It never overwrites listing text automatically.</p>
         <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? "Starting..." : descriptionGenerationInProgress ? "Generating..." : "Generate description"}</button>
-        {generation && <div className="generation-status"><strong>Generation: {generation.status.replaceAll("_", " ")}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>Refresh status</button>{generation.status === "succeeded" && <Link href="/marketplaces">Review in Marketplaces →</Link>}</div>}
+        {generation && <div className="generation-status"><strong>Generation: {generation.status.replaceAll("_", " ")}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>Refresh status</button>{generation.status === "succeeded" && <Link href="/manager/marketplaces">Review in Marketplaces →</Link>}</div>}
         {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || "Generation failed. Try again."}</p>}
         {generationContent && draftForm && <form className="ai-draft" onSubmit={saveDraft}>
           <span className="ai-draft-heading">AI draft (German) · editable</span>
@@ -502,6 +502,6 @@ export default function ProductWorkspacePage() {
           <small className="ai-draft-hint">Title up to 100 characters. Description: two or three paragraphs separated by an empty line. Bullet points: three to five.</small>
           <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? "Saving..." : draftDirty ? "Save draft" : "Draft saved"}</button>
         </form>}
-      </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/marketplaces">Open Marketplaces</Link></section></aside></div>
+      </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/manager/marketplaces">Open Marketplaces</Link></section></aside></div>
   </section></main>;
 }

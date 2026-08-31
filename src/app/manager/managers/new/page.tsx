@@ -52,7 +52,7 @@ export default function CreateManagerPage() {
 
     const access = window.localStorage.getItem("benim_access_token");
     if (!access) {
-      window.location.replace("/login");
+      window.location.replace("/manager/login");
       return;
     }
 
@@ -73,7 +73,7 @@ export default function CreateManagerPage() {
       if (response.status === 401) {
         window.localStorage.removeItem("benim_access_token");
         window.localStorage.removeItem("benim_refresh_token");
-        window.location.replace("/login");
+        window.location.replace("/manager/login");
         return;
       }
 
@@ -101,7 +101,7 @@ export default function CreateManagerPage() {
             <h1>Create manager</h1>
             <p className="products-subtitle">Create an account for a new member of the management team.</p>
           </div>
-          <Link className="back-link" href="/sellers">← Sellers</Link>
+          <Link className="back-link" href="/manager/sellers">← Sellers</Link>
         </header>
 
         <form className="manager-form" onSubmit={submit}>
