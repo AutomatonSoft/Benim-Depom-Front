@@ -50,7 +50,7 @@ export default function LandingPage() {
           </nav>
           <div className="header-right">
             <LangSwitch lang={lang} onChange={setLang} />
-            <a className="btn btn-primary" href={APP_DOWNLOAD_URL === "#download" ? "#download" : APP_DOWNLOAD_URL}>{t.nav.cta}</a>
+            <a className="btn btn-primary" href="#download">{t.nav.cta}</a>
             <a aria-label="WhatsApp" className="wa-nav-btn" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" /></a>
             <button aria-label="Menu" className="menu-toggle" onClick={() => setMenuOpen((open) => !open)} type="button">
               <Ic name={menuOpen ? "x" : "menu"} />
@@ -484,7 +484,7 @@ export default function LandingPage() {
                 <div className="dl-phone-icon"><Ic name="phone" /></div>
                 <h3>{t.download.cardTitle}</h3>
                 <p>{t.download.cardText}</p>
-                <a className="btn btn-primary" href={APP_DOWNLOAD_URL}><Ic name="download" />{t.download.btn}</a>
+                <a className="btn btn-primary" download href={APP_DOWNLOAD_URL}><Ic name="download" />{t.download.btn}</a>
                 <span className="dl-note">{t.download.note}</span>
               </div>
             </div>
