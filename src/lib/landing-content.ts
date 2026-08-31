@@ -169,9 +169,8 @@ export const CONTACT = {
   whatsappUrl: "https://wa.me/905464505530",
 };
 
-// APK link for the mobile app. Replace with the real download URL once the
-// mobile developer provides the build.
-export const APP_DOWNLOAD_URL = "#download";
+// APK file served as a static asset from public/downloads/.
+export const APP_DOWNLOAD_URL = "/downloads/benim-depom.apk";
 
 export const MARKETPLACES = ["OTTO", "Kaufland", "Hood.de"];
 
