@@ -43,6 +43,24 @@ async function refreshAccessTokenRequest() {
   return tokens.access;
 }
 
+export function apiErrorMessage(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
+  const record = data as Record<string, unknown>;
+  const detail = record.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail) && detail.length) return detail.map(String).join(" ");
+  for (const [field, value] of Object.entries(record)) {
+    if (field === "status_code") continue;
+    const text = Array.isArray(value)
+      ? value.map(String).join(" ")
+      : typeof value === "string"
+        ? value
+        : "";
+    if (text.trim()) return field === "non_field_errors" || field === "ean" ? text : `${field}: ${text}`;
+  }
+  return fallback;
+}
+
 export async function authorizedFetch(input: RequestInfo | URL, init: RequestInit = {}) {
   const request = (access: string) => {
     const headers = new Headers(init.headers);

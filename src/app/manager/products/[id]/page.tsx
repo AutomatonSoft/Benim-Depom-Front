@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 import Sidebar from "@/components/Sidebar";
-import { authorizedFetch } from "@/lib/api";
+import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
 type Variant = {
@@ -332,7 +332,7 @@ export default function ProductWorkspacePage() {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || "Changes could not be saved.");
+      if (!response.ok) throw new Error(apiErrorMessage(data, "Changes could not be saved."));
       setProduct(data as Product); setForm(toForm(data as Product)); setFeedback("Product changes saved. Update marketplace listings when you are ready to sync them.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Changes could not be saved."); }
     finally { setSaving(false); }
@@ -347,7 +347,7 @@ export default function ProductWorkspacePage() {
         body: JSON.stringify(action === "reject" ? { comment: rejectComment.trim() } : {}),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || `Product could not be ${action}d.`);
+      if (!response.ok) throw new Error(apiErrorMessage(data, `Product could not be ${action}d.`));
       setProduct(data as Product); setForm(toForm(data as Product)); setFeedback(action === "approve" ? "Product approved and EANs assigned." : "Product rejected. The seller will receive the reason.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Moderation action failed."); }
     finally { setSaving(false); }
@@ -382,6 +382,10 @@ export default function ProductWorkspacePage() {
   }
 
   async function generateImage(imageId: number) {
+    if (product?.status !== "approved") {
+      setError("Image generation is available after the product is approved.");
+      return;
+    }
     const image = product?.images.find((item) => item.id === imageId);
     if (isImageGenerationInProgress(image?.processing_status)) return;
     setSaving(true); setError(""); setFeedback("");
@@ -450,6 +454,7 @@ export default function ProductWorkspacePage() {
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
     <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
+    {product.currency !== "EUR" ? <p className="products-subtitle" role="note">{formatMoney(product.unit_price, product.currency)} converts to listing {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "— until exchange rates are loaded on the server"}.</p> : null}
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
     <section className="workspace-card image-gallery-card">
       <div className="image-gallery-heading">
@@ -487,13 +492,13 @@ export default function ProductWorkspacePage() {
             <img src={image.image} alt="Product" onClick={() => setSelectedImageKey(`source-${image.id}`)} />
             <div>
               <strong>{image.is_primary ? "Primary image" : "Source image"}</strong>
-              <small>{image.processing_status.replaceAll("_", " ")}</small>
+              <small>{image.processing_status === "idle" ? "Not generated" : image.processing_status.replaceAll("_", " ")}</small>
               {image.processing_error && <small className="image-error">{image.processing_error}</small>}
               {image.generated_images.length > 0 && <div className="generated-thumbs">
                 {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
               </div>}
               <div className="image-row-actions">
-                <button disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image.processing_status) ? "Generating..." : image.generated_images.length ? "Generate again" : "Generate image"}</button>
+                <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image.processing_status)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image.processing_status) ? "Generating..." : product.status !== "approved" ? "Generate after approve" : image.generated_images.length ? "Generate again" : "Generate image"}</button>
                 <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void deleteImage(image.id)}>Delete</button>
               </div>
             </div>
