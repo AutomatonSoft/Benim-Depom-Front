@@ -58,7 +58,9 @@ export default function CreateManagerPage() {
 
     setSubmitting(true);
     const payload = Object.fromEntries(
-      Object.entries(values).filter(([key, value]) => value || key === "username" || key.startsWith("password")),
+      Object.entries(values).filter(
+        ([key, value]) => value || key === "username" || key === "email" || key.startsWith("password"),
+      ),
     );
 
     try {
@@ -109,7 +111,7 @@ export default function CreateManagerPage() {
             <p className="eyebrow">Account</p>
             <div className="manager-fields">
               <label>Username<input required autoComplete="username" value={values.username} onChange={(event) => update("username", event.target.value)} /></label>
-              <label>Email <small>Optional</small><input type="email" autoComplete="email" value={values.email} onChange={(event) => update("email", event.target.value)} /></label>
+              <label>Email<input required type="email" autoComplete="email" value={values.email} onChange={(event) => update("email", event.target.value)} /></label>
               <label>Password<input required minLength={8} type="password" autoComplete="new-password" value={values.password} onChange={(event) => update("password", event.target.value)} /></label>
               <label>Confirm password<input required minLength={8} type="password" autoComplete="new-password" value={values.password_confirm} onChange={(event) => update("password_confirm", event.target.value)} /></label>
             </div>
