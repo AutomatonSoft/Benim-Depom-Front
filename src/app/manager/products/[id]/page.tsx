@@ -94,8 +94,9 @@ function isGenerationInProgress(status?: string) {
   return status === "queued" || status === "running";
 }
 
-function isImageGenerationInProgress(status?: string) {
-  return status === "pending" || status === "processing" || status === "result_received";
+function isImageGenerationInProgress(image?: Pick<ProductImage, "processing_status" | "processing_error">) {
+  if (!image || image.processing_error) return false;
+  return image.processing_status === "pending" || image.processing_status === "processing" || image.processing_status === "result_received";
 }
 
 function BackgroundProgress({ label, status }: { label: string; status: string }) {
@@ -138,6 +139,30 @@ function formatMoney(amount: string, currency: string) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(amount));
 }
 
+function PriceCalculationDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="price-help-title" onClick={onClose}>
+      <div className="price-help-dialog" onClick={(event) => event.stopPropagation()}>
+        <h2 id="price-help-title">How the listing price is calculated</h2>
+        <p>The seller enters a purchase price. The marketplace listing is always shown in euro after transport, markup and rounding.</p>
+        <p className="price-help-formula">
+          Listing EUR = round to .49 or .99 of<br />
+          (purchase in EUR + city transport × volume + DE delivery) × 2.13
+        </p>
+        <ul>
+          <li>Purchase: TRY or USD is converted with the latest daily rate. EUR stays as entered.</li>
+          <li>Volume: the largest variant packed size in m³ (width × height × length ÷ 1,000,000).</li>
+          <li>City transport (€ / m³): Istanbul 84, Ankara 180, Izmir 160, Bursa 75, Kars 160, Inegol 75.</li>
+          <li>DE delivery by volume: S up to 0.03 m³ = 20 €, M to 0.5 m³ = 89 €, L to 2.5 m³ = 170 €, XL above that = 250 €.</li>
+          <li>2.13 adds 75% margin, 19% advertising and 19% VAT together (not one after another).</li>
+          <li>The result is rounded to the nearer price ending in 49 or 99. A tie takes the higher price.</li>
+        </ul>
+        <button type="button" className="save-button" onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
 function toForm(product: Product): FormState {
   return {
     title: product.title,
@@ -165,6 +190,7 @@ export default function ProductWorkspacePage() {
   const [draftForm, setDraftForm] = useState<DraftForm | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
+  const [priceHelpOpen, setPriceHelpOpen] = useState(false);
 
   const canModerate = product?.status === "submitted" || product?.status === "under_review";
   const totalQuantity = useMemo(
@@ -172,10 +198,10 @@ export default function ProductWorkspacePage() {
     [form],
   );
   const imageGenerationInProgress = useMemo(
-    () => product?.images.some((image) => isImageGenerationInProgress(image.processing_status)) ?? false,
+    () => product?.images.some((image) => isImageGenerationInProgress(image)) ?? false,
     [product],
   );
-  const activeImageGenerationStatus = product?.images.find((image) => isImageGenerationInProgress(image.processing_status))?.processing_status;
+  const activeImageGenerationStatus = product?.images.find((image) => isImageGenerationInProgress(image))?.processing_status;
   const descriptionGenerationInProgress = isGenerationInProgress(generation?.status);
   const generationContent = generation?.status === "succeeded" ? generation.result?.universal?.content : undefined;
 
@@ -387,7 +413,7 @@ export default function ProductWorkspacePage() {
       return;
     }
     const image = product?.images.find((item) => item.id === imageId);
-    if (isImageGenerationInProgress(image?.processing_status)) return;
+    if (isImageGenerationInProgress(image)) return;
     setSaving(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(`/api/v1/products/${productId}/images/${imageId}/process/`, { method: "POST" });
@@ -454,7 +480,7 @@ export default function ProductWorkspacePage() {
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
     <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
-    {product.currency !== "EUR" ? <p className="products-subtitle" role="note">{formatMoney(product.unit_price, product.currency)} converts to listing {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "— until exchange rates are loaded on the server"}.</p> : null}
+    {product.currency !== "EUR" ? <p className="products-subtitle" role="note">{formatMoney(product.unit_price, product.currency)} → listing {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "not available until the daily euro rate is loaded"}.</p> : null}
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
     <section className="workspace-card image-gallery-card">
       <div className="image-gallery-heading">
@@ -498,15 +524,15 @@ export default function ProductWorkspacePage() {
                 {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
               </div>}
               <div className="image-row-actions">
-                <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image.processing_status)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image.processing_status) ? "Generating..." : product.status !== "approved" ? "Generate after approve" : image.generated_images.length ? "Generate again" : "Generate image"}</button>
-                <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image.processing_status)} onClick={() => void deleteImage(image.id)}>Delete</button>
+                <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? "Generating..." : product.status !== "approved" ? "Generate after approve" : image.generated_images.length ? "Generate again" : "Generate image"}</button>
+                <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image)} onClick={() => void deleteImage(image.id)}>Delete</button>
               </div>
             </div>
           </article>)}
         </div>
       </div>
     </section>
-    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">Product data</p><h2>Edit product</h2><p>Changes are saved locally. Published listings are updated separately from Marketplaces.</p></div><label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Product type<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-two-columns"><label>Unit price<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label></div><p>Warehouse: {product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—"} · Listing: {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</p><h3>Variants · {totalQuantity} pcs total</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>Colour<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>Materials<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Length cm<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>Width cm<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>Height cm<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>Quantity<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save changes"}</button></form>
+    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">Product data</p><h2>Edit product</h2><p>Changes are saved locally. Published listings are updated separately from Marketplaces.</p></div><label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Product type<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-price-block"><button type="button" className="price-calc-hint" onClick={() => setPriceHelpOpen(true)}>Price calculation</button><div className="form-two-columns form-price-fields"><label>Seller unit price<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><label>Listing price (EUR)<input readOnly value={product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "Waiting for exchange rate"} /></label></div></div><p>Warehouse: {product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—"}</p><h3>Variants · {totalQuantity} pcs total</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>Colour<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>Materials<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Length cm<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>Width cm<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>Height cm<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>Quantity<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save changes"}</button></form>
       <aside className="workspace-side"><section className="workspace-card">
         <p className="eyebrow">AI content</p>
         <h2>Descriptions for marketplaces</h2>
@@ -523,5 +549,5 @@ export default function ProductWorkspacePage() {
           <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? "Saving..." : draftDirty ? "Save draft" : "Draft saved"}</button>
         </form>}
       </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/manager/marketplaces">Open Marketplaces</Link></section></aside></div>
-  </section></main>;
+  </section>{priceHelpOpen ? <PriceCalculationDialog onClose={() => setPriceHelpOpen(false)} /> : null}</main>;
 }
