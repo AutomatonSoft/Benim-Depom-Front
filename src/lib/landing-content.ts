@@ -164,7 +164,7 @@ export type LandingDict = {
 export const CONTACT = {
   company: "Mobiliya 1959",
   addressLines: [
-    "Zdelaiti Automaton Soft GmbH",
+    "Automaton Soft GmbH",
     "Am Flugplatz 28",
     "88483 Burgrieden",
   ],
