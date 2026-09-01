@@ -95,4 +95,7 @@ button { font: inherit; }
 @media (max-width: 1100px) { .image-gallery-layout { grid-template-columns: 1fr; } }
 @media (max-width: 620px) { .image-gallery-heading { flex-direction: column; }.image-gallery-stage { height: 300px; }.image-gallery-meta { flex-wrap: wrap; } }
 
+.price-stack { display: grid; gap: 3px; justify-items: end; }
+.price-stack small { color: #8392a6; font-size: 12px; font-weight: 700; }
+
 

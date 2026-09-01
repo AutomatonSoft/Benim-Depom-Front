@@ -17,6 +17,7 @@ type Product = {
   product_type: string;
   unit_price: string;
   currency: string;
+  listing_price_eur?: string | null;
   status: string;
   total_quantity: number;
   images: ProductImage[];
@@ -106,6 +107,16 @@ export default function ProductsPage() {
     }).format(Number(product.unit_price));
   }
 
+  function formatListing(product: Product) {
+    if (product.listing_price_eur == null || product.listing_price_eur === "") {
+      return "Listing —";
+    }
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(Number(product.listing_price_eur));
+  }
+
   return (
     <main className="app-shell">
       <Sidebar active="products" />
@@ -127,7 +138,7 @@ export default function ProductsPage() {
           {!loading && !error && products.length === 0 && <p className="products-message">No products match these filters.</p>}
 
           {!loading && !error && products.length > 0 && <div className="products-table">
-            <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Price</span><span>Created</span></div>
+            <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
               return <Link className="manager-product" href={`/manager/products/${product.id}`} key={product.id}>
@@ -137,7 +148,7 @@ export default function ProductsPage() {
                 </div>
                 <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
                 <strong>{product.total_quantity} pcs</strong>
-                <strong>{formatPrice(product)}</strong>
+                <strong className="price-stack"><span>{formatPrice(product)}</span><small>{formatListing(product)}</small></strong>
                 <time dateTime={product.created_at}>{formatDate(product.created_at)}</time>
               </Link>;
             })}
