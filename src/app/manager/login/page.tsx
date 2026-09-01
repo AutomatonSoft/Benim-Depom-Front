@@ -12,7 +12,7 @@ type Profile = {
 };
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,11 +26,11 @@ export default function LoginPage() {
       const loginResponse = await fetch("/api/v1/auth/login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!loginResponse.ok) {
-        setError("Incorrect username or password.");
+        setError("Incorrect email or password.");
         return;
       }
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
           <p className="eyebrow">Welcome back</p>
           <h2>Sign in to your account</h2>
           <p className="form-intro">Use your manager credentials to continue.</p>
-          <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
+          <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>
           <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>
           {error && <p className="login-error" role="alert">{error}</p>}
           <button className="login-button" disabled={loading}>{loading ? "Signing in…" : "Sign in"} <span>→</span></button>
