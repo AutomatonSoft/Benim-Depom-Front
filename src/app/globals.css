@@ -97,5 +97,18 @@ button { font: inherit; }
 
 .price-stack { display: grid; gap: 3px; justify-items: end; }
 .price-stack small { color: #8392a6; font-size: 12px; font-weight: 700; }
+.form-price-block { display: grid; gap: 6px; }
+.price-calc-hint { justify-self: start; border: 0; background: none; padding: 0; color: #9aa8b8; font-size: 11px; font-weight: 700; cursor: pointer; }
+.price-calc-hint:hover, .price-calc-hint:focus { color: #d77d14; }
+.form-price-fields { grid-template-columns: minmax(0, 1.1fr) 120px minmax(0, 1.2fr); }
+.form-price-fields input[readonly] { background: #f4f7fb; }
+.price-help-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 22px; background: #17396873; }
+.price-help-dialog { width: min(560px, 100%); max-height: 90vh; overflow: auto; border-radius: 18px; background: #fff; padding: 24px; box-shadow: 0 24px 60px #17396833; }
+.price-help-dialog h2 { margin: 0 0 10px; color: #173968; font-size: 20px; }
+.price-help-dialog p, .price-help-dialog li { color: #4a6078; font-size: 14px; line-height: 1.55; }
+.price-help-dialog ul { margin: 8px 0 14px; padding-left: 18px; }
+.price-help-formula { margin: 0 0 14px; border-radius: 12px; background: #f4f7fb; padding: 12px 14px; color: #173968; font-size: 13px; line-height: 1.55; }
+.price-help-dialog .save-button { margin-top: 4px; }
+@media (max-width: 620px) { .form-price-fields { grid-template-columns: 1fr; } }
 
 
