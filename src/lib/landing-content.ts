@@ -163,10 +163,14 @@ export type LandingDict = {
 
 export const CONTACT = {
   company: "Mobiliya 1959",
-  addressLines: ["Alanyurt Yenimahalle Yavuz Selim Sultan Caddesi No:12", "Türkiye, Bursa, İnegöl"],
-  phone: "+90 546 450 55 30",
-  email: "info@mobilya1959.com",
-  whatsappUrl: "https://wa.me/905464505530",
+  addressLines: [
+    "Zdelaiti Automaton Soft GmbH",
+    "Am Flugplatz 28",
+    "88483 Burgrieden",
+  ],
+  phone: "+905545458787",
+  email: "info@automatonsoft.de",
+  whatsappUrl: "https://wa.me/4917643450100",
 };
 
 // APK file served as a static asset from public/downloads/.

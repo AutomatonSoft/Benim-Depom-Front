@@ -549,7 +549,7 @@ export default function LandingPage() {
                   <Ic name="pin" />
                   <div>
                     <div className="cr-label">{t.contact.addressLabel}</div>
-                    <div className="cr-value">{CONTACT.company}<br />{CONTACT.addressLines[0]}<br />{CONTACT.addressLines[1]}</div>
+                    <div className="cr-value">{CONTACT.addressLines[0]}<br />{CONTACT.addressLines[1]}<br />{CONTACT.addressLines[2]}</div>
                   </div>
                 </div>
                 <div className="contact-row">
