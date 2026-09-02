@@ -113,6 +113,10 @@ export default function SellersPage() {
   }
 
   async function decide(sellerId: number, action: "approve" | "reject") {
+    if (action === "reject" && !rejectComment.trim()) {
+      setRequestError("A rejection reason is required.");
+      return;
+    }
     setRequestBusyId(sellerId);
     setRequestError("");
     try {
@@ -121,7 +125,7 @@ export default function SellersPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(action === "reject" ? { comment: rejectComment } : {}),
+          body: JSON.stringify(action === "reject" ? { comment: rejectComment.trim() } : {}),
         },
       );
       if (!response.ok) throw new Error();
@@ -156,7 +160,7 @@ export default function SellersPage() {
                   <input
                     value={rejectComment}
                     onChange={(event) => setRejectComment(event.target.value)}
-                    placeholder="Rejection reason (optional)"
+                    placeholder="Rejection reason"
                   />
                   <button
                     className="approve-button"
@@ -167,7 +171,7 @@ export default function SellersPage() {
                   </button>
                   <button
                     className="reject-button"
-                    disabled={requestBusyId === seller.id}
+                    disabled={requestBusyId === seller.id || !rejectComment.trim()}
                     onClick={() => void decide(seller.id, "reject")}
                   >
                     Reject
