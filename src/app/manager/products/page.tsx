@@ -22,6 +22,7 @@ type Product = {
   total_quantity: number;
   images: ProductImage[];
   created_at: string;
+  seller?: { id: number; username: string; first_name: string; email: string };
 };
 
 type ProductListResponse = {
@@ -144,7 +145,18 @@ export default function ProductsPage() {
               return <Link className="manager-product" href={`/manager/products/${product.id}`} key={product.id}>
                 <div className="manager-product-name">
                   <div className="manager-product-image">{primaryImage ? <img src={primaryImage.image} alt="" /> : <span>▣</span>}</div>
-                  <div><p>{product.product_type}</p><h2>{product.title}</h2><small>#{product.id}</small></div>
+                  <div>
+                    <p>{product.product_type}</p>
+                    <h2>{product.title}</h2>
+                    <small>#{product.id}</small>
+                    {product.seller && (
+                      <span className="product-owner">
+                        <strong>{product.seller.username}</strong>
+                        {product.seller.first_name ? ` · ${product.seller.first_name}` : ""}
+                        {product.seller.email ? <em>{product.seller.email}</em> : null}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
                 <strong>{product.total_quantity} pcs</strong>

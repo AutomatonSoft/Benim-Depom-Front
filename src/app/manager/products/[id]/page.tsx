@@ -64,6 +64,15 @@ type Product = {
   images: ProductImage[];
   created_at: string;
   updated_at: string;
+  seller?: { id: number; username: string; first_name: string; email: string };
+};
+
+type ModerationDecision = {
+  id: number;
+  decision: string;
+  comment: string;
+  manager_username: string;
+  created_at: string;
 };
 
 type FormState = {
@@ -218,7 +227,7 @@ function FormulaEditorDialog({
           (purchase in EUR + city tariff × CBM + DE delivery) × (1 + margin + advertising + VAT)
         </p>
         <h3>Percentages</h3>
-        <div className="form-two-columns form-price-fields">
+        <div className="formula-percent-grid">
           <label>Margin (0.75 = 75%)<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
           <label>Advertising (0.19 = 19%)<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
           <label>VAT (0.19 = 19%)<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
@@ -281,8 +290,12 @@ export default function ProductWorkspacePage() {
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
   const [priceHelpOpen, setPriceHelpOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<ModerationDecision[]>([]);
+  const [historyError, setHistoryError] = useState("");
 
   const canModerate = product?.status === "submitted" || product?.status === "under_review";
+  const latestRejection = history.find((item) => item.decision === "rejected");
   const totalQuantity = useMemo(
     () => form?.variants.reduce((total, variant) => total + Number(variant.quantity || 0), 0) ?? 0,
     [form],
@@ -383,6 +396,20 @@ export default function ProductWorkspacePage() {
     }
   }
 
+  async function loadHistory() {
+    if (!Number.isInteger(productId) || productId < 1) return;
+    setHistoryError("");
+    try {
+      const response = await authorizedFetch(`/api/v1/products/${productId}/moderation-history/`);
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setHistory(Array.isArray(data) ? data : data.results ?? []);
+    } catch {
+      setHistoryError("Unable to load moderation history.");
+      setHistory([]);
+    }
+  }
+
   useEffect(() => {
     if (!localStorage.getItem("benim_access_token")) return void router.replace("/manager/login");
 
@@ -403,6 +430,7 @@ export default function ProductWorkspacePage() {
     }
 
     void loadInitialProduct();
+    void loadHistory();
   }, [productId, router]);
 
   useEffect(() => {
@@ -499,6 +527,7 @@ export default function ProductWorkspacePage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiErrorMessage(data, `Product could not be ${action}d.`));
       setProduct(data as Product); setForm(toForm(data as Product)); setFeedback(action === "approve" ? "Product approved and EANs assigned." : "Product rejected. The seller will receive the reason.");
+      await loadHistory();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Moderation action failed."); }
     finally { setSaving(false); }
   }
@@ -600,11 +629,12 @@ export default function ProductWorkspacePage() {
   if (!product || !form) return null;
 
   return <main className="app-shell"><Sidebar active="products" /><section className="content product-workspace">
-    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p></div><Link className="back-link" href="/manager/products">← Products</Link></header>
+    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p>{product.seller ? <p className="products-subtitle">Created by {product.seller.username}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(); }}>Moderation history</button><Link className="back-link" href="/manager/products">← Products</Link></div></header>
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
     <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
     {product.currency !== "EUR" ? <p className="products-subtitle" role="note">{formatMoney(product.unit_price, product.currency)} → listing {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "not available until the daily euro rate is loaded"}.</p> : null}
+    {product.status === "rejected" && <section className="workspace-card rejection-card"><div><p className="eyebrow">Rejection</p><h2>This product was rejected</h2><p>{latestRejection?.comment?.trim() || "No rejection reason was recorded."}</p></div></section>}
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
     <section className="workspace-card image-gallery-card">
       <div className="image-gallery-heading">
@@ -673,5 +703,26 @@ export default function ProductWorkspacePage() {
           <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? "Saving..." : draftDirty ? "Save draft" : "Draft saved"}</button>
         </form>}
       </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/manager/marketplaces">Open Marketplaces</Link></section></aside></div>
-  </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}</main>;
+  </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}
+    {historyOpen ? <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" onClick={() => setHistoryOpen(false)}>
+      <div className="price-help-dialog history-dialog" onClick={(event) => event.stopPropagation()}>
+        <div className="price-help-heading">
+          <h2 id="history-title">Moderation history</h2>
+          <button type="button" className="price-calc-hint" onClick={() => setHistoryOpen(false)}>Close</button>
+        </div>
+        <p>All approve and reject decisions for this product, newest first.</p>
+        {historyError && <p className="form-feedback error" role="alert">{historyError}</p>}
+        {!historyError && history.length === 0 && <p>No moderation decisions yet.</p>}
+        <ol className="history-list">
+          {history.map((item) => (
+            <li key={item.id}>
+              <strong className={`manager-status ${item.decision}`}>{statusLabels[item.decision] ?? item.decision}</strong>
+              <span>{formatDate(item.created_at, true)} · {item.manager_username}</span>
+              {item.comment ? <p>{item.comment}</p> : <p>No comment.</p>}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div> : null}
+  </main>;
 }
