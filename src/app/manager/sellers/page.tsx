@@ -15,6 +15,7 @@ type Seller = {
   phone: string;
   date_joined: string;
   is_email_verified: boolean;
+  registration_status?: string;
 };
 
 type SellerListResponse = {
@@ -39,6 +40,11 @@ export default function SellersPage() {
   const [hasPrevious, setHasPrevious] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [listRevision, setListRevision] = useState(0);
+  const [requests, setRequests] = useState<Seller[]>([]);
+  const [requestError, setRequestError] = useState("");
+  const [requestBusyId, setRequestBusyId] = useState<number | null>(null);
+  const [rejectComment, setRejectComment] = useState("");
 
   useEffect(() => {
     const access = window.localStorage.getItem("benim_access_token");
@@ -80,7 +86,25 @@ export default function SellersPage() {
     }
 
     void loadSellers();
-  }, [page, activity, appliedSearch]);
+  }, [page, activity, appliedSearch, listRevision]);
+
+  useEffect(() => {
+    const access = window.localStorage.getItem("benim_access_token");
+    if (!access) return;
+
+    async function loadRequests() {
+      const response = await authorizedFetch("/api/v1/manager/users/sellers/registration-requests/");
+      if (!response.ok) {
+        setRequestError("Unable to load registration requests.");
+        return;
+      }
+      const data = (await response.json()) as SellerListResponse;
+      setRequests(data.results);
+      setRequestError("");
+    }
+
+    void loadRequests();
+  }, [listRevision]);
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,11 +112,71 @@ export default function SellersPage() {
     setAppliedSearch(search.trim());
   }
 
+  async function decide(sellerId: number, action: "approve" | "reject") {
+    setRequestBusyId(sellerId);
+    setRequestError("");
+    try {
+      const response = await authorizedFetch(
+        `/api/v1/manager/users/sellers/${sellerId}/${action}/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(action === "reject" ? { comment: rejectComment } : {}),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setRequests((items) => items.filter((item) => item.id !== sellerId));
+      if (action === "reject") setRejectComment("");
+      setListRevision((value) => value + 1);
+    } catch {
+      setRequestError("Unable to update this registration request.");
+    } finally {
+      setRequestBusyId(null);
+    }
+  }
+
   return (
     <main className="app-shell"><Sidebar active="sellers" />
 
       <section className="content products-page">
         <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="primary-link" href="/manager/managers/new">+ Create manager</Link></header>
+
+        {requests.length > 0 || requestError ? (
+          <section className="products-panel registration-requests-panel">
+            <h2 className="registration-requests-title">Registration requests</h2>
+            <p className="products-subtitle">Email confirmed. Waiting for your decision.</p>
+            {requestError ? <p className="products-message error" role="alert">{requestError}</p> : null}
+            {requests.map((seller) => (
+              <article className="registration-request-row" key={seller.id}>
+                <div>
+                  <strong>{fullName(seller)}</strong>
+                  <small>{seller.email}{seller.phone ? ` · ${seller.phone}` : ""}</small>
+                </div>
+                <div className="registration-request-actions">
+                  <input
+                    value={rejectComment}
+                    onChange={(event) => setRejectComment(event.target.value)}
+                    placeholder="Rejection reason (optional)"
+                  />
+                  <button
+                    className="approve-button"
+                    disabled={requestBusyId === seller.id}
+                    onClick={() => void decide(seller.id, "approve")}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    className="reject-button"
+                    disabled={requestBusyId === seller.id}
+                    onClick={() => void decide(seller.id, "reject")}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </article>
+            ))}
+          </section>
+        ) : null}
 
         <section className="products-panel">
           <form className="products-toolbar" onSubmit={applySearch}>
