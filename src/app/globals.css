@@ -4,7 +4,20 @@
 }
 
 
-html, body { min-height: 100%; }
+html, body { min-height: 100%; margin: 0; }
+
+html:has(.bd-landing),
+body:has(.bd-landing) {
+  background: #faf8f5;
+  overflow-x: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:has(.bd-landing),
+  body:has(.bd-landing) {
+    background: #0d1420;
+  }
+}
 
 body {
   background: var(--background);
