@@ -422,6 +422,16 @@ export default function ProductWorkspacePage() {
         const data = await response.json() as Product;
         setProduct(data);
         setForm(toForm(data));
+        try {
+          const historyResponse = await authorizedFetch(`/api/v1/products/${productId}/moderation-history/`);
+          if (!historyResponse.ok) throw new Error();
+          const historyData = await historyResponse.json();
+          setHistory(Array.isArray(historyData) ? historyData : historyData.results ?? []);
+          setHistoryError("");
+        } catch {
+          setHistoryError("Unable to load moderation history.");
+          setHistory([]);
+        }
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Unable to load product.");
       } finally {
@@ -430,7 +440,6 @@ export default function ProductWorkspacePage() {
     }
 
     void loadInitialProduct();
-    void loadHistory();
   }, [productId, router]);
 
   useEffect(() => {
