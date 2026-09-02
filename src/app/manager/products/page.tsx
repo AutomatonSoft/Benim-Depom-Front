@@ -23,6 +23,7 @@ type Product = {
   images: ProductImage[];
   created_at: string;
   seller?: { id: number; username: string; first_name: string; email: string };
+  last_moderation_decision?: "approved" | "rejected" | null;
 };
 
 type ProductListResponse = {
@@ -35,11 +36,12 @@ type ProductListResponse = {
 const statusLabels: Record<string, string> = {
   draft: "Draft",
   submitted: "Awaiting review",
-  under_review: "Under review",
   approved: "Approved",
   rejected: "Rejected",
   deactivated: "Deactivated",
 };
+
+const statusFilterOptions = Object.entries(statusLabels).filter(([value]) => value !== "draft");
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -126,12 +128,17 @@ export default function ProductsPage() {
 
         <section className="products-panel">
           <form className="products-toolbar" onSubmit={applySearch}>
-            <input aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by product title" />
+            <input aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title or EAN" />
             <select aria-label="Filter by status" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }}>
               <option value="">All statuses</option>
-              {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {statusFilterOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             <button type="submit">Search</button>
+            <nav className="pagination" aria-label="Product list pages">
+              <button type="button" disabled={!hasPrevious || loading} onClick={() => setPage((value) => value - 1)}>← Previous</button>
+              <span>Page {page}</span>
+              <button type="button" disabled={!hasNext || loading} onClick={() => setPage((value) => value + 1)}>Next →</button>
+            </nav>
           </form>
 
           {loading && <p className="products-message">Loading products…</p>}
@@ -142,13 +149,17 @@ export default function ProductsPage() {
             <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
+              const showPreviousReject = product.last_moderation_decision === "rejected" && product.status !== "rejected";
               return <Link className="manager-product" href={`/manager/products/${product.id}`} key={product.id}>
                 <div className="manager-product-name">
                   <div className="manager-product-image">{primaryImage ? <img src={primaryImage.image} alt="" /> : <span>▣</span>}</div>
-                  <div>
+                  <div className="manager-product-copy">
                     <p>{product.product_type}</p>
                     <h2>{product.title}</h2>
-                    <small>#{product.id}</small>
+                    <div className="manager-product-meta">
+                      <small>#{product.id}</small>
+                      {showPreviousReject ? <span className="previous-decision">Previous: Reject</span> : null}
+                    </div>
                     {product.seller && (
                       <span className="product-owner">
                         <strong>{product.seller.username}</strong>
@@ -161,12 +172,10 @@ export default function ProductsPage() {
                 <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
                 <strong>{product.total_quantity} pcs</strong>
                 <strong className="price-stack"><span>{formatPrice(product)}</span><small>{formatListing(product)}</small></strong>
-                <time dateTime={product.created_at}>{formatDate(product.created_at)}</time>
+                <time dateTime={product.created_at}>{formatDate(product.created_at, true)}</time>
               </Link>;
             })}
           </div>}
-
-          <footer className="pagination"><button disabled={!hasPrevious || loading} onClick={() => setPage((value) => value - 1)}>← Previous</button><span>Page {page}</span><button disabled={!hasNext || loading} onClick={() => setPage((value) => value + 1)}>Next →</button></footer>
         </section>
       </section>
     </main>

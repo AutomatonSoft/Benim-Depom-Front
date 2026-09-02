@@ -104,7 +104,7 @@ const generatedModeLabels: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = {
-  draft: "Draft", submitted: "Awaiting review", under_review: "Under review",
+  draft: "Draft", submitted: "Awaiting review",
   approved: "Approved", rejected: "Rejected", deactivated: "Deactivated",
 };
 
@@ -294,7 +294,7 @@ export default function ProductWorkspacePage() {
   const [history, setHistory] = useState<ModerationDecision[]>([]);
   const [historyError, setHistoryError] = useState("");
 
-  const canModerate = product?.status === "submitted" || product?.status === "under_review";
+  const canModerate = product?.status === "submitted";
   const latestRejection = history.find((item) => item.decision === "rejected");
   const totalQuantity = useMemo(
     () => form?.variants.reduce((total, variant) => total + Number(variant.quantity || 0), 0) ?? 0,

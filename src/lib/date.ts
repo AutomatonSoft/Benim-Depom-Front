@@ -8,7 +8,7 @@ export function getTimezone() {
 export function formatDate(value: string, withTime = false) {
   return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
-    ...(withTime ? { timeStyle: "short" as const } : {}),
+    ...(withTime ? { timeStyle: "medium" as const } : {}),
     timeZone: getTimezone(),
   }).format(new Date(value));
 }
