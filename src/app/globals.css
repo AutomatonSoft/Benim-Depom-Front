@@ -123,30 +123,4 @@ button { font: inherit; }
 .workspace-card.rejection-card h2 { color: #a33b36; }
 .workspace-card.rejection-card p:not(.eyebrow) { color: #6b3a38; font-size: 14px; }
 
-.registration-requests-panel { margin-bottom: 18px; }
-.registration-requests-title { margin: 0 22px 4px; color: #173968; font-size: 16px; }
-.registration-requests-panel .products-subtitle { margin: 0 22px 12px; }
-.registration-request-row {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.2fr);
-  gap: 16px;
-  align-items: center;
-  padding: 14px 22px;
-  border-top: 1px solid #edf0f5;
-}
-.registration-request-row strong, .registration-request-row small { display: block; }
-.registration-request-row small { margin-top: 4px; color: #8b9bb0; font-size: 12px; }
-.registration-request-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
-.registration-request-actions input {
-  min-width: 180px;
-  height: 40px;
-  border: 1px solid #dbe3ed;
-  border-radius: 9px;
-  padding: 0 12px;
-}
-@media (max-width: 900px) {
-  .registration-request-row { grid-template-columns: 1fr; }
-  .registration-request-actions { justify-content: stretch; }
-}
-
 
