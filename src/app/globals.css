@@ -103,9 +103,17 @@ button { font: inherit; }
 .form-price-fields { grid-template-columns: minmax(0, 1.1fr) 120px minmax(0, 1.2fr); }
 .form-price-fields input[readonly] { background: #f4f7fb; }
 .price-help-overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 22px; background: #17396873; }
-.price-help-dialog { width: min(560px, 100%); max-height: 90vh; overflow: auto; border-radius: 18px; background: #fff; padding: 24px; box-shadow: 0 24px 60px #17396833; }
+.price-help-dialog { width: min(720px, 100%); max-height: 90vh; overflow: auto; border-radius: 18px; background: #fff; padding: 24px; box-shadow: 0 24px 60px #17396833; }
 .price-help-dialog h2 { margin: 0 0 10px; color: #173968; font-size: 20px; }
+.price-help-dialog h3 { margin: 16px 0 8px; color: #29466f; font-size: 13px; }
 .price-help-dialog p, .price-help-dialog li { color: #4a6078; font-size: 14px; line-height: 1.55; }
+.price-help-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.price-help-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.formula-city-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.formula-city-grid label, .formula-tier-row label, .price-formula-dialog label { display: grid; gap: 7px; color: #29466f; font-size: 12px; font-weight: 800; }
+.formula-tier-row { display: grid; grid-template-columns: 48px repeat(3, minmax(0, 1fr)); gap: 11px; align-items: end; margin-bottom: 10px; }
+.price-formula-dialog input { height: 42px; border: 1px solid #dbe3ed; border-radius: 9px; outline: none; background: #fff; padding: 0 12px; color: #173968; font: inherit; }
+@media (max-width: 620px) { .form-price-fields, .formula-city-grid, .formula-tier-row { grid-template-columns: 1fr; } }
 .price-help-dialog ul { margin: 8px 0 14px; padding-left: 18px; }
 .price-help-formula { margin: 0 0 14px; border-radius: 12px; background: #f4f7fb; padding: 12px 14px; color: #173968; font-size: 13px; line-height: 1.55; }
 .price-help-dialog .save-button { margin-top: 4px; }

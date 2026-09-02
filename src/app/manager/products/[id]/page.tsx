@@ -28,6 +28,19 @@ type ProductImage = {
   generated_images: Array<{ id: number; image: string; mode: string }>;
 };
 
+type PricingFormula = {
+  margin: string | number;
+  adv_fee: string | number;
+  vat: string | number;
+  percent_factor?: string;
+  city_tariffs_eur_per_cbm: Record<string, string | number>;
+  de_size_tiers: Array<{ code: string; min_cbm: string | number; max_cbm: string | number; price_eur: string | number }>;
+  eur_to_try: string | null;
+  eur_to_usd: string | null;
+  uses_product_formula?: boolean;
+  uses_manual_listing?: boolean;
+};
+
 type Product = {
   id: number;
   owner: number;
@@ -37,6 +50,9 @@ type Product = {
   currency: "TRY" | "EUR" | "USD";
   warehouse_city?: "IST" | "ANK" | "IZM" | "BUR" | "KSY" | "INE";
   listing_price_eur?: string | null;
+  listing_price_eur_override?: string | null;
+  pricing_overrides?: Record<string, unknown>;
+  pricing_formula?: PricingFormula | null;
   status: string;
   ean_jv: string | null;
   ean_xl: string | null;
@@ -55,6 +71,7 @@ type FormState = {
   product_type: string;
   unit_price: string;
   currency: Product["currency"];
+  listing_price_eur: string;
   variants: Variant[];
 };
 
@@ -139,26 +156,98 @@ function formatMoney(amount: string, currency: string) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(amount));
 }
 
-function PriceCalculationDialog({ onClose }: { onClose: () => void }) {
+const cityOrder = ["IST", "ANK", "IZM", "BUR", "KSY", "INE"] as const;
+
+function FormulaEditorDialog({
+  formula,
+  saving,
+  onClose,
+  onSave,
+  onReset,
+}: {
+  formula: PricingFormula;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (overrides: Record<string, unknown>) => void;
+  onReset: () => void;
+}) {
+  const [draft, setDraft] = useState(formula);
+
+  function setField(field: "margin" | "adv_fee" | "vat" | "eur_to_try" | "eur_to_usd", value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function setCity(city: string, value: string) {
+    setDraft((current) => ({
+      ...current,
+      city_tariffs_eur_per_cbm: { ...current.city_tariffs_eur_per_cbm, [city]: value },
+    }));
+  }
+
+  function setTier(index: number, field: "min_cbm" | "max_cbm" | "price_eur", value: string) {
+    setDraft((current) => ({
+      ...current,
+      de_size_tiers: current.de_size_tiers.map((tier, itemIndex) => itemIndex === index ? { ...tier, [field]: value } : tier),
+    }));
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const overrides: Record<string, unknown> = {
+      margin: draft.margin,
+      adv_fee: draft.adv_fee,
+      vat: draft.vat,
+      city_tariffs_eur_per_cbm: draft.city_tariffs_eur_per_cbm,
+      de_size_tiers: draft.de_size_tiers,
+    };
+    if (draft.eur_to_try) overrides.eur_to_try = draft.eur_to_try;
+    if (draft.eur_to_usd) overrides.eur_to_usd = draft.eur_to_usd;
+    onSave(overrides);
+  }
+
   return (
     <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="price-help-title" onClick={onClose}>
-      <div className="price-help-dialog" onClick={(event) => event.stopPropagation()}>
-        <h2 id="price-help-title">How the listing price is calculated</h2>
-        <p>The seller enters a purchase price. The marketplace listing is always shown in euro after transport, markup and rounding.</p>
+      <form className="price-help-dialog price-formula-dialog" onClick={(event) => event.stopPropagation()} onSubmit={submit}>
+        <div className="price-help-heading">
+          <h2 id="price-help-title">Startpreis formula</h2>
+          <button type="button" className="price-calc-hint" onClick={onClose}>Close</button>
+        </div>
+        <p>These values apply only to this product. Saving recalculates listing EUR and does not change the global catalog.</p>
         <p className="price-help-formula">
           Listing EUR = round to .49 or .99 of<br />
-          (purchase in EUR + city transport × volume + DE delivery) × 2.13
+          (purchase in EUR + city tariff × CBM + DE delivery) × (1 + margin + advertising + VAT)
         </p>
-        <ul>
-          <li>Purchase: TRY or USD is converted with the latest daily rate. EUR stays as entered.</li>
-          <li>Volume: the largest variant packed size in m³ (width × height × length ÷ 1,000,000).</li>
-          <li>City transport (€ / m³): Istanbul 84, Ankara 180, Izmir 160, Bursa 75, Kars 160, Inegol 75.</li>
-          <li>DE delivery by volume: S up to 0.03 m³ = 20 €, M to 0.5 m³ = 89 €, L to 2.5 m³ = 170 €, XL above that = 250 €.</li>
-          <li>2.13 adds 75% margin, 19% advertising and 19% VAT together (not one after another).</li>
-          <li>The result is rounded to the nearer price ending in 49 or 99. A tie takes the higher price.</li>
-        </ul>
-        <button type="button" className="save-button" onClick={onClose}>Close</button>
-      </div>
+        <h3>Percentages</h3>
+        <div className="form-two-columns form-price-fields">
+          <label>Margin (0.75 = 75%)<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
+          <label>Advertising (0.19 = 19%)<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
+          <label>VAT (0.19 = 19%)<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
+        </div>
+        <h3>EUR rates (how many units per 1 €)</h3>
+        <div className="form-two-columns">
+          <label>TRY per EUR<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} /></label>
+          <label>USD per EUR<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} /></label>
+        </div>
+        <h3>City tariffs € / m³</h3>
+        <div className="formula-city-grid">
+          {cityOrder.map((city) => (
+            <label key={city}>{warehouseLabels[city]}<input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} /></label>
+          ))}
+        </div>
+        <h3>DE delivery by volume</h3>
+        {draft.de_size_tiers.map((tier, index) => (
+          <div className="formula-tier-row" key={tier.code}>
+            <strong>{tier.code}</strong>
+            <label>From m³<input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} /></label>
+            <label>To m³<input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} /></label>
+            <label>Price €<input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} /></label>
+          </div>
+        ))}
+        <div className="price-help-actions">
+          <button type="button" className="price-calc-hint" disabled={saving} onClick={onReset}>Use default formula</button>
+          <button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save for this product"}</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -169,6 +258,7 @@ function toForm(product: Product): FormState {
     product_type: product.product_type,
     unit_price: product.unit_price,
     currency: product.currency,
+    listing_price_eur: product.listing_price_eur ?? "",
     variants: product.variants.map((variant) => ({ ...variant, materials: [...variant.materials] })),
   };
 }
@@ -350,10 +440,16 @@ export default function ProductWorkspacePage() {
     if (!form) return;
     setSaving(true); setError(""); setFeedback("");
     try {
-      const payload = {
-        ...form,
+      const payload: Record<string, unknown> = {
+        title: form.title,
+        product_type: form.product_type,
+        unit_price: form.unit_price,
+        currency: form.currency,
         variants: form.variants.map(({ color_hex, materials, width_cm, height_cm, length_cm, quantity }) => ({ color_hex, materials, width_cm, height_cm, length_cm, quantity: Number(quantity) })),
       };
+      if (form.listing_price_eur && form.listing_price_eur !== (product?.listing_price_eur ?? "")) {
+        payload.listing_price_eur_override = form.listing_price_eur;
+      }
       const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
@@ -361,6 +457,34 @@ export default function ProductWorkspacePage() {
       if (!response.ok) throw new Error(apiErrorMessage(data, "Changes could not be saved."));
       setProduct(data as Product); setForm(toForm(data as Product)); setFeedback("Product changes saved. Update marketplace listings when you are ready to sync them.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Changes could not be saved."); }
+    finally { setSaving(false); }
+  }
+
+  async function saveProductFormula(overrides: Record<string, unknown>) {
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pricing_overrides: overrides }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, "Formula could not be saved."));
+      setProduct(data as Product); setForm(toForm(data as Product)); setPriceHelpOpen(false);
+      setFeedback("Listing formula saved for this product only.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Formula could not be saved."); }
+    finally { setSaving(false); }
+  }
+
+  async function resetProductFormula() {
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pricing_overrides: {} }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, "Default formula could not be restored."));
+      setProduct(data as Product); setForm(toForm(data as Product)); setPriceHelpOpen(false);
+      setFeedback("This product now uses the default listing formula.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Default formula could not be restored."); }
     finally { setSaving(false); }
   }
 
@@ -532,7 +656,7 @@ export default function ProductWorkspacePage() {
         </div>
       </div>
     </section>
-    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">Product data</p><h2>Edit product</h2><p>Changes are saved locally. Published listings are updated separately from Marketplaces.</p></div><label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Product type<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-price-block"><button type="button" className="price-calc-hint" onClick={() => setPriceHelpOpen(true)}>Price calculation</button><div className="form-two-columns form-price-fields"><label>Seller unit price<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><label>Listing price (EUR)<input readOnly value={product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "Waiting for exchange rate"} /></label></div></div><p>Warehouse: {product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—"}</p><h3>Variants · {totalQuantity} pcs total</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>Colour<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>Materials<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Length cm<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>Width cm<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>Height cm<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>Quantity<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save changes"}</button></form>
+    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">Product data</p><h2>Edit product</h2><p>Changes are saved locally. Published listings are updated separately from Marketplaces.</p></div><label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Product type<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-price-block"><button type="button" className="price-calc-hint" onClick={() => setPriceHelpOpen(true)}>Change formula</button><div className="form-two-columns form-price-fields"><label>Seller unit price<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><label>Listing price (EUR)<input min="0.01" step="0.01" type="number" value={form.listing_price_eur} placeholder={product.listing_price_eur ? undefined : "Waiting for exchange rate"} onChange={(event) => setForm({ ...form, listing_price_eur: event.target.value })} /></label></div>{product.pricing_formula?.uses_product_formula ? <small className="price-calc-hint">This product uses a custom formula.</small> : null}{product.pricing_formula?.uses_manual_listing ? <small className="price-calc-hint">Listing EUR is a manual value for this product.</small> : null}</div><p>Warehouse: {product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—"}</p><h3>Variants · {totalQuantity} pcs total</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>Colour<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>Materials<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Length cm<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>Width cm<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>Height cm<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>Quantity<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save changes"}</button></form>
       <aside className="workspace-side"><section className="workspace-card">
         <p className="eyebrow">AI content</p>
         <h2>Descriptions for marketplaces</h2>
@@ -549,5 +673,5 @@ export default function ProductWorkspacePage() {
           <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? "Saving..." : draftDirty ? "Save draft" : "Draft saved"}</button>
         </form>}
       </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/manager/marketplaces">Open Marketplaces</Link></section></aside></div>
-  </section>{priceHelpOpen ? <PriceCalculationDialog onClose={() => setPriceHelpOpen(false)} /> : null}</main>;
+  </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}</main>;
 }
