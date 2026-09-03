@@ -52,6 +52,7 @@ type Product = {
   listing_price_eur_override?: string | null;
   pricing_overrides?: Record<string, unknown>;
   pricing_formula?: PricingFormula | null;
+  last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | null;
   status: string;
   ean_jv: string | null;
   ean_xl: string | null;
@@ -166,6 +167,20 @@ const warehouseLabels: Record<string, string> = {
 
 function formatMoney(amount: string, currency: string) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(amount));
+}
+
+function sellerPriceEur(product: Product) {
+  if (product.currency === "EUR") return null;
+  const amount = Number(product.unit_price);
+  const rate = Number(
+    product.currency === "TRY"
+      ? product.pricing_formula?.eur_to_try
+      : product.currency === "USD"
+        ? product.pricing_formula?.eur_to_usd
+        : null,
+  );
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(rate) || rate <= 0) return null;
+  return formatMoney(String(amount / rate), "EUR");
 }
 
 const cityOrder = ["IST", "ANK", "IZM", "BUR", "KSY", "INE"] as const;
@@ -693,14 +708,16 @@ export default function ProductWorkspacePage() {
   if (loading) return <section className="content products-page"><p className="products-message">Loading product...</p></section>;
   if (error && !product) return <section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">← Back to products</Link></section>;
   if (!product || !form) return null;
+  const sellerEur = sellerPriceEur(product);
+  const previouslyRejected = product.status === "submitted" && product.last_moderation_decision === "rejected";
 
   return <><section className="content product-workspace">
-    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p>{product.seller ? <p className="products-subtitle">Created by {product.seller.username}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><div className="availability-action"><button type="button" className="history-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? "Only approved products can receive an availability request." : undefined} onClick={() => void requestAvailability()}>Ask availability</button>{product.availability_reminder_sent_at ? <small>Last request: {formatDate(product.availability_reminder_sent_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>Moderation history</button><Link className="back-link" href="/manager/products">← Products</Link></div></header>
+    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p>{product.seller ? <p className="products-subtitle">Created by {product.seller.username}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><Link className="back-link" href="/manager/products">← Products</Link></div></header>
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
-    <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
+    <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong>{previouslyRejected ? <small className="previous-decision">Previously rejected</small> : null}</article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}{sellerEur ? ` (${sellerEur})` : ""}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
     <section className="workspace-summary workspace-ean"><article><span>EAN JV</span><strong>{product.ean_jv?.trim() || "—"}</strong></article><article><span>EAN XL</span><strong>{product.ean_xl?.trim() || "—"}</strong></article></section>
-    {product.currency !== "EUR" ? <p className="products-subtitle" role="note">{formatMoney(product.unit_price, product.currency)} → listing {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "not available until the daily euro rate is loaded"}.</p> : null}
+    <div className="product-toolbar"><div className="availability-action"><button type="button" className="ask-availability-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? "Only approved products can receive an availability request." : undefined} onClick={() => void requestAvailability()}>Ask availability</button>{product.availability_reminder_sent_at ? <small>Last request: {formatDate(product.availability_reminder_sent_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>Moderation history</button></div>
     {product.status === "rejected" && <section className="workspace-card rejection-card"><div><p className="eyebrow">Rejection</p><h2>This product was rejected</h2><p>{latestRejection?.comment?.trim() || "No rejection reason was recorded."}</p></div></section>}
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
     {canChangeApprovedStatus && <section className="workspace-card moderation-card"><div><p className="eyebrow">Status</p><h2>Change approved status</h2><p>Return it to review or reject it. If listings are live, deactivate them in <Link href="/manager/marketplaces">Marketplaces</Link> first.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>Return to review</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>Reject</button></div></section>}
