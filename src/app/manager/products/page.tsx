@@ -24,6 +24,8 @@ type Product = {
   created_at: string;
   seller?: { id: number; username: string; first_name: string; email: string };
   last_moderation_decision?: "approved" | "rejected" | null;
+  ean_jv?: string | null;
+  ean_xl?: string | null;
 };
 
 type ProductListResponse = {
@@ -120,6 +122,12 @@ export default function ProductsPage() {
     }).format(Number(product.listing_price_eur));
   }
 
+  function eanCountLabel(product: Product) {
+    const count = [product.ean_jv, product.ean_xl].filter((code) => Boolean(code?.trim())).length;
+    if (count === 0) return "—";
+    return `${count} EAN`;
+  }
+
   return (
     <main className="app-shell">
       <Sidebar active="products" />
@@ -146,7 +154,7 @@ export default function ProductsPage() {
           {!loading && !error && products.length === 0 && <p className="products-message">No products match these filters.</p>}
 
           {!loading && !error && products.length > 0 && <div className="products-table">
-            <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
+            <div className="table-header"><span>Product</span><span>Status</span><span>EAN</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
               const showPreviousReject = product.last_moderation_decision === "rejected" && product.status !== "rejected";
@@ -170,6 +178,7 @@ export default function ProductsPage() {
                   </div>
                 </div>
                 <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
+                <strong className="ean-count">{eanCountLabel(product)}</strong>
                 <strong>{product.total_quantity} pcs</strong>
                 <strong className="price-stack"><span>{formatPrice(product)}</span><small>{formatListing(product)}</small></strong>
                 <time dateTime={product.created_at}>{formatDate(product.created_at, true)}</time>
