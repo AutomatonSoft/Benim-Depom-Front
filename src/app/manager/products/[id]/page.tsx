@@ -548,15 +548,7 @@ export default function ProductWorkspacePage() {
       const response = await authorizedFetch(`/api/v1/manager/products/${productId}/availability-request/`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiErrorMessage(data, "Availability request could not be sent."));
-<<<<<<< Updated upstream
       setProduct(data as Product);
-=======
-      const sentAt =
-        typeof data.availability_reminder_sent_at === "string" && data.availability_reminder_sent_at
-          ? data.availability_reminder_sent_at
-          : new Date().toISOString();
-      setProduct({ ...(data as Product), availability_reminder_sent_at: sentAt });
->>>>>>> Stashed changes
       setFeedback("Availability request sent to the seller.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Availability request could not be sent.");
