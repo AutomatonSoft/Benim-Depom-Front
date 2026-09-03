@@ -43,7 +43,6 @@ export default function LandingPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img alt="Benim Depom" className="logo-img" src="/landing/logo.png" />
             </span>
-            <span className="brand-sub-wrap"><span className="brand-sub">by {CONTACT.company}</span></span>
           </a>
           <nav className="main-nav">
             {t.navItems.map((item) => <a href={item.href} key={item.href}>{item.label}</a>)}
@@ -504,8 +503,6 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="about-op">
-              <div className="aop-label">{t.about.opLabel}</div>
-              <div className="aop-name">{CONTACT.company}</div>
               <div className="stat-strip">
                 <div className="st"><div className="stv">3</div><div className="stl">{t.about.stat1}</div></div>
                 <div className="st"><div className="stv">10</div><div className="stl">{t.about.stat2}</div></div>

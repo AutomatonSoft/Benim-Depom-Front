@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
@@ -23,7 +22,9 @@ type Product = {
   images: ProductImage[];
   created_at: string;
   seller?: { id: number; username: string; first_name: string; email: string };
-  last_moderation_decision?: "approved" | "rejected" | null;
+  last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | null;
+  ean_jv?: string | null;
+  ean_xl?: string | null;
 };
 
 type ProductListResponse = {
@@ -120,10 +121,14 @@ export default function ProductsPage() {
     }).format(Number(product.listing_price_eur));
   }
 
+  function eanCountLabel(product: Product) {
+    const count = [product.ean_jv, product.ean_xl].filter((code) => Boolean(code?.trim())).length;
+    if (count === 0) return "—";
+    return `${count} EAN`;
+  }
+
   return (
-    <main className="app-shell">
-      <Sidebar active="products" />
-      <section className="content products-page">
+    <section className="content products-page">
         <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Products</h1><p className="products-subtitle">{count} products in your workspace</p></div><Link className="back-link" href="/manager">← Overview</Link></header>
 
         <section className="products-panel">
@@ -146,10 +151,10 @@ export default function ProductsPage() {
           {!loading && !error && products.length === 0 && <p className="products-message">No products match these filters.</p>}
 
           {!loading && !error && products.length > 0 && <div className="products-table">
-            <div className="table-header"><span>Product</span><span>Status</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
+            <div className="table-header"><span>Product</span><span>Status</span><span>EAN</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
-              const showPreviousReject = product.last_moderation_decision === "rejected" && product.status !== "rejected";
+              const showPreviousReject = product.status === "submitted" && product.last_moderation_decision === "rejected";
               return <Link className="manager-product" href={`/manager/products/${product.id}`} key={product.id}>
                 <div className="manager-product-name">
                   <div className="manager-product-image">{primaryImage ? <img src={primaryImage.image} alt="" /> : <span>▣</span>}</div>
@@ -158,7 +163,6 @@ export default function ProductsPage() {
                     <h2>{product.title}</h2>
                     <div className="manager-product-meta">
                       <small>#{product.id}</small>
-                      {showPreviousReject ? <span className="previous-decision">Previous: Reject</span> : null}
                     </div>
                     {product.seller && (
                       <span className="product-owner">
@@ -169,7 +173,8 @@ export default function ProductsPage() {
                     )}
                   </div>
                 </div>
-                <span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>
+                <div className="manager-status-cell"><span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>{showPreviousReject ? <small className="previous-decision">Previously rejected</small> : null}</div>
+                <strong className="ean-count">{eanCountLabel(product)}</strong>
                 <strong>{product.total_quantity} pcs</strong>
                 <strong className="price-stack"><span>{formatPrice(product)}</span><small>{formatListing(product)}</small></strong>
                 <time dateTime={product.created_at}>{formatDate(product.created_at, true)}</time>
@@ -178,6 +183,5 @@ export default function ProductsPage() {
           </div>}
         </section>
       </section>
-    </main>
   );
 }

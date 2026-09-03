@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-import Sidebar from "@/components/Sidebar";
 import { authorizedFetch } from "@/lib/api";
 import { TIMEZONE_STORAGE_KEY } from "@/lib/date";
 
@@ -105,9 +104,7 @@ export default function SettingsPage() {
   const name = profile ? `${profile.first_name} ${profile.last_name}`.trim() || profile.username : "Loading...";
 
   return (
-    <main className="app-shell">
-      <Sidebar active="settings" />
-      <section className="content settings-page">
+    <section className="content settings-page">
         <header className="topbar">
           <div><p className="eyebrow">Manager panel</p><h1>Settings</h1><p className="products-subtitle">Your account and display preferences</p></div>
         </header>
@@ -118,6 +115,5 @@ export default function SettingsPage() {
           <article className="settings-card"><p className="eyebrow">Security</p><h2>Change password</h2><form className="settings-password-form" onSubmit={changePassword}><label>Current password<input required name="current_password" type="password" autoComplete="current-password" /></label><label>New password<input required minLength={8} name="new_password" type="password" autoComplete="new-password" /></label><label>Confirm new password<input required minLength={8} name="new_password_confirm" type="password" autoComplete="new-password" /></label>{passwordError && <p className="form-feedback error" role="alert">{passwordError}</p>}{passwordSuccess && <p className="form-feedback success" role="status">{passwordSuccess}</p>}<button className="password-submit" disabled={submitting} type="submit">{submitting ? "Changing…" : "Change password"}</button></form></article>
         </section>
       </section>
-    </main>
   );
 }

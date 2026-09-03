@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
-import Sidebar from "@/components/Sidebar";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 
@@ -53,6 +52,7 @@ type Product = {
   listing_price_eur_override?: string | null;
   pricing_overrides?: Record<string, unknown>;
   pricing_formula?: PricingFormula | null;
+  last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | null;
   status: string;
   ean_jv: string | null;
   ean_xl: string | null;
@@ -64,6 +64,7 @@ type Product = {
   images: ProductImage[];
   created_at: string;
   updated_at: string;
+  availability_reminder_sent_at?: string | null;
   seller?: { id: number; username: string; first_name: string; email: string };
 };
 
@@ -103,9 +104,12 @@ const generatedModeLabels: Record<string, string> = {
   human: "Human",
 };
 
+const HISTORY_PAGE_SIZE = 5;
+
 const statusLabels: Record<string, string> = {
   draft: "Draft", submitted: "Awaiting review",
   approved: "Approved", rejected: "Rejected", deactivated: "Deactivated",
+  returned_to_review: "Returned to review",
 };
 
 const defaultTargets = [
@@ -163,6 +167,20 @@ const warehouseLabels: Record<string, string> = {
 
 function formatMoney(amount: string, currency: string) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(Number(amount));
+}
+
+function sellerPriceEur(product: Product) {
+  if (product.currency === "EUR") return null;
+  const amount = Number(product.unit_price);
+  const rate = Number(
+    product.currency === "TRY"
+      ? product.pricing_formula?.eur_to_try
+      : product.currency === "USD"
+        ? product.pricing_formula?.eur_to_usd
+        : null,
+  );
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(rate) || rate <= 0) return null;
+  return formatMoney(String(amount / rate), "EUR");
 }
 
 const cityOrder = ["IST", "ANK", "IZM", "BUR", "KSY", "INE"] as const;
@@ -293,8 +311,12 @@ export default function ProductWorkspacePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ModerationDecision[]>([]);
   const [historyError, setHistoryError] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyCount, setHistoryCount] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const canModerate = product?.status === "submitted";
+  const canChangeApprovedStatus = product?.status === "approved";
   const latestRejection = history.find((item) => item.decision === "rejected");
   const totalQuantity = useMemo(
     () => form?.variants.reduce((total, variant) => total + Number(variant.quantity || 0), 0) ?? 0,
@@ -396,17 +418,24 @@ export default function ProductWorkspacePage() {
     }
   }
 
-  async function loadHistory() {
+  async function loadHistory(page = 1) {
     if (!Number.isInteger(productId) || productId < 1) return;
     setHistoryError("");
+    setHistoryLoading(true);
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/moderation-history/`);
+      const response = await authorizedFetch(`/api/v1/products/${productId}/moderation-history/?page=${page}`);
       if (!response.ok) throw new Error();
       const data = await response.json();
-      setHistory(Array.isArray(data) ? data : data.results ?? []);
+      const results = Array.isArray(data) ? data : data.results ?? [];
+      setHistory(results);
+      setHistoryCount(Array.isArray(data) ? results.length : Number(data.count ?? results.length));
+      setHistoryPage(page);
     } catch {
       setHistoryError("Unable to load moderation history.");
       setHistory([]);
+      setHistoryCount(0);
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -423,11 +452,7 @@ export default function ProductWorkspacePage() {
         setProduct(data);
         setForm(toForm(data));
         try {
-          const historyResponse = await authorizedFetch(`/api/v1/products/${productId}/moderation-history/`);
-          if (!historyResponse.ok) throw new Error();
-          const historyData = await historyResponse.json();
-          setHistory(Array.isArray(historyData) ? historyData : historyData.results ?? []);
-          setHistoryError("");
+          await loadHistory(1);
         } catch {
           setHistoryError("Unable to load moderation history.");
           setHistory([]);
@@ -536,9 +561,56 @@ export default function ProductWorkspacePage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiErrorMessage(data, `Product could not be ${action}d.`));
       setProduct(data as Product); setForm(toForm(data as Product)); setFeedback(action === "approve" ? "Product approved and EANs assigned." : "Product rejected. The seller will receive the reason.");
-      await loadHistory();
+      await loadHistory(1);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Moderation action failed."); }
     finally { setSaving(false); }
+  }
+
+  async function changeApprovedStatus(nextStatus: "submitted" | "rejected") {
+    if (nextStatus === "rejected" && !rejectComment.trim()) {
+      setError("Enter a reason before rejecting the product.");
+      return;
+    }
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/status/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          nextStatus === "rejected"
+            ? { status: nextStatus, comment: rejectComment.trim() }
+            : { status: nextStatus },
+        ),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, "Product status could not be changed."));
+      setProduct(data as Product);
+      setForm(toForm(data as Product));
+      setRejectComment("");
+      setFeedback(
+        nextStatus === "submitted"
+          ? "Product returned to review. EANs were kept."
+          : "Product rejected. The seller will receive the reason.",
+      );
+      await loadHistory(1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Product status could not be changed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function requestAvailability() {
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/availability-request/`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, "Availability request could not be sent."));
+      setProduct(data as Product);
+      setFeedback("Availability request sent to the seller.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Availability request could not be sent.");
+    } finally { setSaving(false); }
   }
 
   async function uploadImage(event: ChangeEvent<HTMLInputElement>) {
@@ -633,18 +705,22 @@ export default function ProductWorkspacePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [descriptionGenerationInProgress, imageGenerationInProgress, generation?.id]);
 
-  if (loading) return <main className="app-shell"><Sidebar active="products" /><section className="content products-page"><p className="products-message">Loading product...</p></section></main>;
-  if (error && !product) return <main className="app-shell"><Sidebar active="products" /><section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">← Back to products</Link></section></main>;
+  if (loading) return <section className="content products-page"><p className="products-message">Loading product...</p></section>;
+  if (error && !product) return <section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">← Back to products</Link></section>;
   if (!product || !form) return null;
+  const sellerEur = sellerPriceEur(product);
+  const previouslyRejected = product.status === "submitted" && product.last_moderation_decision === "rejected";
 
-  return <main className="app-shell"><Sidebar active="products" /><section className="content product-workspace">
-    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p>{product.seller ? <p className="products-subtitle">Created by {product.seller.username}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(); }}>Moderation history</button><Link className="back-link" href="/manager/products">← Products</Link></div></header>
+  return <><section className="content product-workspace">
+    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p>{product.seller ? <p className="products-subtitle">Created by {product.seller.username}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><Link className="back-link" href="/manager/products">← Products</Link></div></header>
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
     {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
-    <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong></article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
-    {product.currency !== "EUR" ? <p className="products-subtitle" role="note">{formatMoney(product.unit_price, product.currency)} → listing {product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "not available until the daily euro rate is loaded"}.</p> : null}
+    <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong>{previouslyRejected ? <small className="previous-decision">Previously rejected</small> : null}</article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}{sellerEur ? ` (${sellerEur})` : ""}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
+    <section className="workspace-summary workspace-ean"><article><span>EAN JV</span><strong>{product.ean_jv?.trim() || "—"}</strong></article><article><span>EAN XL</span><strong>{product.ean_xl?.trim() || "—"}</strong></article></section>
+    <div className="product-toolbar"><div className="availability-action"><button type="button" className="ask-availability-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? "Only approved products can receive an availability request." : undefined} onClick={() => void requestAvailability()}>Ask availability</button>{product.availability_reminder_sent_at ? <small>Last request: {formatDate(product.availability_reminder_sent_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>Moderation history</button></div>
     {product.status === "rejected" && <section className="workspace-card rejection-card"><div><p className="eyebrow">Rejection</p><h2>This product was rejected</h2><p>{latestRejection?.comment?.trim() || "No rejection reason was recorded."}</p></div></section>}
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
+    {canChangeApprovedStatus && <section className="workspace-card moderation-card"><div><p className="eyebrow">Status</p><h2>Change approved status</h2><p>Return it to review or reject it. If listings are live, deactivate them in <Link href="/manager/marketplaces">Marketplaces</Link> first.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>Return to review</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>Reject</button></div></section>}
     <section className="workspace-card image-gallery-card">
       <div className="image-gallery-heading">
         <div>
@@ -721,17 +797,26 @@ export default function ProductWorkspacePage() {
         </div>
         <p>All approve and reject decisions for this product, newest first.</p>
         {historyError && <p className="form-feedback error" role="alert">{historyError}</p>}
-        {!historyError && history.length === 0 && <p>No moderation decisions yet.</p>}
-        <ol className="history-list">
-          {history.map((item) => (
-            <li key={item.id}>
-              <strong className={`manager-status ${item.decision}`}>{statusLabels[item.decision] ?? item.decision}</strong>
-              <span>{formatDate(item.created_at, true)} · {item.manager_username}</span>
-              {item.comment ? <p>{item.comment}</p> : <p>No comment.</p>}
-            </li>
-          ))}
-        </ol>
+        {!historyError && historyCount === 0 && !historyLoading && <p>No moderation decisions yet.</p>}
+        {!historyError && historyCount > 0 && (
+          <nav className="pagination" aria-label="Moderation history pages">
+            <button type="button" disabled={historyLoading || historyPage <= 1} onClick={() => void loadHistory(historyPage - 1)}>← Previous</button>
+            <span>Page {historyPage}</span>
+            <button type="button" disabled={historyLoading || historyPage >= Math.ceil(historyCount / HISTORY_PAGE_SIZE)} onClick={() => void loadHistory(historyPage + 1)}>Next →</button>
+          </nav>
+        )}
+        {!historyError && history.length > 0 && (
+          <ol className="history-list">
+            {history.map((item) => (
+              <li key={item.id}>
+                <strong className={`manager-status ${item.decision}`}>{statusLabels[item.decision] ?? item.decision}</strong>
+                <span>{formatDate(item.created_at, true)} · {item.manager_username}</span>
+                {item.comment ? <p>{item.comment}</p> : <p>No comment.</p>}
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
     </div> : null}
-  </main>;
+  </>;
 }

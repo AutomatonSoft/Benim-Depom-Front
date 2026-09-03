@@ -1,6 +1,12 @@
-﻿import type { ReactNode } from "react";
+﻿"use client";
+
+import type { ReactNode } from "react";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { authorizedFetch } from "@/lib/api";
 
 type ActivePage =
   | "overview"
@@ -35,7 +41,35 @@ function SidebarIcon({ name }: { name: IconName }) {
   return <svg className="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
 }
 
-export default function Sidebar({ active }: { active: ActivePage }) {
+function activeFromPath(pathname: string): ActivePage {
+  if (pathname.startsWith("/manager/products")) return "products";
+  if (pathname.startsWith("/manager/sellers") || pathname.startsWith("/manager/managers")) return "sellers";
+  if (pathname.startsWith("/manager/messages")) return "messages";
+  if (pathname.startsWith("/manager/eans")) return "eans";
+  if (pathname.startsWith("/manager/marketplaces")) return "marketplaces";
+  if (pathname.startsWith("/manager/settings")) return "settings";
+  return "overview";
+}
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const active = activeFromPath(pathname);
+  const [profile, setProfile] = useState<{ username: string; first_name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      const response = await authorizedFetch("/api/v1/auth/me/");
+      if (!response.ok) return;
+      setProfile((await response.json()) as { username: string; first_name: string; role: string });
+    }
+
+    void loadProfile();
+  }, []);
+
+  const displayName = profile?.first_name.trim() || profile?.username || "Manager";
+  const initials = displayName.slice(0, 2).toUpperCase();
+  const roleLabel = profile?.role === "admin" ? "Admin" : "Manager";
+
   return (
     <aside className="sidebar">
       <Link className="brand" href="/manager">Benim<span>Depom</span></Link>
@@ -50,7 +84,7 @@ export default function Sidebar({ active }: { active: ActivePage }) {
       </nav>
       <div className="sidebar-bottom">
         <Link className={`nav-item ${active === "settings" ? "active" : ""}`} href="/manager/settings"><SidebarIcon name="settings" />Settings</Link>
-        <div className="profile"><span>AK</span><div><strong>Alikhan</strong><small>Manager</small></div></div>
+        <div className="profile"><span>{initials}</span><div><strong>{displayName}</strong><small>{roleLabel}</small></div></div>
       </div>
     </aside>
   );
