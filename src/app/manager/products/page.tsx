@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
@@ -23,7 +22,7 @@ type Product = {
   images: ProductImage[];
   created_at: string;
   seller?: { id: number; username: string; first_name: string; email: string };
-  last_moderation_decision?: "approved" | "rejected" | null;
+  last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | null;
   ean_jv?: string | null;
   ean_xl?: string | null;
 };
@@ -129,9 +128,7 @@ export default function ProductsPage() {
   }
 
   return (
-    <main className="app-shell">
-      <Sidebar active="products" />
-      <section className="content products-page">
+    <section className="content products-page">
         <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Products</h1><p className="products-subtitle">{count} products in your workspace</p></div><Link className="back-link" href="/manager">← Overview</Link></header>
 
         <section className="products-panel">
@@ -187,6 +184,5 @@ export default function ProductsPage() {
           </div>}
         </section>
       </section>
-    </main>
   );
 }

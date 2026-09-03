@@ -24,7 +24,6 @@ export default function ImpressumPage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img alt="Benim Depom" className="logo-img" src="/landing/logo.png" />
             </span>
-            <span className="brand-sub-wrap"><span className="brand-sub">by {CONTACT.company}</span></span>
           </Link>
           <div className="header-right">
             <div className="lang-switch">

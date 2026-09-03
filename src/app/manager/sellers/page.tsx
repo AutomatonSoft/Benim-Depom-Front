@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { FormEvent, useEffect, useState } from "react";
@@ -89,9 +88,7 @@ export default function SellersPage() {
   }
 
   return (
-    <main className="app-shell"><Sidebar active="sellers" />
-
-      <section className="content products-page">
+    <section className="content products-page">
         <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Sellers</h1><p className="products-subtitle">{count} registered sellers</p></div><Link className="primary-link" href="/manager/managers/new">+ Create manager</Link></header>
 
         <section className="products-panel">
@@ -122,6 +119,5 @@ export default function SellersPage() {
           <footer className="pagination"><button disabled={!hasPrevious || loading} onClick={() => setPage((value) => value - 1)}>← Previous</button><span>Page {page}</span><button disabled={!hasNext || loading} onClick={() => setPage((value) => value + 1)}>Next →</button></footer>
         </section>
       </section>
-    </main>
   );
 }

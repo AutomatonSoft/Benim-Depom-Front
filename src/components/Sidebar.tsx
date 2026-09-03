@@ -1,6 +1,9 @@
-﻿import type { ReactNode } from "react";
+﻿"use client";
+
+import type { ReactNode } from "react";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { authorizedFetch } from "@/lib/api";
@@ -38,7 +41,19 @@ function SidebarIcon({ name }: { name: IconName }) {
   return <svg className="sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
 }
 
-export default function Sidebar({ active }: { active: ActivePage }) {
+function activeFromPath(pathname: string): ActivePage {
+  if (pathname.startsWith("/manager/products")) return "products";
+  if (pathname.startsWith("/manager/sellers") || pathname.startsWith("/manager/managers")) return "sellers";
+  if (pathname.startsWith("/manager/messages")) return "messages";
+  if (pathname.startsWith("/manager/eans")) return "eans";
+  if (pathname.startsWith("/manager/marketplaces")) return "marketplaces";
+  if (pathname.startsWith("/manager/settings")) return "settings";
+  return "overview";
+}
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const active = activeFromPath(pathname);
   const [profile, setProfile] = useState<{ username: string; first_name: string; role: string } | null>(null);
 
   useEffect(() => {
