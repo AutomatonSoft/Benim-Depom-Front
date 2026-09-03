@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 
-import Sidebar from "@/components/Sidebar";
 import { authorizedFetch } from "@/lib/api";
 
 type FormValues = {
@@ -94,9 +93,7 @@ export default function CreateManagerPage() {
   }
 
   return (
-    <main className="app-shell">
-      <Sidebar active="sellers" />
-      <section className="content create-manager-page">
+    <section className="content create-manager-page">
         <header className="topbar">
           <div>
             <p className="eyebrow">Manager panel</p>
@@ -132,6 +129,5 @@ export default function CreateManagerPage() {
           <button className="create-manager-button" disabled={submitting} type="submit">{submitting ? "Creating…" : "Create manager"}</button>
         </form>
       </section>
-    </main>
   );
 }

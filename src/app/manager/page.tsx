@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { useEffect, useState } from "react";
@@ -183,9 +182,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="app-shell"><Sidebar active="overview" />
-
-      <section className="content" id="overview">
+    <section className="content" id="overview">
         <header className="topbar">
           <div><p className="eyebrow">Manager panel</p><h1>{greeting(profile)}</h1></div>
           <Link className="notification" href="/manager/messages" aria-label="Messages">♢</Link>
@@ -243,6 +240,5 @@ export default function Home() {
           )}
         </section>
       </section>
-    </main>
   );
 }

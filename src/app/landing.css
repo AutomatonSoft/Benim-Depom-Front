@@ -113,8 +113,6 @@
 .bd-landing .header-inner { display: flex; align-items: center; justify-content: space-between; height: 84px; gap: 10px; }
 .bd-landing .logo { display: flex; align-items: center; gap: 8px; font-family: var(--font-cond); font-weight: 700; font-size: 1.3rem; letter-spacing: -0.01em; flex: none; }
 .bd-landing .logo-img { height: 46px; width: auto; display: block; flex: none; }
-.bd-landing .brand-sub-wrap { display: flex; flex-direction: column; justify-content: center; }
-.bd-landing .brand-sub { display: block; font-family: var(--font-body); font-weight: 400; font-size: 0.66rem; color: var(--ink-faint); letter-spacing: 0.03em; margin-top: -2px; }
 .bd-landing .logo-chip { background: #fff; padding: 12px 22px; border-radius: 12px; display: inline-flex; width: fit-content; align-items: center; box-shadow: var(--shadow-sm); }
 @media (max-width: 560px) {
   .bd-landing .logo-chip { padding: 8px 14px; }
@@ -152,9 +150,6 @@
   .bd-landing .main-nav { display: none; }
   .bd-landing .header-right .btn-primary { display: none; }
   .bd-landing .menu-toggle { display: flex; }
-}
-@media (max-width: 1360px) {
-  .bd-landing .logo .brand-sub-wrap { display: none; }
 }
 @media (max-width: 560px) {
   .bd-landing .wa-nav-btn { display: none; }
@@ -411,9 +406,8 @@
 .bd-landing .about-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
 @media (max-width: 880px) { .bd-landing .about-wrap { grid-template-columns: 1fr; gap: 32px; } }
 .bd-landing .about-wrap p { color: var(--ink-soft); font-size: 1.05rem; margin-bottom: 16px; }
-.bd-landing .about-op { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 22px; }
-.bd-landing .about-op .aop-label { font-family: var(--font-cond); font-size: 0.78rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-.bd-landing .about-op .aop-name { font-family: var(--font-cond); font-weight: 700; font-size: 1.2rem; }
+.bd-landing .about-op { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 0; overflow: hidden; }
+.bd-landing .about-op .stat-strip { margin-top: 0; border: none; border-radius: 0; }
 .bd-landing .story-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
 .bd-landing .story-chip { background: var(--surface-alt); border-radius: 999px; padding: 8px 14px; font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-soft); }
 .bd-landing .stat-strip { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; margin-top: 18px; }
