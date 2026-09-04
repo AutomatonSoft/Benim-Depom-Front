@@ -231,37 +231,49 @@ function FormulaEditorDialog({
           <h2 id="price-help-title">{t("formula.title")}</h2>
           <button type="button" className="price-calc-hint" onClick={onClose}>{t("common.close")}</button>
         </div>
-        <p>{t("formula.intro")}</p>
+        <p className="formula-intro">{t("formula.intro")}</p>
         <p className="price-help-formula">
           {t("formula.listing")}<br />
           {t("formula.listingRest")}
         </p>
-        <h3>{t("formula.percentages")}</h3>
-        <div className="formula-percent-grid">
-          <label>{t("formula.margin")}<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
-          <label>{t("formula.advertising")}<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
-          <label>{t("formula.vat")}<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
+        <div className="formula-sections">
+          <section className="formula-block">
+            <h3>{t("formula.percentages")}</h3>
+            <div className="formula-percent-grid">
+              <label>{t("formula.margin")}<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
+              <label>{t("formula.advertising")}<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
+              <label>{t("formula.vat")}<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
+            </div>
+          </section>
+          <section className="formula-block">
+            <h3>{t("formula.rates")}</h3>
+            <div className="formula-rates-grid">
+              <label>{t("formula.try")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} /></label>
+              <label>{t("formula.usd")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} /></label>
+            </div>
+          </section>
+          <section className="formula-block">
+            <h3>{t("formula.cityTariffs")}</h3>
+            <div className="formula-city-grid">
+              {cityOrder.map((city) => (
+                <label key={city}>{warehouseLabels[city]}<input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} /></label>
+              ))}
+            </div>
+          </section>
+          <section className="formula-block">
+            <h3>{t("formula.deDelivery")}</h3>
+            <div className="formula-tier-list">
+              {draft.de_size_tiers.map((tier, index) => (
+                <div className="formula-tier-row" key={tier.code}>
+                  <strong>{tier.code}</strong>
+                  <label>{t("formula.from")}<input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} /></label>
+                  <label>{t("formula.to")}<input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} /></label>
+                  <label>{t("formula.price")}<input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} /></label>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
-        <h3>{t("formula.rates")}</h3>
-        <div className="form-two-columns">
-          <label>{t("formula.try")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} /></label>
-          <label>{t("formula.usd")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} /></label>
-        </div>
-        <h3>{t("formula.cityTariffs")}</h3>
-        <div className="formula-city-grid">
-          {cityOrder.map((city) => (
-            <label key={city}>{warehouseLabels[city]}<input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} /></label>
-          ))}
-        </div>
-        <h3>{t("formula.deDelivery")}</h3>
-        {draft.de_size_tiers.map((tier, index) => (
-          <div className="formula-tier-row" key={tier.code}>
-            <strong>{tier.code}</strong>
-            <label>{t("formula.from")}<input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} /></label>
-            <label>{t("formula.to")}<input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} /></label>
-            <label>{t("formula.price")}<input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} /></label>
-          </div>
-        ))}
         <div className="price-help-actions">
           <button type="button" className="price-calc-hint" disabled={saving} onClick={onReset}>{t("formula.useDefault")}</button>
           <button className="save-button" disabled={saving} type="submit">{saving ? t("product.saving") : t("formula.save")}</button>
