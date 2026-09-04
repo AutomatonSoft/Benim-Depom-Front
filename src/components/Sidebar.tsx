@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { authorizedFetch } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 type ActivePage =
   | "overview"
@@ -19,12 +20,12 @@ type ActivePage =
 
 type IconName = ActivePage;
 
-const links: { id: Exclude<ActivePage, "settings">; href: string; label: string }[] = [
-  { id: "overview", href: "/manager", label: "Overview" },
-  { id: "products", href: "/manager/products", label: "Products" },
-  { id: "sellers", href: "/manager/sellers", label: "Sellers" },
-  { id: "messages", href: "/manager/messages", label: "Messages" },
-  { id: "eans", href: "/manager/eans", label: "EAN" },
+const links: { id: Exclude<ActivePage, "settings">; href: string; key: "nav.overview" | "nav.products" | "nav.sellers" | "nav.messages" | "nav.eans" }[] = [
+  { id: "overview", href: "/manager", key: "nav.overview" },
+  { id: "products", href: "/manager/products", key: "nav.products" },
+  { id: "sellers", href: "/manager/sellers", key: "nav.sellers" },
+  { id: "messages", href: "/manager/messages", key: "nav.messages" },
+  { id: "eans", href: "/manager/eans", key: "nav.eans" },
 ];
 
 function SidebarIcon({ name }: { name: IconName }) {
@@ -53,6 +54,7 @@ function activeFromPath(pathname: string): ActivePage {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { t } = useI18n();
   const active = activeFromPath(pathname);
   const [profile, setProfile] = useState<{ username: string; first_name: string; role: string } | null>(null);
 
@@ -66,24 +68,24 @@ export default function Sidebar() {
     void loadProfile();
   }, []);
 
-  const displayName = profile?.first_name.trim() || profile?.username || "Manager";
+  const displayName = profile?.first_name.trim() || profile?.username || t("common.role.manager");
   const initials = displayName.slice(0, 2).toUpperCase();
-  const roleLabel = profile?.role === "admin" ? "Admin" : "Manager";
+  const roleLabel = profile?.role === "admin" ? t("common.role.admin") : t("common.role.manager");
 
   return (
     <aside className="sidebar">
       <Link className="brand" href="/manager">Benim<span>Depom</span></Link>
-      <nav aria-label="Main navigation">
+      <nav aria-label={t("nav.main")}>
         {links.map((link) => (
           <Link className={`nav-item ${active === link.id ? "active" : ""}`} href={link.href} key={link.id}>
             <SidebarIcon name={link.id} />
-            {link.label}
+            {t(link.key)}
           </Link>
         ))}
-        <Link className={`nav-item ${active === "marketplaces" ? "active" : ""}`} href="/manager/marketplaces"><SidebarIcon name="marketplaces" />Marketplaces</Link>
+        <Link className={`nav-item ${active === "marketplaces" ? "active" : ""}`} href="/manager/marketplaces"><SidebarIcon name="marketplaces" />{t("nav.marketplaces")}</Link>
       </nav>
       <div className="sidebar-bottom">
-        <Link className={`nav-item ${active === "settings" ? "active" : ""}`} href="/manager/settings"><SidebarIcon name="settings" />Settings</Link>
+        <Link className={`nav-item ${active === "settings" ? "active" : ""}`} href="/manager/settings"><SidebarIcon name="settings" />{t("nav.settings")}</Link>
         <div className="profile"><span>{initials}</span><div><strong>{displayName}</strong><small>{roleLabel}</small></div></div>
       </div>
     </aside>
