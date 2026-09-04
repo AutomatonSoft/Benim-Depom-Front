@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { useI18n, type MessageKey } from "@/i18n";
 import { FormEvent, useEffect, useState } from "react";
 
 type ProductImage = {
@@ -34,17 +35,12 @@ type ProductListResponse = {
   results: Product[];
 };
 
-const statusLabels: Record<string, string> = {
-  draft: "Draft",
-  submitted: "Awaiting review",
-  approved: "Approved",
-  rejected: "Rejected",
-  deactivated: "Deactivated",
-};
+const statusKeys = ["draft", "submitted", "approved", "rejected", "deactivated"] as const;
 
-const statusFilterOptions = Object.entries(statusLabels).filter(([value]) => value !== "draft");
+const statusFilterOptions = statusKeys.filter((value) => value !== "draft");
 
 export default function ProductsPage() {
+  const { t } = useI18n();
   const [products, setProducts] = useState<Product[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -89,14 +85,14 @@ export default function ProductsPage() {
         setHasNext(Boolean(data.next));
         setHasPrevious(Boolean(data.previous));
       } catch {
-        setError("Unable to load products. Please try again.");
+        setError(t("products.loadError"));
       } finally {
         setLoading(false);
       }
     }
 
     void loadProducts();
-  }, [page, status, appliedSearch]);
+  }, [page, status, appliedSearch, t]);
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,7 +109,7 @@ export default function ProductsPage() {
 
   function formatListing(product: Product) {
     if (product.listing_price_eur == null || product.listing_price_eur === "") {
-      return "Listing —";
+      return t("products.listingEmpty");
     }
     return new Intl.NumberFormat("de-DE", {
       style: "currency",
@@ -124,34 +120,34 @@ export default function ProductsPage() {
   function eanCountLabel(product: Product) {
     const count = [product.ean_jv, product.ean_xl].filter((code) => Boolean(code?.trim())).length;
     if (count === 0) return "—";
-    return `${count} EAN`;
+    return t("products.eanCount", { count });
   }
 
   return (
     <section className="content products-page">
-        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Products</h1><p className="products-subtitle">{count} products in your workspace</p></div><Link className="back-link" href="/manager">← Overview</Link></header>
+        <header className="topbar"><div><p className="eyebrow">{t("common.panel")}</p><h1>{t("products.title")}</h1><p className="products-subtitle">{t("products.subtitle", { count })}</p></div><Link className="back-link" href="/manager">{t("products.backOverview")}</Link></header>
 
         <section className="products-panel">
           <form className="products-toolbar" onSubmit={applySearch}>
-            <input aria-label="Search products" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title or EAN" />
-            <select aria-label="Filter by status" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }}>
-              <option value="">All statuses</option>
-              {statusFilterOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            <input aria-label={t("products.searchAria")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("products.searchPlaceholder")} />
+            <select aria-label={t("products.statusAria")} value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }}>
+              <option value="">{t("products.allStatuses")}</option>
+              {statusFilterOptions.map((value) => <option key={value} value={value}>{t(`status.${value}` as MessageKey)}</option>)}
             </select>
-            <button type="submit">Search</button>
-            <nav className="pagination" aria-label="Product list pages">
-              <button type="button" disabled={!hasPrevious || loading} onClick={() => setPage((value) => value - 1)}>← Previous</button>
-              <span>Page {page}</span>
-              <button type="button" disabled={!hasNext || loading} onClick={() => setPage((value) => value + 1)}>Next →</button>
+            <button type="submit">{t("common.search")}</button>
+            <nav className="pagination" aria-label={t("products.pagesAria")}>
+              <button type="button" disabled={!hasPrevious || loading} onClick={() => setPage((value) => value - 1)}>{t("common.previous")}</button>
+              <span>{t("common.page", { page })}</span>
+              <button type="button" disabled={!hasNext || loading} onClick={() => setPage((value) => value + 1)}>{t("common.next")}</button>
             </nav>
           </form>
 
-          {loading && <p className="products-message">Loading products…</p>}
+          {loading && <p className="products-message">{t("products.loading")}</p>}
           {error && <p className="products-message error" role="alert">{error}</p>}
-          {!loading && !error && products.length === 0 && <p className="products-message">No products match these filters.</p>}
+          {!loading && !error && products.length === 0 && <p className="products-message">{t("products.empty")}</p>}
 
           {!loading && !error && products.length > 0 && <div className="products-table">
-            <div className="table-header"><span>Product</span><span>Status</span><span>EAN</span><span>Stock</span><span>Seller / listing</span><span>Created</span></div>
+            <div className="table-header"><span>{t("products.col.product")}</span><span>{t("products.col.status")}</span><span>{t("products.col.ean")}</span><span>{t("products.col.stock")}</span><span>{t("products.col.sellerListing")}</span><span>{t("products.col.created")}</span></div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
               const showPreviousReject = product.status === "submitted" && product.last_moderation_decision === "rejected";
@@ -173,9 +169,9 @@ export default function ProductsPage() {
                     )}
                   </div>
                 </div>
-                <div className="manager-status-cell"><span className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</span>{showPreviousReject ? <small className="previous-decision">Previously rejected</small> : null}</div>
+                <div className="manager-status-cell"><span className={`manager-status ${product.status}`}>{t(`status.${product.status}` as MessageKey)}</span>{showPreviousReject ? <small className="previous-decision">{t("products.previouslyRejected")}</small> : null}</div>
                 <strong className="ean-count">{eanCountLabel(product)}</strong>
-                <strong>{product.total_quantity} pcs</strong>
+                <strong>{t("products.pcs", { count: product.total_quantity })}</strong>
                 <strong className="price-stack"><span>{formatPrice(product)}</span><small>{formatListing(product)}</small></strong>
                 <time dateTime={product.created_at}>{formatDate(product.created_at, true)}</time>
               </Link>;

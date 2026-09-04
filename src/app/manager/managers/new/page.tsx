@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 
 import { authorizedFetch } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 type FormValues = {
   username: string;
@@ -27,14 +28,15 @@ const initialValues: FormValues = {
   preferred_language: "de",
 };
 
-function apiError(data: unknown) {
-  if (!data || typeof data !== "object") return "Unable to create the manager.";
+function apiError(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
   return Object.entries(data)
     .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(" ") : value}`)
     .join(" ");
 }
 
 export default function CreateManagerPage() {
+  const { t } = useI18n();
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -79,14 +81,14 @@ export default function CreateManagerPage() {
       }
 
       if (!response.ok) {
-        setError(apiError(await response.json().catch(() => null)));
+        setError(apiError(await response.json().catch(() => null), t("managerCreate.failed")));
         return;
       }
 
-      setSuccess("Manager account created successfully.");
+      setSuccess(t("managerCreate.success"));
       setValues(initialValues);
     } catch {
-      setError("Unable to reach the API. Please try again.");
+      setError(t("common.apiUnreachable"));
     } finally {
       setSubmitting(false);
     }
@@ -96,37 +98,37 @@ export default function CreateManagerPage() {
     <section className="content create-manager-page">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Manager panel</p>
-            <h1>Create manager</h1>
-            <p className="products-subtitle">Create an account for a new member of the management team.</p>
+            <p className="eyebrow">{t("common.panel")}</p>
+            <h1>{t("managerCreate.title")}</h1>
+            <p className="products-subtitle">{t("managerCreate.subtitle")}</p>
           </div>
-          <Link className="back-link" href="/manager/sellers">← Sellers</Link>
+          <Link className="back-link" href="/manager/sellers">{t("managerCreate.back")}</Link>
         </header>
 
         <form className="manager-form" onSubmit={submit}>
           <section>
-            <p className="eyebrow">Account</p>
+            <p className="eyebrow">{t("managerCreate.account")}</p>
             <div className="manager-fields">
-              <label>Username<input required autoComplete="username" value={values.username} onChange={(event) => update("username", event.target.value)} /></label>
-              <label>Email<input required type="email" autoComplete="email" value={values.email} onChange={(event) => update("email", event.target.value)} /></label>
-              <label>Password<input required minLength={8} type="password" autoComplete="new-password" value={values.password} onChange={(event) => update("password", event.target.value)} /></label>
-              <label>Confirm password<input required minLength={8} type="password" autoComplete="new-password" value={values.password_confirm} onChange={(event) => update("password_confirm", event.target.value)} /></label>
+              <label>{t("managerCreate.username")}<input required autoComplete="username" value={values.username} onChange={(event) => update("username", event.target.value)} /></label>
+              <label>{t("managerCreate.email")}<input required type="email" autoComplete="email" value={values.email} onChange={(event) => update("email", event.target.value)} /></label>
+              <label>{t("managerCreate.password")}<input required minLength={8} type="password" autoComplete="new-password" value={values.password} onChange={(event) => update("password", event.target.value)} /></label>
+              <label>{t("managerCreate.confirmPassword")}<input required minLength={8} type="password" autoComplete="new-password" value={values.password_confirm} onChange={(event) => update("password_confirm", event.target.value)} /></label>
             </div>
           </section>
 
           <section>
-            <p className="eyebrow">Profile</p>
+            <p className="eyebrow">{t("managerCreate.profile")}</p>
             <div className="manager-fields">
-              <label>First name <small>Optional</small><input autoComplete="given-name" value={values.first_name} onChange={(event) => update("first_name", event.target.value)} /></label>
-              <label>Last name <small>Optional</small><input autoComplete="family-name" value={values.last_name} onChange={(event) => update("last_name", event.target.value)} /></label>
-              <label>Phone <small>Optional</small><input type="tel" autoComplete="tel" value={values.phone} onChange={(event) => update("phone", event.target.value)} /></label>
-              <label>Preferred language <small>Optional</small><select value={values.preferred_language} onChange={(event) => update("preferred_language", event.target.value)}><option value="de">Deutsch</option><option value="en">English</option><option value="tr">Türkçe</option><option value="ru">Русский</option></select></label>
+              <label>{t("managerCreate.firstName")} <small>{t("common.optional")}</small><input autoComplete="given-name" value={values.first_name} onChange={(event) => update("first_name", event.target.value)} /></label>
+              <label>{t("managerCreate.lastName")} <small>{t("common.optional")}</small><input autoComplete="family-name" value={values.last_name} onChange={(event) => update("last_name", event.target.value)} /></label>
+              <label>{t("managerCreate.phone")} <small>{t("common.optional")}</small><input type="tel" autoComplete="tel" value={values.phone} onChange={(event) => update("phone", event.target.value)} /></label>
+              <label>{t("managerCreate.preferredLanguage")} <small>{t("common.optional")}</small><select value={values.preferred_language} onChange={(event) => update("preferred_language", event.target.value)}><option value="de">Deutsch</option><option value="en">English</option><option value="tr">Türkçe</option><option value="ru">Русский</option></select></label>
             </div>
           </section>
 
           {error && <p className="form-feedback error" role="alert">{error}</p>}
           {success && <p className="form-feedback success" role="status">{success}</p>}
-          <button className="create-manager-button" disabled={submitting} type="submit">{submitting ? "Creating…" : "Create manager"}</button>
+          <button className="create-manager-button" disabled={submitting} type="submit">{submitting ? t("managerCreate.submitting") : t("managerCreate.submit")}</button>
         </form>
       </section>
   );

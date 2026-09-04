@@ -6,6 +6,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { useI18n, type MessageKey } from "@/i18n";
 
 type Variant = {
   id: number;
@@ -65,6 +66,8 @@ type Product = {
   created_at: string;
   updated_at: string;
   availability_reminder_sent_at?: string | null;
+  availability_confirmed_at?: string | null;
+  is_available?: boolean;
   seller?: { id: number; username: string; first_name: string; email: string };
 };
 
@@ -98,19 +101,7 @@ type GalleryItem = { key: string; url: string; label: string; generated: boolean
 
 type DraftForm = { title: string; description: string; bullets: string };
 
-const generatedModeLabels: Record<string, string> = {
-  white: "White background",
-  interior: "Interior",
-  human: "Human",
-};
-
 const HISTORY_PAGE_SIZE = 5;
-
-const statusLabels: Record<string, string> = {
-  draft: "Draft", submitted: "Awaiting review",
-  approved: "Approved", rejected: "Rejected", deactivated: "Deactivated",
-  returned_to_review: "Returned to review",
-};
 
 const defaultTargets = [
   { marketplace: "otto", account: "jv" }, { marketplace: "otto", account: "xl" },
@@ -198,6 +189,7 @@ function FormulaEditorDialog({
   onSave: (overrides: Record<string, unknown>) => void;
   onReset: () => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(formula);
 
   function setField(field: "margin" | "adv_fee" | "vat" | "eur_to_try" | "eur_to_usd", value: string) {
@@ -236,43 +228,43 @@ function FormulaEditorDialog({
     <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="price-help-title" onClick={onClose}>
       <form className="price-help-dialog price-formula-dialog" onClick={(event) => event.stopPropagation()} onSubmit={submit}>
         <div className="price-help-heading">
-          <h2 id="price-help-title">Startpreis formula</h2>
-          <button type="button" className="price-calc-hint" onClick={onClose}>Close</button>
+          <h2 id="price-help-title">{t("formula.title")}</h2>
+          <button type="button" className="price-calc-hint" onClick={onClose}>{t("common.close")}</button>
         </div>
-        <p>These values apply only to this product. Saving recalculates listing EUR and does not change the global catalog.</p>
+        <p>{t("formula.intro")}</p>
         <p className="price-help-formula">
-          Listing EUR = round to .49 or .99 of<br />
-          (purchase in EUR + city tariff × CBM + DE delivery) × (1 + margin + advertising + VAT)
+          {t("formula.listing")}<br />
+          {t("formula.listingRest")}
         </p>
-        <h3>Percentages</h3>
+        <h3>{t("formula.percentages")}</h3>
         <div className="formula-percent-grid">
-          <label>Margin (0.75 = 75%)<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
-          <label>Advertising (0.19 = 19%)<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
-          <label>VAT (0.19 = 19%)<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
+          <label>{t("formula.margin")}<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
+          <label>{t("formula.advertising")}<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
+          <label>{t("formula.vat")}<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
         </div>
-        <h3>EUR rates (how many units per 1 €)</h3>
+        <h3>{t("formula.rates")}</h3>
         <div className="form-two-columns">
-          <label>TRY per EUR<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} /></label>
-          <label>USD per EUR<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} /></label>
+          <label>{t("formula.try")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} /></label>
+          <label>{t("formula.usd")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} /></label>
         </div>
-        <h3>City tariffs € / m³</h3>
+        <h3>{t("formula.cityTariffs")}</h3>
         <div className="formula-city-grid">
           {cityOrder.map((city) => (
             <label key={city}>{warehouseLabels[city]}<input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} /></label>
           ))}
         </div>
-        <h3>DE delivery by volume</h3>
+        <h3>{t("formula.deDelivery")}</h3>
         {draft.de_size_tiers.map((tier, index) => (
           <div className="formula-tier-row" key={tier.code}>
             <strong>{tier.code}</strong>
-            <label>From m³<input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} /></label>
-            <label>To m³<input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} /></label>
-            <label>Price €<input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} /></label>
+            <label>{t("formula.from")}<input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} /></label>
+            <label>{t("formula.to")}<input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} /></label>
+            <label>{t("formula.price")}<input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} /></label>
           </div>
         ))}
         <div className="price-help-actions">
-          <button type="button" className="price-calc-hint" disabled={saving} onClick={onReset}>Use default formula</button>
-          <button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save for this product"}</button>
+          <button type="button" className="price-calc-hint" disabled={saving} onClick={onReset}>{t("formula.useDefault")}</button>
+          <button className="save-button" disabled={saving} type="submit">{saving ? t("product.saving") : t("formula.save")}</button>
         </div>
       </form>
     </div>
@@ -293,6 +285,7 @@ function toForm(product: Product): FormState {
 export default function ProductWorkspacePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useI18n();
   const productId = Number(params.id);
   const [product, setProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
@@ -334,14 +327,14 @@ export default function ProductWorkspacePage() {
     if (!product) return [];
     const items: GalleryItem[] = [];
     for (const image of product.images) {
-      items.push({ key: `source-${image.id}`, url: image.image, label: image.is_primary ? "Primary image" : "Source image", generated: false });
-      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: "Processed image", generated: true });
+      items.push({ key: `source-${image.id}`, url: image.image, label: image.is_primary ? t("product.primaryImage") : t("product.sourceImage"), generated: false });
+      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: t("product.processedImage"), generated: true });
       for (const generated of image.generated_images) {
-        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`, generated: true });
+        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`, generated: true });
       }
     }
     return items;
-  }, [product]);
+  }, [product, t]);
   const selectedImageIndex = Math.max(0, galleryItems.findIndex((item) => item.key === selectedImageKey));
   const selectedGalleryItem: GalleryItem | undefined = galleryItems[selectedImageIndex];
 
@@ -406,13 +399,13 @@ export default function ProductWorkspacePage() {
     try {
       const response = await authorizedFetch(`/api/v1/products/${productId}/`);
       if (response.status === 401) return void router.replace("/manager/login");
-      if (response.status === 404) throw new Error("Product was not found.");
-      if (!response.ok) throw new Error("Unable to load product.");
+      if (response.status === 404) throw new Error(t("product.notFound"));
+      if (!response.ok) throw new Error(t("product.loadError"));
       const data = await response.json() as Product;
       setProduct(data);
       if (!options?.silent) setForm(toForm(data));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to load product.");
+      setError(cause instanceof Error ? cause.message : t("product.loadError"));
     } finally {
       if (!options?.silent) setLoading(false);
     }
@@ -431,7 +424,7 @@ export default function ProductWorkspacePage() {
       setHistoryCount(Array.isArray(data) ? results.length : Number(data.count ?? results.length));
       setHistoryPage(page);
     } catch {
-      setHistoryError("Unable to load moderation history.");
+      setHistoryError(t("product.historyError"));
       setHistory([]);
       setHistoryCount(0);
     } finally {
@@ -446,26 +439,28 @@ export default function ProductWorkspacePage() {
       try {
         const response = await authorizedFetch(`/api/v1/products/${productId}/`);
         if (response.status === 401) return void router.replace("/manager/login");
-        if (response.status === 404) throw new Error("Product was not found.");
-        if (!response.ok) throw new Error("Unable to load product.");
+        if (response.status === 404) throw new Error(t("product.notFound"));
+        if (!response.ok) throw new Error(t("product.loadError"));
         const data = await response.json() as Product;
         setProduct(data);
         setForm(toForm(data));
         try {
           await loadHistory(1);
         } catch {
-          setHistoryError("Unable to load moderation history.");
+          setHistoryError(t("product.historyError"));
           setHistory([]);
         }
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Unable to load product.");
+        setError(cause instanceof Error ? cause.message : t("product.loadError"));
       } finally {
         setLoading(false);
       }
     }
 
     void loadInitialProduct();
-  }, [productId, router]);
+  // loadHistory is recreated each render; initial load should run once per product.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId, router, t]);
 
   useEffect(() => {
     const savedGenerationId = window.localStorage.getItem(generationStorageKey(productId));
@@ -605,11 +600,11 @@ export default function ProductWorkspacePage() {
     try {
       const response = await authorizedFetch(`/api/v1/manager/products/${productId}/availability-request/`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiErrorMessage(data, "Availability request could not be sent."));
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.availabilityFailed")));
       setProduct(data as Product);
-      setFeedback("Availability request sent to the seller.");
+      setFeedback(t("product.availabilitySent"));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Availability request could not be sent.");
+      setError(cause instanceof Error ? cause.message : t("product.availabilityFailed"));
     } finally { setSaving(false); }
   }
 
@@ -628,7 +623,7 @@ export default function ProductWorkspacePage() {
   }
 
   async function deleteImage(imageId: number) {
-    if (!window.confirm("Delete this image together with all its AI-generated variants?")) return;
+    if (!window.confirm(t("product.deleteImageConfirm"))) return;
     setSaving(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(`/api/v1/products/${productId}/images/${imageId}/`, { method: "DELETE" });
@@ -705,113 +700,113 @@ export default function ProductWorkspacePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [descriptionGenerationInProgress, imageGenerationInProgress, generation?.id]);
 
-  if (loading) return <section className="content products-page"><p className="products-message">Loading product...</p></section>;
-  if (error && !product) return <section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">← Back to products</Link></section>;
+  if (loading) return <section className="content products-page"><p className="products-message">{t("product.loading")}</p></section>;
+  if (error && !product) return <section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">{t("product.backToList")}</Link></section>;
   if (!product || !form) return null;
   const sellerEur = sellerPriceEur(product);
   const previouslyRejected = product.status === "submitted" && product.last_moderation_decision === "rejected";
 
   return <><section className="content product-workspace">
-    <header className="topbar"><div><p className="eyebrow">Product workspace</p><h1>{product.title}</h1><p className="products-subtitle">Product #{product.id} · last updated {formatDate(product.updated_at, true)}</p>{product.seller ? <p className="products-subtitle">Created by {product.seller.username}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><Link className="back-link" href="/manager/products">← Products</Link></div></header>
+    <header className="topbar"><div><p className="eyebrow">{t("product.workspace")}</p><h1>{product.title}</h1><p className="products-subtitle">{t("product.updated", { id: product.id, date: formatDate(product.updated_at, true) })}</p>{product.seller ? <p className="products-subtitle">{t("product.createdBy", { name: product.seller.username })}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><Link className="back-link" href="/manager/products">{t("product.back")}</Link></div></header>
     {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
-    {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">Background tasks</p><h2>Generation continues in the background</h2><p>You can safely leave or refresh this page. The server keeps processing and this screen checks the saved task every four seconds.</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label="Description generation" status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label="Image generation" status={activeImageGenerationStatus} />}</section>}
-    <section className="workspace-summary"><article><span>Status</span><strong className={`manager-status ${product.status}`}>{statusLabels[product.status] ?? product.status}</strong>{previouslyRejected ? <small className="previous-decision">Previously rejected</small> : null}</article><article><span>Stock</span><strong>{product.total_quantity} pcs</strong></article><article><span>Seller price</span><strong>{formatMoney(product.unit_price, product.currency)}{sellerEur ? ` (${sellerEur})` : ""}</strong></article><article><span>Listing EUR</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
+    {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">{t("product.background")}</p><h2>{t("product.backgroundTitle")}</h2><p>{t("product.backgroundHint")}</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label={t("product.descGeneration")} status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label={t("product.imageGeneration")} status={activeImageGenerationStatus} />}</section>}
+    <section className="workspace-summary"><article><span>{t("product.statusEyebrow")}</span><strong className={`manager-status ${product.status}`}>{t(`status.${product.status}` as MessageKey)}</strong>{previouslyRejected ? <small className="previous-decision">{t("products.previouslyRejected")}</small> : null}</article><article><span>{t("product.stock")}</span><strong>{t("products.pcs", { count: product.total_quantity })}</strong></article><article><span>{t("product.sellerPrice")}</span><strong>{formatMoney(product.unit_price, product.currency)}{sellerEur ? ` (${sellerEur})` : ""}</strong></article><article><span>{t("product.listingEur")}</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
     <section className="workspace-summary workspace-ean"><article><span>EAN JV</span><strong>{product.ean_jv?.trim() || "—"}</strong></article><article><span>EAN XL</span><strong>{product.ean_xl?.trim() || "—"}</strong></article></section>
-    <div className="product-toolbar"><div className="availability-action"><button type="button" className="ask-availability-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? "Only approved products can receive an availability request." : undefined} onClick={() => void requestAvailability()}>Ask availability</button>{product.availability_reminder_sent_at ? <small>Last request: {formatDate(product.availability_reminder_sent_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>Moderation history</button></div>
-    {product.status === "rejected" && <section className="workspace-card rejection-card"><div><p className="eyebrow">Rejection</p><h2>This product was rejected</h2><p>{latestRejection?.comment?.trim() || "No rejection reason was recorded."}</p></div></section>}
-    {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">Moderation</p><h2>Review this seller submission</h2><p>Approve assigns EANs. Reject sends the seller your reason.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>Approve product</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>Reject</button></div></section>}
-    {canChangeApprovedStatus && <section className="workspace-card moderation-card"><div><p className="eyebrow">Status</p><h2>Change approved status</h2><p>Return it to review or reject it. If listings are live, deactivate them in <Link href="/manager/marketplaces">Marketplaces</Link> first.</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>Return to review</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder="Reason for rejection" /><button className="reject-button" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>Reject</button></div></section>}
+    <div className="product-toolbar"><div className="availability-action"><button type="button" className="ask-availability-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? t("product.askAvailabilityHint") : undefined} onClick={() => void requestAvailability()}>{t("product.askAvailability")}</button>{product.availability_reminder_sent_at ? <small>{t("product.lastRequest", { date: formatDate(product.availability_reminder_sent_at, true) })}</small> : null}{product.availability_confirmed_at ? <small>{t("product.lastResponse")} <span className={product.is_available ? "availability-yes" : "availability-no"}>{product.is_available ? t("common.yes") : t("common.no")}</span>, {formatDate(product.availability_confirmed_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>{t("product.history")}</button></div>
+    {product.status === "rejected" && <section className="workspace-card rejection-card"><div><p className="eyebrow">{t("product.rejection")}</p><h2>{t("product.rejectedTitle")}</h2><p>{latestRejection?.comment?.trim() || t("product.noRejectReason")}</p></div></section>}
+    {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">{t("product.moderation")}</p><h2>{t("product.reviewTitle")}</h2><p>{t("product.reviewHint")}</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>{t("product.approve")}</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder={t("product.rejectReason")} /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>{t("product.reject")}</button></div></section>}
+    {canChangeApprovedStatus && <section className="workspace-card moderation-card"><div><p className="eyebrow">{t("product.statusEyebrow")}</p><h2>{t("product.changeStatus")}</h2><p>{t("product.changeStatusHintBefore")}<Link href="/manager/marketplaces">{t("nav.marketplaces")}</Link>{t("product.changeStatusHintAfter")}</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>{t("product.returnToReview")}</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder={t("product.rejectReason")} /><button className="reject-button" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>{t("product.reject")}</button></div></section>}
     <section className="workspace-card image-gallery-card">
       <div className="image-gallery-heading">
         <div>
-          <p className="eyebrow">Images</p>
-          <h2>Images & generation</h2>
-          <p>Source and AI-generated images live here. Click a thumbnail to preview it, browse with the arrows, or open the full-size file in a new tab.</p>
+          <p className="eyebrow">{t("product.images")}</p>
+          <h2>{t("product.imagesTitle")}</h2>
+          <p>{t("product.imagesHint")}</p>
         </div>
-        <label className="upload-image-button">Add image<input accept="image/jpeg,image/png,image/webp" disabled={saving} type="file" onChange={(event) => void uploadImage(event)} /></label>
+        <label className="upload-image-button">{t("product.addImage")}<input accept="image/jpeg,image/png,image/webp" disabled={saving} type="file" onChange={(event) => void uploadImage(event)} /></label>
       </div>
       <div className="image-gallery-layout">
         <div className="image-gallery-viewer">
           <div className="image-gallery-stage">
             {selectedGalleryItem ? <>
               <img src={selectedGalleryItem.url} alt={selectedGalleryItem.label} />
-              {selectedGalleryItem.generated && <span className="ai-badge">AI generated</span>}
+              {selectedGalleryItem.generated && <span className="ai-badge">{t("product.aiGenerated")}</span>}
               {galleryItems.length > 1 && <>
-                <button type="button" className="image-gallery-nav prev" aria-label="Previous image" onClick={() => stepGallery(-1)}>‹</button>
-                <button type="button" className="image-gallery-nav next" aria-label="Next image" onClick={() => stepGallery(1)}>›</button>
+                <button type="button" className="image-gallery-nav prev" aria-label={t("product.prevImage")} onClick={() => stepGallery(-1)}>‹</button>
+                <button type="button" className="image-gallery-nav next" aria-label={t("product.nextImage")} onClick={() => stepGallery(1)}>›</button>
               </>}
-            </> : <p className="image-gallery-empty">No images yet. Upload the first image to start.</p>}
+            </> : <p className="image-gallery-empty">{t("product.noImages")}</p>}
           </div>
           {selectedGalleryItem && <div className="image-gallery-meta">
             <strong>{selectedGalleryItem.label}</strong>
             <span>{selectedImageIndex + 1} / {galleryItems.length}</span>
-            <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">Open in new tab ↗</a>
+            <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">{t("product.openTab")}</a>
           </div>}
           {galleryItems.length > 1 && <div className="image-gallery-thumbs">
             {galleryItems.map((item, index) => <button key={item.key} type="button" className={index === selectedImageIndex ? "is-active" : ""} title={item.label} onClick={() => setSelectedImageKey(item.key)}><img src={item.url} alt={item.label} />{item.generated && <span className="ai-badge">AI</span>}</button>)}
           </div>}
         </div>
         <div className="image-workspace-list">
-          {product.images.length === 0 && <p>No source images uploaded yet.</p>}
+          {product.images.length === 0 && <p>{t("product.noSourceImages")}</p>}
           {product.images.map((image) => <article key={image.id}>
-            <img src={image.image} alt="Product" onClick={() => setSelectedImageKey(`source-${image.id}`)} />
+            <img src={image.image} alt="" onClick={() => setSelectedImageKey(`source-${image.id}`)} />
             <div>
-              <strong>{image.is_primary ? "Primary image" : "Source image"}</strong>
-              <small>{image.processing_status === "idle" ? "Not generated" : image.processing_status.replaceAll("_", " ")}</small>
+              <strong>{image.is_primary ? t("product.primaryImage") : t("product.sourceImage")}</strong>
+              <small>{image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}</small>
               {image.processing_error && <small className="image-error">{image.processing_error}</small>}
               {image.generated_images.length > 0 && <div className="generated-thumbs">
-                {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`Generated · ${generatedModeLabels[generated.mode] ?? generated.mode}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
+                {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
               </div>}
               <div className="image-row-actions">
-                <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? "Generating..." : product.status !== "approved" ? "Generate after approve" : image.generated_images.length ? "Generate again" : "Generate image"}</button>
-                <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image)} onClick={() => void deleteImage(image.id)}>Delete</button>
+                <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? t("product.generating") : product.status !== "approved" ? t("product.generateAfterApprove") : image.generated_images.length ? t("product.generateAgain") : t("product.generateImage")}</button>
+                <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image)} onClick={() => void deleteImage(image.id)}>{t("product.delete")}</button>
               </div>
             </div>
           </article>)}
         </div>
       </div>
     </section>
-    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">Product data</p><h2>Edit product</h2><p>Changes are saved locally. Published listings are updated separately from Marketplaces.</p></div><label>Title<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>Product type<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-price-block"><button type="button" className="price-calc-hint" onClick={() => setPriceHelpOpen(true)}>Change formula</button><div className="form-two-columns form-price-fields"><label>Seller unit price<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>Currency<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><label>Listing price (EUR)<input min="0.01" step="0.01" type="number" value={form.listing_price_eur} placeholder={product.listing_price_eur ? undefined : "Waiting for exchange rate"} onChange={(event) => setForm({ ...form, listing_price_eur: event.target.value })} /></label></div>{product.pricing_formula?.uses_product_formula ? <small className="price-calc-hint">This product uses a custom formula.</small> : null}{product.pricing_formula?.uses_manual_listing ? <small className="price-calc-hint">Listing EUR is a manual value for this product.</small> : null}</div><p>Warehouse: {product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—"}</p><h3>Variants · {totalQuantity} pcs total</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>Colour<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>Materials<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>Length cm<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>Width cm<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>Height cm<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>Quantity<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? "Saving..." : "Save changes"}</button></form>
+    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">{t("product.data")}</p><h2>{t("product.edit")}</h2><p>{t("product.editHint")}</p></div><label>{t("product.fieldTitle")}<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>{t("product.fieldType")}<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-price-block"><button type="button" className="price-calc-hint" onClick={() => setPriceHelpOpen(true)}>{t("product.changeFormula")}</button><div className="form-two-columns form-price-fields"><label>{t("product.sellerUnitPrice")}<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>{t("product.currency")}<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><label>{t("product.listingPrice")}<input min="0.01" step="0.01" type="number" value={form.listing_price_eur} placeholder={product.listing_price_eur ? undefined : t("product.waitingRate")} onChange={(event) => setForm({ ...form, listing_price_eur: event.target.value })} /></label></div>{product.pricing_formula?.uses_product_formula ? <small className="price-calc-hint">{t("product.customFormula")}</small> : null}{product.pricing_formula?.uses_manual_listing ? <small className="price-calc-hint">{t("product.manualListing")}</small> : null}</div><p>{t("product.warehouse", { city: product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—" })}</p><h3>{t("product.variants", { count: totalQuantity })}</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>{t("product.colour")}<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>{t("product.materials")}<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>{t("product.length")}<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>{t("product.width")}<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>{t("product.height")}<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>{t("product.quantity")}<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? t("product.saving") : t("product.saveChanges")}</button></form>
       <aside className="workspace-side"><section className="workspace-card">
-        <p className="eyebrow">AI content</p>
-        <h2>Descriptions for marketplaces</h2>
-        <p>Generates a reviewable draft for OTTO, Hood and Kaufland. It never overwrites listing text automatically.</p>
-        <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? "Starting..." : descriptionGenerationInProgress ? "Generating..." : "Generate description"}</button>
-        {generation && <div className="generation-status"><strong>Generation: {generation.status.replaceAll("_", " ")}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>Refresh status</button>{generation.status === "succeeded" && <Link href="/manager/marketplaces">Review in Marketplaces →</Link>}</div>}
-        {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || "Generation failed. Try again."}</p>}
+        <p className="eyebrow">{t("product.ai")}</p>
+        <h2>{t("product.aiTitle")}</h2>
+        <p>{t("product.aiHint")}</p>
+        <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? t("product.starting") : descriptionGenerationInProgress ? t("product.generating") : t("product.generateDescription")}</button>
+        {generation && <div className="generation-status"><strong>{t("product.generationStatus", { status: generation.status.replaceAll("_", " ") })}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>{t("product.refreshStatus")}</button>{generation.status === "succeeded" && <Link href="/manager/marketplaces">{t("product.reviewMarketplaces")}</Link>}</div>}
+        {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || t("product.generationFailed")}</p>}
         {generationContent && draftForm && <form className="ai-draft" onSubmit={saveDraft}>
-          <span className="ai-draft-heading">AI draft (German) · editable</span>
-          <label className="ai-draft-field"><span>Title</span><input required maxLength={100} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
-          <label className="ai-draft-field"><span>Description</span><textarea required rows={9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} /></label>
-          <label className="ai-draft-field"><span>Bullet points · one per line</span><textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} /></label>
-          <small className="ai-draft-hint">Title up to 100 characters. Description: two or three paragraphs separated by an empty line. Bullet points: three to five.</small>
-          <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? "Saving..." : draftDirty ? "Save draft" : "Draft saved"}</button>
+          <span className="ai-draft-heading">{t("product.draftHeading")}</span>
+          <label className="ai-draft-field"><span>{t("product.draftTitle")}</span><input required maxLength={100} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
+          <label className="ai-draft-field"><span>{t("product.draftDescription")}</span><textarea required rows={9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} /></label>
+          <label className="ai-draft-field"><span>{t("product.draftBullets")}</span><textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} /></label>
+          <small className="ai-draft-hint">{t("product.draftHint")}</small>
+          <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}</button>
         </form>}
-      </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">Next step</p><h2>Marketplace listing</h2><p>Choose accounts, review marketplace-specific fields, then publish or update listings.</p><Link className="save-button" href="/manager/marketplaces">Open Marketplaces</Link></section></aside></div>
+      </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">{t("product.nextStep")}</p><h2>{t("product.listingTitle")}</h2><p>{t("product.listingHint")}</p><Link className="save-button" href="/manager/marketplaces">{t("product.openMarketplaces")}</Link></section></aside></div>
   </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}
     {historyOpen ? <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" onClick={() => setHistoryOpen(false)}>
       <div className="price-help-dialog history-dialog" onClick={(event) => event.stopPropagation()}>
         <div className="price-help-heading">
-          <h2 id="history-title">Moderation history</h2>
-          <button type="button" className="price-calc-hint" onClick={() => setHistoryOpen(false)}>Close</button>
+          <h2 id="history-title">{t("product.history")}</h2>
+          <button type="button" className="price-calc-hint" onClick={() => setHistoryOpen(false)}>{t("common.close")}</button>
         </div>
-        <p>All approve and reject decisions for this product, newest first.</p>
+        <p>{t("product.historyIntro")}</p>
         {historyError && <p className="form-feedback error" role="alert">{historyError}</p>}
-        {!historyError && historyCount === 0 && !historyLoading && <p>No moderation decisions yet.</p>}
+        {!historyError && historyCount === 0 && !historyLoading && <p>{t("product.historyEmpty")}</p>}
         {!historyError && historyCount > 0 && (
-          <nav className="pagination" aria-label="Moderation history pages">
-            <button type="button" disabled={historyLoading || historyPage <= 1} onClick={() => void loadHistory(historyPage - 1)}>← Previous</button>
-            <span>Page {historyPage}</span>
-            <button type="button" disabled={historyLoading || historyPage >= Math.ceil(historyCount / HISTORY_PAGE_SIZE)} onClick={() => void loadHistory(historyPage + 1)}>Next →</button>
+          <nav className="pagination" aria-label={t("product.historyPages")}>
+            <button type="button" disabled={historyLoading || historyPage <= 1} onClick={() => void loadHistory(historyPage - 1)}>{t("common.previous")}</button>
+            <span>{t("common.page", { page: historyPage })}</span>
+            <button type="button" disabled={historyLoading || historyPage >= Math.ceil(historyCount / HISTORY_PAGE_SIZE)} onClick={() => void loadHistory(historyPage + 1)}>{t("common.next")}</button>
           </nav>
         )}
         {!historyError && history.length > 0 && (
           <ol className="history-list">
             {history.map((item) => (
               <li key={item.id}>
-                <strong className={`manager-status ${item.decision}`}>{statusLabels[item.decision] ?? item.decision}</strong>
+                <strong className={`manager-status ${item.decision}`}>{t(`status.${item.decision}` as MessageKey)}</strong>
                 <span>{formatDate(item.created_at, true)} · {item.manager_username}</span>
-                {item.comment ? <p>{item.comment}</p> : <p>No comment.</p>}
+                {item.comment ? <p>{item.comment}</p> : <p>{t("product.noComment")}</p>}
               </li>
             ))}
           </ol>
