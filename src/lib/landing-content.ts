@@ -32,6 +32,7 @@ export type IconName =
   | "chevron"
   | "menu"
   | "info"
+  | "search"
   | "warn"
   | "mail"
   | "phoneCall"
@@ -538,7 +539,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
     ],
     problem: {
       eyebrow: "Starting point",
-      title: "Your furniture is sitting in the warehouse. Why should it stay there?",
+      title: "Your furniture is sitting in the warehouse.\nWhy should it stay there?",
       pathOldTitle: "Traditional path",
       pathNewTitle: "Benim Depom",
     },
