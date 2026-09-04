@@ -69,6 +69,9 @@ type Product = {
   availability_confirmed_at?: string | null;
   is_available?: boolean;
   seller?: { id: number; username: string; first_name: string; email: string };
+  catalog_revision?: number;
+  pending_changes?: Record<string, unknown> | null;
+  pending_changes_submitted_at?: string | null;
 };
 
 type ModerationDecision = {
@@ -283,6 +286,24 @@ function FormulaEditorDialog({
   );
 }
 
+function formatChangeValue(value: unknown) {
+  if (value == null || value === "") return "—";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function currentFieldValue(product: Product, field: string) {
+  if (field === "variants") return formatChangeValue(product.variants);
+  const record = product as unknown as Record<string, unknown>;
+  return formatChangeValue(record[field]);
+}
+
 function toForm(product: Product): FormState {
   return {
     title: product.title,
@@ -322,7 +343,9 @@ export default function ProductWorkspacePage() {
 
   const canModerate = product?.status === "submitted";
   const canChangeApprovedStatus = product?.status === "approved";
+  const pendingEntries = Object.entries(product?.pending_changes ?? {}).filter(([, value]) => value !== undefined);
   const latestRejection = history.find((item) => item.decision === "rejected");
+  const sellerWithdrew = product?.status === "rejected" && !product.last_moderation_decision && !latestRejection;
   const totalQuantity = useMemo(
     () => form?.variants.reduce((total, variant) => total + Number(variant.quantity || 0), 0) ?? 0,
     [form],
@@ -415,7 +438,7 @@ export default function ProductWorkspacePage() {
       if (!response.ok) throw new Error(t("product.loadError"));
       const data = await response.json() as Product;
       setProduct(data);
-      if (!options?.silent) setForm(toForm(data));
+      setForm(toForm(data));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("product.loadError"));
     } finally {
@@ -563,9 +586,16 @@ export default function ProductWorkspacePage() {
     try {
       const response = await authorizedFetch(`/api/v1/manager/products/${productId}/${action}/`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(action === "reject" ? { comment: rejectComment.trim() } : {}),
+        body: JSON.stringify({
+          ...(action === "reject" ? { comment: rejectComment.trim() } : {}),
+          expected_catalog_revision: product?.catalog_revision,
+        }),
       });
       const data = await response.json().catch(() => ({}));
+      if (response.status === 409) {
+        await loadProduct({ silent: true });
+        throw new Error(apiErrorMessage(data, t("product.sellerChanged")));
+      }
       if (!response.ok) throw new Error(apiErrorMessage(data, `Product could not be ${action}d.`));
       setProduct(data as Product); setForm(toForm(data as Product)); setFeedback(action === "approve" ? "Product approved and EANs assigned." : "Product rejected. The seller will receive the reason.");
       await loadHistory(1);
@@ -585,11 +615,15 @@ export default function ProductWorkspacePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           nextStatus === "rejected"
-            ? { status: nextStatus, comment: rejectComment.trim() }
-            : { status: nextStatus },
+            ? { status: nextStatus, comment: rejectComment.trim(), expected_catalog_revision: product?.catalog_revision }
+            : { status: nextStatus, expected_catalog_revision: product?.catalog_revision },
         ),
       });
       const data = await response.json().catch(() => ({}));
+      if (response.status === 409) {
+        await loadProduct({ silent: true });
+        throw new Error(apiErrorMessage(data, t("product.sellerChanged")));
+      }
       if (!response.ok) throw new Error(apiErrorMessage(data, "Product status could not be changed."));
       setProduct(data as Product);
       setForm(toForm(data as Product));
@@ -602,6 +636,32 @@ export default function ProductWorkspacePage() {
       await loadHistory(1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Product status could not be changed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function approveSellerChanges() {
+    if (!product) return;
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/seller-changes/approve/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expected_catalog_revision: product.catalog_revision }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 409) {
+        await loadProduct({ silent: true });
+        throw new Error(apiErrorMessage(data, t("product.sellerChanged")));
+      }
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.pendingApproveFailed")));
+      const job = (data as { marketplace_job?: unknown }).marketplace_job;
+      setProduct(data as Product);
+      setForm(toForm(data as Product));
+      setFeedback(job ? t("product.pendingApprovedQueued") : t("product.pendingApproved"));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("product.pendingApproveFailed"));
     } finally {
       setSaving(false);
     }
@@ -725,7 +785,9 @@ export default function ProductWorkspacePage() {
     <section className="workspace-summary"><article><span>{t("product.statusEyebrow")}</span><strong className={`manager-status ${product.status}`}>{t(`status.${product.status}` as MessageKey)}</strong>{previouslyRejected ? <small className="previous-decision">{t("products.previouslyRejected")}</small> : null}</article><article><span>{t("product.stock")}</span><strong>{t("products.pcs", { count: product.total_quantity })}</strong></article><article><span>{t("product.sellerPrice")}</span><strong>{formatMoney(product.unit_price, product.currency)}{sellerEur ? ` (${sellerEur})` : ""}</strong></article><article><span>{t("product.listingEur")}</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
     <section className="workspace-summary workspace-ean"><article><span>EAN JV</span><strong>{product.ean_jv?.trim() || "—"}</strong></article><article><span>EAN XL</span><strong>{product.ean_xl?.trim() || "—"}</strong></article></section>
     <div className="product-toolbar"><div className="availability-action"><button type="button" className="ask-availability-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? t("product.askAvailabilityHint") : undefined} onClick={() => void requestAvailability()}>{t("product.askAvailability")}</button>{product.availability_reminder_sent_at ? <small>{t("product.lastRequest", { date: formatDate(product.availability_reminder_sent_at, true) })}</small> : null}{product.availability_confirmed_at ? <small>{t("product.lastResponse")} <span className={product.is_available ? "availability-yes" : "availability-no"}>{product.is_available ? t("common.yes") : t("common.no")}</span>, {formatDate(product.availability_confirmed_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>{t("product.history")}</button></div>
-    {product.status === "rejected" && <section className="workspace-card rejection-card"><div><p className="eyebrow">{t("product.rejection")}</p><h2>{t("product.rejectedTitle")}</h2><p>{latestRejection?.comment?.trim() || t("product.noRejectReason")}</p></div></section>}
+    {sellerWithdrew && <section className="workspace-card rejection-card"><div><p className="eyebrow">{t("product.withdrawal")}</p><h2>{t("product.withdrawnTitle")}</h2><p>{t("product.withdrawnHint")}</p></div></section>}
+    {product.status === "rejected" && !sellerWithdrew && <section className="workspace-card rejection-card"><div><p className="eyebrow">{t("product.rejection")}</p><h2>{t("product.rejectedTitle")}</h2><p>{latestRejection?.comment?.trim() || t("product.noRejectReason")}</p></div></section>}
+    {pendingEntries.length > 0 && <section className="workspace-card pending-changes-card"><div><p className="eyebrow">{t("product.pendingChanges")}</p><h2>{t("product.pendingTitle")}</h2><p>{t("product.pendingHint")}</p></div><dl className="pending-changes-list">{pendingEntries.map(([field, value]) => <div key={field}><dt>{field}</dt><dd><small title={t("product.pendingOld")}>{currentFieldValue(product, field)}</small><strong title={t("product.pendingNew")}>{formatChangeValue(value)}</strong></dd></div>)}</dl><button className="approve-button" disabled={saving} onClick={() => void approveSellerChanges()}>{saving ? t("product.saving") : t("product.approveChanges")}</button></section>}
     {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">{t("product.moderation")}</p><h2>{t("product.reviewTitle")}</h2><p>{t("product.reviewHint")}</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>{t("product.approve")}</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder={t("product.rejectReason")} /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>{t("product.reject")}</button></div></section>}
     {canChangeApprovedStatus && <section className="workspace-card moderation-card"><div><p className="eyebrow">{t("product.statusEyebrow")}</p><h2>{t("product.changeStatus")}</h2><p>{t("product.changeStatusHintBefore")}<Link href="/manager/marketplaces">{t("nav.marketplaces")}</Link>{t("product.changeStatusHintAfter")}</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>{t("product.returnToReview")}</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder={t("product.rejectReason")} /><button className="reject-button" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>{t("product.reject")}</button></div></section>}
     <section className="workspace-card image-gallery-card">
