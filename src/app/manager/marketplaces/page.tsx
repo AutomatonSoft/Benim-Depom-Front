@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { useI18n, type MessageKey } from "@/i18n";
 
 type Marketplace = "hood" | "otto" | "kaufland";
 type Account = "jv" | "xl";
@@ -16,14 +17,15 @@ type Target = { marketplace: Marketplace; account: Account };
 const targets: Target[] = [{ marketplace: "otto", account: "jv" }, { marketplace: "otto", account: "xl" }, { marketplace: "hood", account: "jv" }, { marketplace: "hood", account: "xl" }, { marketplace: "kaufland", account: "jv" }, { marketplace: "kaufland", account: "xl" }];
 const targetKey = (target: Target) => `${target.marketplace}:${target.account}`;
 const marketplaceName: Record<Marketplace, string> = { otto: "OTTO", hood: "Hood", kaufland: "Kaufland" };
-const publicationStatus: Record<string, string> = { pending: "Pending", publishing: "Publishing", active: "Active", deactivating: "Deactivating", deactivated: "Deactivated", deleting: "Deleting", deleted: "Deleted", failed: "Failed" };
+const publicationStatusKeys = ["pending", "publishing", "active", "deactivating", "deactivated", "deleting", "deleted", "failed"] as const;
 
-function apiError(data: unknown) {
-  if (!data || typeof data !== "object") return "Unable to start publication.";
+function apiError(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") return fallback;
   return Object.entries(data).map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(" ") : value}`).join(" ");
 }
 
 export default function MarketplacesPage() {
+  const { t } = useI18n();
   const [publications, setPublications] = useState<Publication[]>([]);
   const [approvedProducts, setApprovedProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -64,14 +66,14 @@ export default function MarketplacesPage() {
         setPublications(((await publicationResponse.json()) as ListResponse<Publication>).results);
         setApprovedProducts(((await productResponse.json()) as ListResponse<Product>).results);
       } catch {
-        setError("Unable to load marketplace data. Please try again.");
+        setError(t("marketplaces.loadError"));
       } finally {
         setLoading(false);
       }
     }
 
     void loadData();
-  }, [marketplace, account, status, reloadKey]);
+  }, [marketplace, account, status, reloadKey, t]);
 
   function toggleTarget(target: Target) {
     const key = targetKey(target);
@@ -99,25 +101,35 @@ export default function MarketplacesPage() {
         return;
       }
       if (!response.ok) {
-        setError(apiError(await response.json().catch(() => null)));
+        setError(apiError(await response.json().catch(() => null), t("marketplaces.publishError")));
         return;
       }
       const job = (await response.json()) as { id: string };
-      setNotice(`Publication job ${job.id} was queued. Statuses will appear below after processing.`);
+      setNotice(t("marketplaces.jobQueued", { id: job.id }));
       setReloadKey((value) => value + 1);
     } catch {
-      setError("Unable to reach the API. Please try again.");
+      setError(t("common.apiUnreachable"));
     } finally {
       setPublishing(false);
     }
   }
 
+  function linkedCopy(text: string, href: string, label: string) {
+    const [before, after = ""] = text.split("{link}");
+    return <span>{before}<Link href={href}>{label}</Link>{after}</span>;
+  }
+
   return (
     <section className="content marketplaces-page">
-        <header className="topbar"><div><p className="eyebrow">Manager panel</p><h1>Marketplaces</h1><p className="products-subtitle">Prepare approved products, select targets and monitor listing status.</p></div><button className="refresh-button" onClick={() => setReloadKey((value) => value + 1)} disabled={loading}>Refresh</button></header>
-        <section className="marketplace-workflow"><article><b>1</b><div><strong>Review</strong><span>Seller submits a product in <Link href="/manager/messages">Messages</Link>.</span></div></article><article><b>2</b><div><strong>Approve</strong><span>Approve it in <Link href="/manager/products">Products</Link>; EAN codes are assigned automatically.</span></div></article><article><b>3</b><div><strong>Prepare</strong><span>Complete marketplace fields and generate images before publication.</span></div></article><article><b>4</b><div><strong>Publish</strong><span>Select marketplaces and accounts below. All targets are selected by default.</span></div></article></section>
-        <section className="publish-card"><div className="publish-card-heading"><div><p className="eyebrow">Publication</p><h2>Publish approved product</h2></div><span>All requests are queued safely</span></div><div className="publish-controls"><label>Approved product<select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}><option value="">Select a product</option>{approvedProducts.map((product) => <option key={product.id} value={product.id}>#{product.id} · {product.title || product.product_type}</option>)}</select></label><div className="target-picker"><div className="target-picker-heading"><strong>Publication targets</strong><button type="button" onClick={() => setSelectedTargets(selectedTargets.length === targets.length ? [] : targets.map(targetKey))}>{selectedTargets.length === targets.length ? "Clear all" : "Select all"}</button></div><div className="target-grid">{targets.map((target) => <label key={targetKey(target)}><input checked={selectedTargets.includes(targetKey(target))} onChange={() => toggleTarget(target)} type="checkbox" /><span>{marketplaceName[target.marketplace]} <small>{target.account.toUpperCase()}</small></span></label>)}</div></div><button className="publish-button" disabled={!selectedProductId || selectedTargets.length === 0 || publishing} onClick={() => void publish()}>{publishing ? "Queueing…" : `Publish to ${selectedTargets.length} target${selectedTargets.length === 1 ? "" : "s"}`}</button></div>{error && <p className="form-feedback error" role="alert">{error}</p>}{notice && <p className="form-feedback success" role="status">{notice}</p>}</section>
-        <section className="products-panel marketplace-list"><div className="marketplace-list-heading"><div><p className="eyebrow">Listing status</p><h2>Recent publications</h2></div><div className="marketplace-filters"><select aria-label="Filter marketplace" value={marketplace} onChange={(event) => setMarketplace(event.target.value)}><option value="">All marketplaces</option><option value="otto">OTTO</option><option value="hood">Hood</option><option value="kaufland">Kaufland</option></select><select aria-label="Filter account" value={account} onChange={(event) => setAccount(event.target.value)}><option value="">All accounts</option><option value="jv">JV</option><option value="xl">XL</option></select><select aria-label="Filter listing status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{Object.entries(publicationStatus).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></div>{loading && <p className="products-message">Loading publications…</p>}{!loading && !error && publications.length === 0 && <p className="products-message">No publications match these filters.</p>}{!loading && !error && publications.length > 0 && <div className="publication-table"><div className="publication-header"><span>Product</span><span>Marketplace</span><span>EAN</span><span>Status</span><span>Updated</span></div>{publications.map((publication) => <article key={publication.id}><div><strong>{publication.product_title}</strong><small>#{publication.product_id} · {publication.account.toUpperCase()}</small></div><span>{marketplaceName[publication.marketplace]}</span><code>{publication.ean}</code><span className={`publication-status ${publication.status}`}>{publicationStatus[publication.status] ?? publication.status}</span><time dateTime={publication.updated_at}>{formatDate(publication.updated_at, true)}</time></article>)}</div>}</section>
+        <header className="topbar"><div><p className="eyebrow">{t("common.panel")}</p><h1>{t("marketplaces.title")}</h1><p className="products-subtitle">{t("marketplaces.subtitle")}</p></div><button className="refresh-button" onClick={() => setReloadKey((value) => value + 1)} disabled={loading}>{t("common.refresh")}</button></header>
+        <section className="marketplace-workflow">
+          <article><b>1</b><div><strong>{t("marketplaces.step1Title")}</strong>{linkedCopy(t("marketplaces.step1"), "/manager/messages", t("nav.messages"))}</div></article>
+          <article><b>2</b><div><strong>{t("marketplaces.step2Title")}</strong>{linkedCopy(t("marketplaces.step2"), "/manager/products", t("nav.products"))}</div></article>
+          <article><b>3</b><div><strong>{t("marketplaces.step3Title")}</strong><span>{t("marketplaces.step3")}</span></div></article>
+          <article><b>4</b><div><strong>{t("marketplaces.step4Title")}</strong><span>{t("marketplaces.step4")}</span></div></article>
+        </section>
+        <section className="publish-card"><div className="publish-card-heading"><div><p className="eyebrow">{t("marketplaces.publication")}</p><h2>{t("marketplaces.publishTitle")}</h2></div><span>{t("marketplaces.queuedHint")}</span></div><div className="publish-controls"><label>{t("marketplaces.approvedProduct")}<select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}><option value="">{t("marketplaces.selectProduct")}</option>{approvedProducts.map((product) => <option key={product.id} value={product.id}>#{product.id} · {product.title || product.product_type}</option>)}</select></label><div className="target-picker"><div className="target-picker-heading"><strong>{t("marketplaces.targets")}</strong><button type="button" onClick={() => setSelectedTargets(selectedTargets.length === targets.length ? [] : targets.map(targetKey))}>{selectedTargets.length === targets.length ? t("marketplaces.clearAll") : t("marketplaces.selectAll")}</button></div><div className="target-grid">{targets.map((target) => <label key={targetKey(target)}><input checked={selectedTargets.includes(targetKey(target))} onChange={() => toggleTarget(target)} type="checkbox" /><span>{marketplaceName[target.marketplace]} <small>{target.account.toUpperCase()}</small></span></label>)}</div></div><button className="publish-button" disabled={!selectedProductId || selectedTargets.length === 0 || publishing} onClick={() => void publish()}>{publishing ? t("marketplaces.queueing") : selectedTargets.length === 1 ? t("marketplaces.publish", { count: selectedTargets.length }) : t("marketplaces.publishPlural", { count: selectedTargets.length })}</button></div>{error && <p className="form-feedback error" role="alert">{error}</p>}{notice && <p className="form-feedback success" role="status">{notice}</p>}</section>
+        <section className="products-panel marketplace-list"><div className="marketplace-list-heading"><div><p className="eyebrow">{t("marketplaces.listingStatus")}</p><h2>{t("marketplaces.recent")}</h2></div><div className="marketplace-filters"><select aria-label={t("marketplaces.filterMarketplace")} value={marketplace} onChange={(event) => setMarketplace(event.target.value)}><option value="">{t("marketplaces.allMarketplaces")}</option><option value="otto">OTTO</option><option value="hood">Hood</option><option value="kaufland">Kaufland</option></select><select aria-label={t("marketplaces.filterAccount")} value={account} onChange={(event) => setAccount(event.target.value)}><option value="">{t("marketplaces.allAccounts")}</option><option value="jv">JV</option><option value="xl">XL</option></select><select aria-label={t("marketplaces.filterStatus")} value={status} onChange={(event) => setStatus(event.target.value)}><option value="">{t("marketplaces.allStatuses")}</option>{publicationStatusKeys.map((value) => <option key={value} value={value}>{t(`pub.${value}` as MessageKey)}</option>)}</select></div></div>{loading && <p className="products-message">{t("marketplaces.loading")}</p>}{!loading && !error && publications.length === 0 && <p className="products-message">{t("marketplaces.empty")}</p>}{!loading && !error && publications.length > 0 && <div className="publication-table"><div className="publication-header"><span>{t("marketplaces.col.product")}</span><span>{t("marketplaces.col.marketplace")}</span><span>{t("marketplaces.col.ean")}</span><span>{t("marketplaces.col.status")}</span><span>{t("marketplaces.col.updated")}</span></div>{publications.map((publication) => <article key={publication.id}><div><strong>{publication.product_title}</strong><small>#{publication.product_id} · {publication.account.toUpperCase()}</small></div><span>{marketplaceName[publication.marketplace]}</span><code>{publication.ean}</code><span className={`publication-status ${publication.status}`}>{t(`pub.${publication.status}` as MessageKey)}</span><time dateTime={publication.updated_at}>{formatDate(publication.updated_at, true)}</time></article>)}</div>}</section>
       </section>
   );
 }

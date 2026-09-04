@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { useI18n, type MessageKey } from "@/i18n";
 import { useEffect, useState } from "react";
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -55,16 +56,15 @@ type ListResponse<T> = {
   results: T[];
 };
 
-function greetingName(profile: Profile | null) {
+function greetingName(profile: Profile | null, fallback: string) {
   const name = profile?.first_name.trim() || profile?.username || "";
-  return name || "there";
+  return name || fallback;
 }
 
-function greeting(profile: Profile | null) {
-  const hour = new Date().getHours();
-  const hello = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  if (!profile) return hello;
-  return `${hello}, ${greetingName(profile)}`;
+function greetingHello(hour: number, t: (key: MessageKey) => string) {
+  if (hour < 12) return t("overview.helloMorning");
+  if (hour < 18) return t("overview.helloAfternoon");
+  return t("overview.helloEvening");
 }
 
 function emptyActiveListings(): ActiveListing[] {
@@ -96,7 +96,7 @@ function queueFromProducts(results: FallbackProduct[]): QueueItem[] {
     product_type: product.product_type,
     created_at: product.created_at,
     image: product.images?.find((image) => image.is_primary)?.image ?? product.images?.[0]?.image ?? "",
-    seller_name: product.seller?.first_name?.trim() || product.seller?.username || "Seller",
+    seller_name: product.seller?.first_name?.trim() || product.seller?.username || "",
   }));
 }
 
@@ -132,6 +132,7 @@ async function loadFallbackDashboard(): Promise<Dashboard> {
 }
 
 export default function Home() {
+  const { t } = useI18n();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,28 +173,32 @@ export default function Home() {
           setDashboard(await loadFallbackDashboard());
         }
       } catch {
-        setError("Unable to load the overview. Please try again.");
+        setError(t("overview.loadError"));
       } finally {
         setLoading(false);
       }
     }
 
     void loadOverview();
-  }, []);
+  }, [t]);
+
+  const hello = greetingHello(new Date().getHours(), t);
+  const name = greetingName(profile, t("overview.there"));
+  const heading = profile ? (name ? t("overview.helloName", { hello, name }) : hello) : hello;
 
   return (
     <section className="content" id="overview">
         <header className="topbar">
-          <div><p className="eyebrow">Manager panel</p><h1>{greeting(profile)}</h1></div>
-          <Link className="notification" href="/manager/messages" aria-label="Messages">♢</Link>
+          <div><p className="eyebrow">{t("common.panel")}</p><h1>{heading}</h1></div>
+          <Link className="notification" href="/manager/messages" aria-label={t("nav.messages")}>♢</Link>
         </header>
 
         {error && <p className="form-feedback error" role="alert">{error}</p>}
 
         <div className="summary-grid">
-          <article className="metric-card blue"><div><p>Awaiting review</p><strong>{loading ? "—" : dashboard?.awaiting_review ?? 0}</strong><small>+{dashboard?.awaiting_review_today ?? 0} today</small></div><Icon>▣</Icon></article>
-          <article className="metric-card orange"><div><p>Published today</p><strong>{loading ? "—" : dashboard?.published_today ?? 0}</strong><small>{(dashboard?.published_today_marketplaces ?? 0) === 0 ? "No marketplace listings today" : `Across ${dashboard?.published_today_marketplaces} marketplace${dashboard?.published_today_marketplaces === 1 ? "" : "s"}`}</small></div><Icon>↗</Icon></article>
-          <article className="metric-card white"><div><p>Active sellers</p><strong>{loading ? "—" : dashboard?.active_sellers ?? 0}</strong><small>+{dashboard?.sellers_joined_this_month ?? 0} this month</small></div><Icon>♙</Icon></article>
+          <article className="metric-card blue"><div><p>{t("overview.awaitingReview")}</p><strong>{loading ? "—" : dashboard?.awaiting_review ?? 0}</strong><small>{t("overview.today", { count: dashboard?.awaiting_review_today ?? 0 })}</small></div><Icon>▣</Icon></article>
+          <article className="metric-card orange"><div><p>{t("overview.publishedToday")}</p><strong>{loading ? "—" : dashboard?.published_today ?? 0}</strong><small>{(dashboard?.published_today_marketplaces ?? 0) === 0 ? t("overview.noListingsToday") : (dashboard?.published_today_marketplaces === 1 ? t("overview.acrossMarketplaces", { count: dashboard?.published_today_marketplaces ?? 0 }) : t("overview.acrossMarketplacesPlural", { count: dashboard?.published_today_marketplaces ?? 0 }))}</small></div><Icon>↗</Icon></article>
+          <article className="metric-card white"><div><p>{t("overview.activeSellers")}</p><strong>{loading ? "—" : dashboard?.active_sellers ?? 0}</strong><small>{t("overview.thisMonth", { count: dashboard?.sellers_joined_this_month ?? 0 })}</small></div><Icon>♙</Icon></article>
         </div>
 
         <div className="listing-grid">
@@ -201,26 +206,26 @@ export default function Home() {
             <article className="listing-card" key={`${listing.marketplace}-${listing.account}`}>
               <p>{channelLabel(listing)}</p>
               <strong>{loading ? "—" : listing.count}</strong>
-              <small>Active listings</small>
+              <small>{t("overview.activeListings")}</small>
             </article>
           ))}
           <article className="listing-card ean">
-            <p>Free EAN JV</p>
+            <p>{t("overview.freeEanJv")}</p>
             <strong>{loading ? "—" : dashboard?.free_eans?.jv ?? 0}</strong>
-            <small>Available in the pool</small>
+            <small>{t("overview.availableInPool")}</small>
           </article>
           <article className="listing-card ean">
-            <p>Free EAN XL</p>
+            <p>{t("overview.freeEanXl")}</p>
             <strong>{loading ? "—" : dashboard?.free_eans?.xl ?? 0}</strong>
-            <small>Available in the pool</small>
+            <small>{t("overview.availableInPool")}</small>
           </article>
         </div>
 
         <section className="review-panel" id="products">
-          <div className="panel-heading"><div><p className="eyebrow">Moderation queue</p><h2>Review seller products</h2></div><Link className="link-button" href="/manager/products">Open products <span>→</span></Link></div>
-          {loading && <div className="dashboard-empty"><span>▣</span><div><strong>Loading the queue…</strong><p>Fetching products waiting for review.</p></div></div>}
+          <div className="panel-heading"><div><p className="eyebrow">{t("overview.queueEyebrow")}</p><h2>{t("overview.queueTitle")}</h2></div><Link className="link-button" href="/manager/products">{t("overview.openProducts")} <span>→</span></Link></div>
+          {loading && <div className="dashboard-empty"><span>▣</span><div><strong>{t("overview.loadingQueue")}</strong><p>{t("overview.loadingQueueHint")}</p></div></div>}
           {!loading && dashboard && dashboard.queue.length === 0 && (
-            <div className="dashboard-empty"><span>▣</span><div><strong>Nothing is waiting for review.</strong><p>New seller submissions will show up here.</p></div></div>
+            <div className="dashboard-empty"><span>▣</span><div><strong>{t("overview.emptyQueue")}</strong><p>{t("overview.emptyQueueHint")}</p></div></div>
           )}
           {!loading && dashboard && dashboard.queue.length > 0 && (
             <div className="product-list">
@@ -230,9 +235,9 @@ export default function Home() {
                   <div className="product-main">
                     <p>{item.product_type}</p>
                     <h3>{item.title}</h3>
-                    <small>{item.seller_name} · {formatDate(item.created_at, true)}</small>
+                    <small>{item.seller_name || t("overview.sellerFallback")} · {formatDate(item.created_at, true)}</small>
                   </div>
-                  <span className="status review">Awaiting review</span>
+                  <span className="status review">{t("status.submitted")}</span>
                   <span className="more" aria-hidden="true">→</span>
                 </Link>
               ))}
