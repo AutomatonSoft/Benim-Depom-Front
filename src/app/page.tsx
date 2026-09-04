@@ -29,6 +29,7 @@ export default function LandingPage() {
   const [lang, setLang] = useLandingLang();
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [uploadZoom, setUploadZoom] = useState<{ x: number; y: number } | null>(null);
   const t = LANDING_I18N[lang];
 
   const closeMenu = () => setMenuOpen(false);
@@ -39,17 +40,14 @@ export default function LandingPage() {
       <header className="site-header">
         <div className="container header-inner">
           <a className="logo" href="#home">
-            <span className="logo-chip">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="Benim Depom" className="logo-img" src="/landing/logo.png" />
-            </span>
+            <span className="logo-wordmark">Benim<span>Depom</span></span>
           </a>
           <nav className="main-nav">
             {t.navItems.map((item) => <a href={item.href} key={item.href}>{item.label}</a>)}
           </nav>
           <div className="header-right">
             <LangSwitch lang={lang} onChange={setLang} />
-            <a className="btn btn-primary" href="#download">{t.nav.cta}</a>
+            <a className="btn btn-primary" href="#download"><Ic name="download" />{t.nav.cta}</a>
             <a aria-label="WhatsApp" className="wa-nav-btn" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" /></a>
             <button aria-label="Menu" className="menu-toggle" onClick={() => setMenuOpen((open) => !open)} type="button">
               <Ic name={menuOpen ? "x" : "menu"} />
@@ -65,7 +63,7 @@ export default function LandingPage() {
           {t.navItems.map((item) => <a href={item.href} key={item.href} onClick={closeMenu}>{item.label}</a>)}
         </nav>
         <div className="mn-actions">
-          <a className="btn btn-primary btn-block" href="#download" onClick={closeMenu}>{t.nav.cta}</a>
+          <a className="btn btn-primary btn-block" href="#download" onClick={closeMenu}><Ic name="download" />{t.nav.cta}</a>
         </div>
       </div>
 
@@ -87,10 +85,12 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="hero-visual">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="" aria-hidden="true" className="hero-showroom" src="/landing/showroom-hero.png" />
               <div className="pipeline-card">
                 <div className="pipeline-top">
                   <div className="dot-row"><span className="dot" /><span className="dot" /><span className="dot" /></div>
-                  <span className="label">benim.automatonsoft.de</span>
+                  <span className="label">benimdepom.info</span>
                 </div>
                 <div className="phone-frame">
                   <div className="pf-status"><span>09:41</span><span>Benim Depom</span></div>
@@ -141,7 +141,7 @@ export default function LandingPage() {
         <section className="section">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.compare.eyebrow}</div>
+              <div className="eyebrow"><Ic name="distribution" />{t.compare.eyebrow}</div>
               <h2 className="h2 center">{t.compare.title}</h2>
             </div>
             <div className="compare-grid">
@@ -163,10 +163,10 @@ export default function LandingPage() {
         </section>
 
         {/* ===== Value proposition ===== */}
-        <section className="section section-alt">
+        <section className="section section-alt value-section">
           <div className="container">
             <div className="section-head">
-              <div className="eyebrow">{t.value.eyebrow}</div>
+              <div className="eyebrow"><Ic name="layers" />{t.value.eyebrow}</div>
               <h2 className="h2">{t.value.title}</h2>
             </div>
             <div className="card-grid">
@@ -182,10 +182,10 @@ export default function LandingPage() {
         </section>
 
         {/* ===== Problem ===== */}
-        <section className="section">
+        <section className="section problem-section">
           <div className="container">
             <div className="section-head">
-              <div className="eyebrow">{t.problem.eyebrow}</div>
+              <div className="eyebrow"><Ic name="warn" />{t.problem.eyebrow}</div>
               <h2 className="h2">{t.problem.title}</h2>
             </div>
             <ul className="problem-list">
@@ -223,7 +223,7 @@ export default function LandingPage() {
         <section className="section section-alt">
           <div className="container">
             <div className="solution-panel">
-              <div className="eyebrow">{t.solution.eyebrow}</div>
+              <div className="eyebrow"><Ic name="check" />{t.solution.eyebrow}</div>
               <h2 className="h2 center">{t.solution.title}</h2>
               <p>{t.solution.text}</p>
             </div>
@@ -234,7 +234,7 @@ export default function LandingPage() {
         <section className="section" id="how">
           <div className="container">
             <div className="section-head">
-              <div className="eyebrow">{t.how.eyebrow}</div>
+              <div className="eyebrow"><Ic name="arrow" />{t.how.eyebrow}</div>
               <h2 className="h2">{t.how.title}</h2>
               <p className="lead">{t.how.lead}</p>
             </div>
@@ -256,7 +256,7 @@ export default function LandingPage() {
         <section className="section section-alt">
           <div className="container upload-grid">
             <div>
-              <div className="eyebrow">{t.mobile.eyebrow}</div>
+              <div className="eyebrow"><Ic name="phone" />{t.mobile.eyebrow}</div>
               <h2 className="h2">{t.mobile.title}</h2>
               <p className="lead" style={{ marginTop: 16, fontSize: "1.125rem", color: "var(--ink-soft)" }}>{t.mobile.text}</p>
               <div className="upload-steps">
@@ -269,13 +269,27 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <div className="hero-visual">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt="Benim Depom - mobile product capture and marketplace publishing workflow"
-                className="upload-illustration"
-                src={`/landing/mobile-upload-${lang}.jpg`}
-              />
+            <div className="upload-visual">
+              <a
+                aria-label="Open the product capture workflow image in full size"
+                className="upload-preview"
+                href={`/landing/mobile-upload-${lang}.jpg`}
+                onMouseLeave={() => setUploadZoom(null)}
+                onMouseMove={({ clientX, clientY, currentTarget }) => {
+                  const { left, top, width, height } = currentTarget.getBoundingClientRect();
+                  setUploadZoom({ x: ((clientX - left) / width) * 100, y: ((clientY - top) / height) * 100 });
+                }}
+                rel="noopener"
+                target="_blank"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt="Benim Depom - mobile product capture and marketplace publishing workflow"
+                  className="upload-illustration"
+                  src={`/landing/mobile-upload-${lang}.jpg`}
+                />
+                {uploadZoom && <span aria-hidden="true" className="upload-magnifier" style={{ left: `${uploadZoom.x}%`, top: `${uploadZoom.y}%`, backgroundImage: `url(/landing/mobile-upload-${lang}.jpg)`, backgroundPosition: `${(uploadZoom.x * 6.5 - 50) / 5.5}% ${(uploadZoom.y * 6.5 - 50) / 5.5}%` }} />}
+              </a>
             </div>
           </div>
         </section>
@@ -284,7 +298,7 @@ export default function LandingPage() {
         <section className="section">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.techform.eyebrow}</div>
+              <div className="eyebrow"><Ic name="barcode" />{t.techform.eyebrow}</div>
               <h2 className="h2 center">{t.techform.title}</h2>
             </div>
             <div className="window-card" style={{ maxWidth: 920, margin: "0 auto" }}>
@@ -312,7 +326,7 @@ export default function LandingPage() {
         <section className="section section-alt" id="for-manufacturers">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.ai.eyebrow}</div>
+              <div className="eyebrow"><Ic name="ai" />{t.ai.eyebrow}</div>
               <h2 className="h2 center">{t.ai.title}</h2>
             </div>
             <div className="ai-grid">
@@ -346,7 +360,7 @@ export default function LandingPage() {
         <section className="section">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.mp.eyebrow}</div>
+              <div className="eyebrow"><Ic name="store" />{t.mp.eyebrow}</div>
               <h2 className="h2 center">{t.mp.title}</h2>
               <p className="lead center">{t.mp.lead}</p>
             </div>
@@ -367,7 +381,7 @@ export default function LandingPage() {
         <section className="section section-alt">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.logi.eyebrow}</div>
+              <div className="eyebrow"><Ic name="truck" />{t.logi.eyebrow}</div>
               <h2 className="h2 center">{t.logi.title}</h2>
               <p className="lead center">{t.logi.text}</p>
             </div>
@@ -397,7 +411,7 @@ export default function LandingPage() {
         <section className="section" id="benefits">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.ww.eyebrow}</div>
+              <div className="eyebrow"><Ic name="user" />{t.ww.eyebrow}</div>
               <h2 className="h2 center">{t.ww.title}</h2>
             </div>
             <div className="ww-grid">
@@ -421,10 +435,10 @@ export default function LandingPage() {
         </section>
 
         {/* ===== Advantages ===== */}
-        <section className="section section-alt">
+        <section className="section section-alt advantages-section">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.adv.eyebrow}</div>
+              <div className="eyebrow"><Ic name="shield" />{t.adv.eyebrow}</div>
               <h2 className="h2 center">{t.adv.title}</h2>
             </div>
             <div className="card-grid">
@@ -440,7 +454,7 @@ export default function LandingPage() {
         </section>
 
         {/* ===== Marketing card ===== */}
-        <section className="section">
+        <section className="section mkt-section">
           <div className="container">
             <div className="mkt-card">
               <h3>{t.mkt.title}</h3>
@@ -451,7 +465,7 @@ export default function LandingPage() {
         </section>
 
         {/* ===== Free banner ===== */}
-        <section className="section" style={{ paddingTop: 0 }}>
+        <section className="section free-banner-section">
           <div className="container">
             <div className="free-banner-wrap">
               <div className="free-banner-img-wrap">
@@ -470,7 +484,7 @@ export default function LandingPage() {
         <section className="section section-alt" id="download">
           <div className="container dl-wrap">
             <div className="dl-info">
-              <div className="eyebrow">{t.download.eyebrow}</div>
+              <div className="eyebrow"><Ic name="download" />{t.download.eyebrow}</div>
               <h2 className="h2">{t.download.title}</h2>
               <p className="lead" style={{ marginTop: 16, fontSize: "1.125rem", color: "var(--ink-soft)" }}>{t.download.lead}</p>
               <ul>
@@ -494,7 +508,7 @@ export default function LandingPage() {
         <section className="section" id="about">
           <div className="container about-wrap">
             <div>
-              <div className="eyebrow">{t.about.eyebrow}</div>
+              <div className="eyebrow"><Ic name="factory" />{t.about.eyebrow}</div>
               <h2 className="h2">{t.about.title}</h2>
               <p style={{ marginTop: 16 }}>{t.about.p1}</p>
               <p>{t.about.p2}</p>
@@ -516,7 +530,7 @@ export default function LandingPage() {
         <section className="section section-alt" id="faq">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.faq.eyebrow}</div>
+              <div className="eyebrow"><Ic name="info" />{t.faq.eyebrow}</div>
               <h2 className="h2 center">{t.faq.title}</h2>
             </div>
             <div className="faq-list">
@@ -534,10 +548,10 @@ export default function LandingPage() {
         </section>
 
         {/* ===== Contact ===== */}
-        <section className="section" id="contact">
+        <section className="section contact-section" id="contact">
           <div className="container">
             <div className="section-head center">
-              <div className="eyebrow">{t.contact.eyebrow}</div>
+              <div className="eyebrow"><Ic name="phoneCall" />{t.contact.eyebrow}</div>
               <h2 className="h2 center">{t.contact.title}</h2>
             </div>
             <div className="contact-grid">
@@ -564,27 +578,35 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <div className="contact-actions">
-                  <a className="btn btn-whatsapp" href={CONTACT.whatsappUrl} rel="noopener" target="_blank">{t.contact.waBtn}</a>
-                  <a className="btn btn-outline" href={`mailto:${CONTACT.email}`}>{t.contact.mailBtn}</a>
+                  <a className="btn btn-whatsapp" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" />{t.contact.waBtn}</a>
+                  <a className="btn btn-outline" href={`mailto:${CONTACT.email}`}><Ic name="mail" />{t.contact.mailBtn}</a>
                 </div>
               </div>
               <div className="map-block">
-                <Ic name="globe" />
-                <p>{t.contact.mapNote}</p>
+                <iframe
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=25.6%2C35.7%2C45.4%2C42.4&layer=mapnik&marker=40.08%2C29.51"
+                  title="Map of Turkey with the Benim Depom logistics starting point in İnegöl, Bursa"
+                />
+                <div className="map-overlay">
+                  <Ic name="pin" />
+                  <p>{t.contact.mapNote}</p>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* ===== Final CTA ===== */}
-        <section className="section">
+        <section className="section final-cta-section">
           <div className="container">
             <div className="final-cta">
               <h2>{t.finalcta.title}</h2>
               <p className="fc-sub">{t.finalcta.sub}</p>
               <div className="fc-actions">
-                <a className="btn btn-primary" href="#download">{t.finalcta.btn1}</a>
-                <a className="btn btn-ghost-light" href={CONTACT.whatsappUrl} rel="noopener" target="_blank">{t.finalcta.btn2}</a>
+                <a className="btn btn-primary" href="#download"><Ic name="download" />{t.finalcta.btn1}</a>
+                <a className="btn btn-ghost-light" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" />{t.finalcta.btn2}</a>
               </div>
             </div>
           </div>
