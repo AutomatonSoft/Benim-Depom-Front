@@ -14,7 +14,6 @@ type Seller = {
   last_name: string;
   phone: string;
   date_joined: string;
-  is_email_verified: boolean;
   product_count?: number;
 };
 
@@ -145,11 +144,11 @@ export default function SellersPage() {
           {!loading && !error && sellers.length === 0 && <p className="products-message">{t("sellers.empty")}</p>}
 
           {!loading && !error && sellers.length > 0 && <div className="sellers-table">
-            <div className="seller-table-header"><span>{t("sellers.col.seller")}</span><span>{t("sellers.col.contact")}</span><span>{t("sellers.col.verification")}</span><span>{t("sellers.col.joined")}</span><span /></div>
+            <div className="seller-table-header"><span>{t("sellers.col.seller")}</span><span>{t("sellers.col.contact")}</span><span>{t("sellers.col.products")}</span><span>{t("sellers.col.joined")}</span><span /></div>
             {sellers.map((seller) => <article className="seller-row" key={seller.id}>
               <div className="seller-name"><span>{fullName(seller).slice(0, 1).toUpperCase()}</span><div><h2>{fullName(seller)}</h2><small>@{seller.username}</small></div></div>
               <div className="seller-contact"><strong>{seller.email || t("sellers.noEmail")}</strong><small>{seller.phone || t("sellers.noPhone")}</small></div>
-              <span className={`verification ${seller.is_email_verified ? "verified" : "unverified"}`}>{seller.is_email_verified ? t("common.verified") : t("common.unverified")}</span>
+              <Link className="seller-product-count" href={`/manager/sellers/${seller.id}/products`} aria-label={t("sellers.openProducts", { name: fullName(seller) })}>{seller.product_count ?? 0}</Link>
               <time dateTime={seller.date_joined}>{formatDate(seller.date_joined)}</time>
               <button type="button" className="seller-delete-button" aria-label={t("sellers.deleteAria", { name: fullName(seller) })} onClick={() => { setActionError(""); setFeedback(""); setPendingSeller(seller); }}>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2m-7 3v9m4-9v9M6 7l1 14h10l1-14" /></svg>
