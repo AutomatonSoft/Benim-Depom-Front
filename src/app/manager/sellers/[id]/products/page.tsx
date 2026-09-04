@@ -49,6 +49,7 @@ export default function SellerProductsPage() {
   const { t } = useI18n();
   const params = useParams<{ id: string }>();
   const sellerId = Number(params.id);
+  const sellerIdValid = Number.isInteger(sellerId) && sellerId > 0;
   const [products, setProducts] = useState<Product[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -58,19 +59,15 @@ export default function SellerProductsPage() {
   const [sellerName, setSellerName] = useState("");
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(sellerIdValid);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!sellerIdValid) return;
+
     const access = window.localStorage.getItem("benim_access_token");
     if (!access) {
       window.location.replace("/manager/login");
-      return;
-    }
-
-    if (!Number.isInteger(sellerId) || sellerId < 1) {
-      setLoading(false);
-      setError(t("sellerProducts.loadError"));
       return;
     }
 
@@ -82,12 +79,15 @@ export default function SellerProductsPage() {
     if (availability) query.set("is_available", availability);
     if (appliedSearch) query.set("search", appliedSearch);
 
+    let cancelled = false;
+
     async function loadProducts() {
       setLoading(true);
       setError("");
 
       try {
         const response = await authorizedFetch(`/api/v1/manager/products/?${query}`);
+        if (cancelled) return;
 
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
@@ -99,6 +99,7 @@ export default function SellerProductsPage() {
         if (!response.ok) throw new Error("request failed");
 
         const data = (await response.json()) as ProductListResponse;
+        if (cancelled) return;
         setProducts(data.results);
         setCount(data.count);
         setHasNext(Boolean(data.next));
@@ -106,14 +107,17 @@ export default function SellerProductsPage() {
         const name = data.results.map(sellerLabel).find(Boolean);
         if (name) setSellerName(name);
       } catch {
-        setError(t("sellerProducts.loadError"));
+        if (!cancelled) setError(t("sellerProducts.loadError"));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     void loadProducts();
-  }, [page, availability, appliedSearch, sellerId, t]);
+    return () => {
+      cancelled = true;
+    };
+  }, [page, availability, appliedSearch, sellerId, sellerIdValid, t]);
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -144,6 +148,7 @@ export default function SellerProductsPage() {
     return t("products.eanCount", { count: eanCount });
   }
 
+  const loadError = sellerIdValid ? error : t("sellerProducts.loadError");
   const subtitle = sellerName
     ? t("sellerProducts.namedSubtitle", { name: sellerName, count })
     : t("sellerProducts.subtitle", { count });
@@ -175,11 +180,11 @@ export default function SellerProductsPage() {
           </nav>
         </form>
 
-        {loading && <p className="products-message">{t("sellerProducts.loading")}</p>}
-        {error && <p className="products-message error" role="alert">{error}</p>}
-        {!loading && !error && products.length === 0 && <p className="products-message">{t("sellerProducts.empty")}</p>}
+        {sellerIdValid && loading && <p className="products-message">{t("sellerProducts.loading")}</p>}
+        {loadError && <p className="products-message error" role="alert">{loadError}</p>}
+        {sellerIdValid && !loading && !error && products.length === 0 && <p className="products-message">{t("sellerProducts.empty")}</p>}
 
-        {!loading && !error && products.length > 0 && <div className="products-table seller-products-table">
+        {sellerIdValid && !loading && !error && products.length > 0 && <div className="products-table seller-products-table">
           <div className="table-header">
             <span>{t("products.col.product")}</span>
             <span>{t("products.col.status")}</span>
@@ -195,7 +200,12 @@ export default function SellerProductsPage() {
             const available = product.is_available !== false;
             return <Link className="manager-product" href={`/manager/products/${product.id}`} key={product.id}>
               <div className="manager-product-name">
-                <div className="manager-product-image">{primaryImage ? <img src={primaryImage.image} alt="" /> : <span>▣</span>}</div>
+                <div className="manager-product-image">
+                  {primaryImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={primaryImage.image} alt="" />
+                  ) : <span>▣</span>}
+                </div>
                 <div className="manager-product-copy">
                   <p>{product.product_type}</p>
                   <h2>{product.title}</h2>
