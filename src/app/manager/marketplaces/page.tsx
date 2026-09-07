@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { formatListingErrors, listingChannelLabel, listingPreviewPath } from "@/lib/listings";
 import { useI18n, type MessageKey } from "@/i18n";
 
 type Marketplace = "hood" | "otto" | "kaufland";
@@ -126,6 +127,8 @@ export default function MarketplacesPage() {
   const [appliedProductFilter, setAppliedProductFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previews, setPreviews] = useState<Array<{ key: string; label: string; ok: boolean; detail: string }>>([]);
   const [busyKey, setBusyKey] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -229,6 +232,7 @@ export default function MarketplacesPage() {
 
   function toggleTarget(target: Target) {
     const key = targetKey(target);
+    setPreviews([]);
     setSelectedTargets((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
     );
@@ -271,6 +275,57 @@ export default function MarketplacesPage() {
       setError(t("common.apiUnreachable"));
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function previewSelected() {
+    if (!selectedProductId || selectedTargets.length === 0) return;
+    setPreviewing(true);
+    setError("");
+    setNotice("");
+    try {
+      const productId = Number(selectedProductId);
+      const publicationResponse = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+      const publicationBody = publicationResponse.ok ? await publicationResponse.json() : [];
+      const productPublications: Publication[] = Array.isArray(publicationBody)
+        ? publicationBody
+        : publicationBody.results ?? [];
+      const selected = targets.filter((target) => selectedTargets.includes(targetKey(target)));
+      const rows = await Promise.all(
+        selected.map(async (target) => {
+          const publication = productPublications.find(
+            (item) => item.marketplace === target.marketplace && item.account === target.account,
+          );
+          const kauflandMode =
+            publication && publication.status !== "deleted" && publication.status !== "failed"
+              ? "update"
+              : "create";
+          const response = await authorizedFetch(listingPreviewPath(productId, target, kauflandMode));
+          const data = await response.json().catch(() => null);
+          if (redirectIfUnauthorized(response.status)) {
+            return { key: targetKey(target), label: listingChannelLabel(target), ok: false, detail: "" };
+          }
+          if (!response.ok) {
+            return {
+              key: targetKey(target),
+              label: listingChannelLabel(target),
+              ok: false,
+              detail: formatListingErrors(data?.errors) || apiErrorMessage(data, t("listing.previewNotReady")),
+            };
+          }
+          return {
+            key: targetKey(target),
+            label: listingChannelLabel(target),
+            ok: true,
+            detail: t("listing.previewOk"),
+          };
+        }),
+      );
+      setPreviews(rows);
+    } catch {
+      setError(t("common.apiUnreachable"));
+    } finally {
+      setPreviewing(false);
     }
   }
 
@@ -486,7 +541,7 @@ export default function MarketplacesPage() {
         <div className="publish-controls">
           <label>
             {t("marketplaces.approvedProduct")}
-            <select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}>
+            <select value={selectedProductId} onChange={(event) => { setPreviews([]); setSelectedProductId(event.target.value); }}>
               <option value="">{t("marketplaces.selectProduct")}</option>
               {approvedProducts.map((product) => (
                 <option key={product.id} value={product.id}>
@@ -500,9 +555,10 @@ export default function MarketplacesPage() {
               <strong>{t("marketplaces.targets")}</strong>
               <button
                 type="button"
-                onClick={() =>
-                  setSelectedTargets(selectedTargets.length === targets.length ? [] : targets.map(targetKey))
-                }
+                onClick={() => {
+                  setPreviews([]);
+                  setSelectedTargets(selectedTargets.length === targets.length ? [] : targets.map(targetKey));
+                }}
               >
                 {selectedTargets.length === targets.length ? t("marketplaces.clearAll") : t("marketplaces.selectAll")}
               </button>
@@ -522,6 +578,17 @@ export default function MarketplacesPage() {
               ))}
             </div>
           </div>
+        </div>
+        <p className="ai-draft-hint listing-publish-hint">{t("listing.previewAllHint")}</p>
+        <div className="listing-prep-actions">
+          <button
+            type="button"
+            className="listing-preview-button"
+            disabled={!selectedProductId || selectedTargets.length === 0 || previewing}
+            onClick={() => void previewSelected()}
+          >
+            {previewing ? t("listing.previewing") : t("listing.previewAll")}
+          </button>
           <button
             className="publish-button"
             disabled={!selectedProductId || selectedTargets.length === 0 || publishing}
@@ -534,6 +601,21 @@ export default function MarketplacesPage() {
                 : t("marketplaces.publishPlural", { count: selectedTargets.length })}
           </button>
         </div>
+        {selectedProductId ? (
+          <Link className="listing-open-marketplaces" href={`/manager/products/${selectedProductId}`}>
+            {t("listing.editOnProduct")}
+          </Link>
+        ) : null}
+        {previews.length > 0 && (
+          <div className="publish-previews">
+            {previews.map((row) => (
+              <article key={row.key} className={`publish-preview-row ${row.ok ? "is-ok" : "is-bad"}`}>
+                <strong>{row.label}</strong>
+                <span>{row.detail}</span>
+              </article>
+            ))}
+          </div>
+        )}
         {error && (
           <p className="form-feedback error" role="alert">
             {error}

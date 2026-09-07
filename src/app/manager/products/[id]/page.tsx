@@ -6,6 +6,8 @@ import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState
 
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { listingTargets } from "@/lib/listings";
+import { ListingPrep } from "@/components/ListingPrep";
 import { useI18n, type MessageKey } from "@/i18n";
 
 type Variant = {
@@ -96,6 +98,7 @@ type GenerationContent = { title?: string; description?: string; bullet_points?:
 type Generation = {
   id: string;
   status: string;
+  targets?: Array<{ marketplace: string; account: string }>;
   result: { universal?: { model?: string; content?: GenerationContent } } | null;
   error: { code?: string; detail?: string } | null;
 };
@@ -128,12 +131,6 @@ function moveImageInList(images: ProductImage[], fromId: number, toId: number) {
 type DraftForm = { title: string; description: string; bullets: string };
 
 const HISTORY_PAGE_SIZE = 5;
-
-const defaultTargets = [
-  { marketplace: "otto", account: "jv" }, { marketplace: "otto", account: "xl" },
-  { marketplace: "hood", account: "jv" }, { marketplace: "hood", account: "xl" },
-  { marketplace: "kaufland", account: "jv" }, { marketplace: "kaufland", account: "xl" },
-];
 
 const generationStorageKey = (productId: number) => `benim_ai_generation_${productId}`;
 
@@ -359,6 +356,8 @@ export default function ProductWorkspacePage() {
   const [draftForm, setDraftForm] = useState<DraftForm | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [listingReloadToken, setListingReloadToken] = useState(0);
   const [priceHelpOpen, setPriceHelpOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ModerationDecision[]>([]);
@@ -462,9 +461,38 @@ export default function ProductWorkspacePage() {
       }
       setGeneration(data as Generation);
       setDraftDirty(false);
-      setFeedback("AI draft saved. Applying it from Marketplaces will use your edited text.");
+      setFeedback(t("product.draftSavedFeedback"));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Draft could not be saved."); }
     finally { setDraftSaving(false); }
+  }
+
+  async function applyDraft() {
+    if (!generation || generation.status !== "succeeded") return;
+    if (draftDirty) {
+      setError(t("listing.saveDraftFirst"));
+      return;
+    }
+    setApplying(true); setError(""); setFeedback("");
+    try {
+      const targets = generation.targets?.length ? generation.targets : listingTargets;
+      const response = await authorizedFetch(
+        `/api/v1/orchestrator/products/${productId}/ai-content/generations/${generation.id}/apply/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targets, overwrite: true }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("listing.applyFailed")));
+      setListingReloadToken((value) => value + 1);
+      const updated = Array.isArray(data.updated_targets) ? data.updated_targets.length : 0;
+      setFeedback(t("listing.applied", { count: updated || targets.length }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("listing.applyFailed"));
+    } finally {
+      setApplying(false);
+    }
   }
 
   async function loadProduct(options?: { silent?: boolean }): Promise<Product | null> {
@@ -897,7 +925,7 @@ export default function ProductWorkspacePage() {
     setGenerating(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/ai-content/generate/`, {
-        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: defaultTargets }),
+        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: listingTargets }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || "AI generation could not be started.");
@@ -921,7 +949,7 @@ export default function ProductWorkspacePage() {
       if (updatedGeneration.status === "failed") {
         window.localStorage.removeItem(generationStorageKey(productId));
       }
-      if (data.status === "succeeded") setFeedback("AI draft is ready. Review it below or open Marketplaces to apply it to listings.");
+      if (data.status === "succeeded") setFeedback(t("product.aiReady"));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to check generation status."); }
     finally { setGenerating(false); }
   }
@@ -1073,8 +1101,12 @@ export default function ProductWorkspacePage() {
           <label className="ai-draft-field"><span>{t("product.draftBullets")}</span><textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} /></label>
           <small className="ai-draft-hint">{t("product.draftHint")}</small>
           <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}</button>
+          <button type="button" className="ai-apply-button" disabled={applying || draftDirty || draftSaving} onClick={() => void applyDraft()}>{applying ? t("listing.applying") : t("listing.apply")}</button>
+          <small className="ai-draft-hint">{t("listing.applyHint")}</small>
         </form>}
-      </section><section className="workspace-card marketplace-next-step"><p className="eyebrow">{t("product.nextStep")}</p><h2>{t("product.listingTitle")}</h2><p>{t("product.listingHint")}</p><Link className="save-button" href="/manager/marketplaces">{t("product.openMarketplaces")}</Link></section></aside></div>
+      </section>
+      <ListingPrep productId={product.id} reloadToken={listingReloadToken} />
+      </aside></div>
   </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}
     {historyOpen ? <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" onClick={() => setHistoryOpen(false)}>
       <div className="price-help-dialog history-dialog" onClick={(event) => event.stopPropagation()}>
