@@ -21,7 +21,6 @@ type Variant = {
 type ProductImage = {
   id: number;
   image: string;
-  processed_image: string | null;
   position?: number;
   is_primary: boolean;
   processing_status: string;
@@ -400,7 +399,6 @@ export default function ProductWorkspacePage() {
         sourceImageId: image.id,
         isPrimary: image.is_primary,
       });
-      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: t("product.processedImage"), generated: true });
       for (const generated of image.generated_images) {
         items.push({
           key: `generated-${generated.id}`,
@@ -1034,7 +1032,7 @@ export default function ProductWorkspacePage() {
                   {image.generated_images.length > 0 && <div className="generated-thumbs">
                     {image.generated_images.map((generated) => (
                       <div key={generated.id} className="generated-thumb">
-                        <button type="button" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}>
+                        <button type="button" className="generated-open" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}>
                           <img src={generated.image} alt={generated.mode} />
                           <span className="ai-badge">AI</span>
                         </button>
