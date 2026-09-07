@@ -960,12 +960,6 @@ export default function ProductWorkspacePage() {
           {selectedGalleryItem && <div className="image-gallery-meta">
             <strong>{selectedGalleryItem.label}</strong>
             <span>{selectedImageIndex + 1} / {galleryItems.length}</span>
-<<<<<<< Updated upstream
-            {selectedGalleryItem.sourceImageId && !selectedGalleryItem.isPrimary ? (
-              <button type="button" className="image-make-primary" disabled={saving} onClick={() => void makeImagePrimary(selectedGalleryItem.sourceImageId!)}>{t("product.makePrimary")}</button>
-            ) : null}
-=======
->>>>>>> Stashed changes
             <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">{t("product.openTab")}</a>
           </div>}
           {galleryItems.length > 1 && <div className="image-gallery-thumbs">
@@ -1009,15 +1003,6 @@ export default function ProductWorkspacePage() {
                   <small>{image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}</small>
                   {image.processing_error && <small className="image-error">{image.processing_error}</small>}
                   {image.generated_images.length > 0 && <div className="generated-thumbs">
-<<<<<<< Updated upstream
-                    {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
-                  </div>}
-                  <div className="image-row-actions">
-                    {image.is_primary
-                      ? <span className="image-primary-pill">{t("product.coverBadge")}</span>
-                      : <button type="button" className="image-make-primary" disabled={saving} onClick={() => void makeImagePrimary(image.id)}>{t("product.makePrimary")}</button>}
-                    <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? t("product.generating") : product.status !== "approved" ? t("product.generateAfterApprove") : image.generated_images.length ? t("product.generateAgain") : t("product.generateImage")}</button>
-=======
                     {image.generated_images.map((generated) => (
                       <div key={generated.id} className="generated-thumb">
                         <button type="button" className="generated-open" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}>
@@ -1033,7 +1018,6 @@ export default function ProductWorkspacePage() {
                     ) : (
                       <small>{t("product.generateCoverOnly")}</small>
                     )}
->>>>>>> Stashed changes
                     <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image)} onClick={() => void deleteImage(image.id)}>{t("product.delete")}</button>
                   </div>
                 </div>
