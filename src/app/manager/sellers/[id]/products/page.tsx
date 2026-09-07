@@ -26,7 +26,7 @@ type Product = {
   images: ProductImage[];
   created_at: string;
   seller?: { id: number; username: string; first_name: string; email: string };
-  last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | null;
+  last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | "withdrawn" | null;
   ean_jv?: string | null;
   ean_xl?: string | null;
 };
