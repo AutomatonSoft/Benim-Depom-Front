@@ -172,8 +172,10 @@ button { font: inherit; }
 .image-gallery-card .image-workspace-list > article:first-of-type { border-top: 0; padding-top: 0; }
 .image-gallery-card .image-workspace-list > article > img { cursor: pointer; }
 .image-workspace-list .generated-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 3px 0 2px; }
+.image-workspace-list .generated-thumb { position: relative; width: 38px; height: 38px; }
 .image-workspace-list .generated-thumbs button { position: relative; width: 38px; height: 38px; margin: 0; padding: 0; overflow: hidden; border: 1px solid #e6edf5; border-radius: 8px; background: #f1f4f8; }
 .image-workspace-list .generated-thumbs .ai-badge { top: 2px; left: 2px; padding: 1px 3px; font-size: 8px; }
+.image-workspace-list .generated-delete { position: absolute; top: -6px; right: -6px; z-index: 2; width: 18px; height: 18px; min-height: 18px; padding: 0; border-radius: 50%; background: #c33c33 !important; color: #fff !important; font-size: 12px; line-height: 1; }
 .image-workspace-list .image-row-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 3px; }
 .image-workspace-list .image-row-actions button { margin-top: 0; }
 .image-workspace-list .image-delete-button { background: #fdeeed; color: #c33c33; }
@@ -258,5 +260,6 @@ button { font: inherit; }
 .image-gallery-thumbs button.is-primary { box-shadow: 0 0 0 1px #f7941d55; }
 .image-cover-dot { position: absolute; top: 5px; right: 5px; z-index: 1; width: 8px; height: 8px; border-radius: 50%; background: #f7941d; box-shadow: 0 0 0 2px #fff; }
 .image-gallery-meta .image-make-primary { min-height: 32px; padding: 0 12px; font-size: 12px; }
+.image-gallery-meta .image-delete-button { min-height: 32px; padding: 0 12px; font-size: 12px; background: #fdeeed; color: #c33c33; }
 
 
