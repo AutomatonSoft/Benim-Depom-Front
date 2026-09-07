@@ -107,6 +107,7 @@ type GalleryItem = {
   label: string;
   generated: boolean;
   sourceImageId?: number;
+  generatedId?: number;
   isPrimary?: boolean;
 };
 
@@ -401,7 +402,14 @@ export default function ProductWorkspacePage() {
       });
       if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: t("product.processedImage"), generated: true });
       for (const generated of image.generated_images) {
-        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`, generated: true });
+        items.push({
+          key: `generated-${generated.id}`,
+          url: generated.image,
+          label: `${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`,
+          generated: true,
+          sourceImageId: image.id,
+          generatedId: generated.id,
+        });
       }
     }
     return items;
@@ -756,6 +764,28 @@ export default function ProductWorkspacePage() {
     finally { setSaving(false); }
   }
 
+  async function deleteGeneratedImage(sourceImageId: number, generatedId: number) {
+    if (!window.confirm(t("product.deleteGeneratedConfirm"))) return;
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(
+        `/api/v1/products/${productId}/images/${sourceImageId}/generated/${generatedId}/`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(apiErrorMessage(data, t("product.generatedDeleteFailed")));
+      }
+      if (selectedImageKey === `generated-${generatedId}`) setSelectedImageKey(`source-${sourceImageId}`);
+      setFeedback(t("product.generatedDeleted"));
+      await loadProduct({ silent: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("product.generatedDeleteFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function persistImageOrder(nextImages: ProductImage[]) {
     if (!product) return;
     const previous = product.images;
@@ -844,11 +874,15 @@ export default function ProductWorkspacePage() {
   }
 
   async function generateImage(imageId: number) {
+    const image = product?.images.find((item) => item.id === imageId);
     if (product?.status !== "approved") {
-      setError("Image generation is available after the product is approved.");
+      setError(t("product.imageGenAfterApprove"));
       return;
     }
-    const image = product?.images.find((item) => item.id === imageId);
+    if (!image?.is_primary) {
+      setError(t("product.generateCoverOnly"));
+      return;
+    }
     if (isImageGenerationInProgress(image)) return;
     setSaving(true); setError(""); setFeedback("");
     try {
@@ -949,8 +983,11 @@ export default function ProductWorkspacePage() {
           {selectedGalleryItem && <div className="image-gallery-meta">
             <strong>{selectedGalleryItem.label}</strong>
             <span>{selectedImageIndex + 1} / {galleryItems.length}</span>
-            {selectedGalleryItem.sourceImageId && !selectedGalleryItem.isPrimary ? (
+            {selectedGalleryItem.sourceImageId && !selectedGalleryItem.isPrimary && !selectedGalleryItem.generatedId ? (
               <button type="button" className="image-make-primary" disabled={saving} onClick={() => void makeImagePrimary(selectedGalleryItem.sourceImageId!)}>{t("product.makePrimary")}</button>
+            ) : null}
+            {selectedGalleryItem.generatedId && selectedGalleryItem.sourceImageId ? (
+              <button type="button" className="image-delete-button" disabled={saving} onClick={() => void deleteGeneratedImage(selectedGalleryItem.sourceImageId!, selectedGalleryItem.generatedId!)}>{t("product.deleteGenerated")}</button>
             ) : null}
             <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">{t("product.openTab")}</a>
           </div>}
@@ -995,13 +1032,25 @@ export default function ProductWorkspacePage() {
                   <small>{image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}</small>
                   {image.processing_error && <small className="image-error">{image.processing_error}</small>}
                   {image.generated_images.length > 0 && <div className="generated-thumbs">
-                    {image.generated_images.map((generated) => <button key={generated.id} type="button" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}><img src={generated.image} alt={generated.mode} /><span className="ai-badge">AI</span></button>)}
+                    {image.generated_images.map((generated) => (
+                      <div key={generated.id} className="generated-thumb">
+                        <button type="button" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}>
+                          <img src={generated.image} alt={generated.mode} />
+                          <span className="ai-badge">AI</span>
+                        </button>
+                        <button type="button" className="generated-delete" disabled={saving} aria-label={t("product.deleteGenerated")} onClick={() => void deleteGeneratedImage(image.id, generated.id)}>×</button>
+                      </div>
+                    ))}
                   </div>}
                   <div className="image-row-actions">
                     {image.is_primary
                       ? <span className="image-primary-pill">{t("product.coverBadge")}</span>
                       : <button type="button" className="image-make-primary" disabled={saving} onClick={() => void makeImagePrimary(image.id)}>{t("product.makePrimary")}</button>}
-                    <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? t("product.generating") : product.status !== "approved" ? t("product.generateAfterApprove") : image.generated_images.length ? t("product.generateAgain") : t("product.generateImage")}</button>
+                    {image.is_primary ? (
+                      <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? t("product.generating") : product.status !== "approved" ? t("product.generateAfterApprove") : image.generated_images.length ? t("product.generateAgain") : t("product.generateImage")}</button>
+                    ) : (
+                      <small>{t("product.generateCoverOnly")}</small>
+                    )}
                     <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image)} onClick={() => void deleteImage(image.id)}>{t("product.delete")}</button>
                   </div>
                 </div>
