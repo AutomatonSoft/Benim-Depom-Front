@@ -142,10 +142,6 @@ export default function MarketplacesPage() {
   const shouldPoll = inProgressCount > 0 || listingBusy;
 
   useEffect(() => {
-    setPreviews([]);
-  }, [selectedProductId, selectedTargets]);
-
-  useEffect(() => {
     async function loadData() {
       const access = window.localStorage.getItem("benim_access_token");
       if (!access) return void window.location.replace("/manager/login");
@@ -236,6 +232,7 @@ export default function MarketplacesPage() {
 
   function toggleTarget(target: Target) {
     const key = targetKey(target);
+    setPreviews([]);
     setSelectedTargets((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
     );
@@ -544,7 +541,7 @@ export default function MarketplacesPage() {
         <div className="publish-controls">
           <label>
             {t("marketplaces.approvedProduct")}
-            <select value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}>
+            <select value={selectedProductId} onChange={(event) => { setPreviews([]); setSelectedProductId(event.target.value); }}>
               <option value="">{t("marketplaces.selectProduct")}</option>
               {approvedProducts.map((product) => (
                 <option key={product.id} value={product.id}>
@@ -558,9 +555,10 @@ export default function MarketplacesPage() {
               <strong>{t("marketplaces.targets")}</strong>
               <button
                 type="button"
-                onClick={() =>
-                  setSelectedTargets(selectedTargets.length === targets.length ? [] : targets.map(targetKey))
-                }
+                onClick={() => {
+                  setPreviews([]);
+                  setSelectedTargets(selectedTargets.length === targets.length ? [] : targets.map(targetKey));
+                }}
               >
                 {selectedTargets.length === targets.length ? t("marketplaces.clearAll") : t("marketplaces.selectAll")}
               </button>
@@ -618,7 +616,6 @@ export default function MarketplacesPage() {
             ))}
           </div>
         )}
-        </div>
         {error && (
           <p className="form-feedback error" role="alert">
             {error}
