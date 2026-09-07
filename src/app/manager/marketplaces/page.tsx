@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
@@ -116,7 +117,8 @@ export default function MarketplacesPage() {
   const [activeCount, setActiveCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [approvedProducts, setApprovedProducts] = useState<Product[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const searchParams = useSearchParams();
+  const [selectedProductId, setSelectedProductId] = useState(() => searchParams.get("product") || "");
   const [selectedTargets, setSelectedTargets] = useState(() => targets.map(targetKey));
   const [marketplace, setMarketplace] = useState("");
   const [account, setAccount] = useState("");
@@ -602,8 +604,8 @@ export default function MarketplacesPage() {
           </button>
         </div>
         {selectedProductId ? (
-          <Link className="listing-open-marketplaces" href={`/manager/products/${selectedProductId}`}>
-            {t("listing.editOnProduct")}
+          <Link className="listing-open-marketplaces" href={`/manager/products/${selectedProductId}/listings`}>
+            {t("listing.editOnListings")}
           </Link>
         ) : null}
         {previews.length > 0 && (
