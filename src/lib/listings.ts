@@ -19,6 +19,24 @@ export const marketplaceName: Record<Marketplace, string> = {
   kaufland: "Kaufland",
 };
 
+export const DEFAULT_OTTO_VAT = "FULL";
+
+export const ottoCatalogLanguages = ["ru", "en", "tr", "de"] as const;
+export type OttoCatalogLanguage = (typeof ottoCatalogLanguages)[number];
+
+export function ottoCatalogPath(path: string, language: OttoCatalogLanguage) {
+  const trimmed = path.replace(/^\/+|\/+$/g, "");
+  if (language === "de") return `/api/v1/catalog/otto/${trimmed}/`;
+  return `/api/v1/catalog/otto/${trimmed}/${language}/`;
+}
+
+export function defaultOttoShippingProfileId(
+  profiles: Array<{ shipping_profile_id: string; shipping_profile_name: string }>,
+) {
+  const match = profiles.find((profile) => /4\s*[-–]\s*8\s*wochen/i.test(profile.shipping_profile_name));
+  return match?.shipping_profile_id ?? "";
+}
+
 export function listingChannelLabel(target: ListingTarget) {
   return `${marketplaceName[target.marketplace]} ${target.account.toUpperCase()}`;
 }
@@ -51,4 +69,57 @@ export function formatListingErrors(errors: unknown): string {
       .join(" · ");
   }
   return "";
+}
+
+type OttoConfigPayload = {
+  product_line?: string;
+  description?: string;
+  bullet_points?: string[];
+  vat?: string;
+  shipping_profile_id?: string;
+  [key: string]: unknown;
+};
+
+type ShippingProfile = { shipping_profile_id: string; shipping_profile_name: string };
+
+/** Ensure both OTTO JV/XL configs have VAT + shipping defaults persisted for preview/publish. */
+export async function ensureOttoListingDefaults(
+  productId: number,
+  authorizedFetchFn: (input: string, init?: RequestInit) => Promise<Response>,
+) {
+  const ottoTargets = listingTargets.filter((target) => target.marketplace === "otto");
+  const [jvProfilesResponse, xlProfilesResponse] = await Promise.all([
+    authorizedFetchFn("/api/v1/catalog/otto/shipping-profiles/?account=jv"),
+    authorizedFetchFn("/api/v1/catalog/otto/shipping-profiles/?account=xl"),
+  ]);
+  const profilesByAccount: Record<Account, ShippingProfile[]> = {
+    jv: jvProfilesResponse.ok ? ((await jvProfilesResponse.json().catch(() => [])) as ShippingProfile[]) : [],
+    xl: xlProfilesResponse.ok ? ((await xlProfilesResponse.json().catch(() => [])) as ShippingProfile[]) : [],
+  };
+
+  await Promise.all(
+    ottoTargets.map(async (target) => {
+      const response = await authorizedFetchFn(listingConfigPath(productId, target));
+      if (!response.ok) return;
+      const body = (await response.json().catch(() => null)) as { configuration?: OttoConfigPayload } | null;
+      const configuration = body?.configuration || {};
+      const vat = String(configuration.vat || "").trim();
+      const shipping = String(configuration.shipping_profile_id || "").trim();
+      const defaultShipping = defaultOttoShippingProfileId(profilesByAccount[target.account] || []);
+      const nextVat = vat || DEFAULT_OTTO_VAT;
+      const nextShipping = shipping || defaultShipping;
+      if (vat && shipping) return;
+      if (!nextShipping) return;
+
+      await authorizedFetchFn(listingConfigPath(productId, target), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...configuration,
+          vat: nextVat,
+          shipping_profile_id: nextShipping,
+        }),
+      });
+    }),
+  );
 }

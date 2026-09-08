@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
+import { Feedback, PageContainer, PageHeader, SectionCard, SectionCardHeader } from "@/components/manager/ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { authorizedFetch } from "@/lib/api";
 import { useI18n } from "@/i18n";
 
@@ -41,6 +47,8 @@ export default function CreateManagerPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
   function update(field: keyof FormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -59,9 +67,7 @@ export default function CreateManagerPage() {
 
     setSubmitting(true);
     const payload = Object.fromEntries(
-      Object.entries(values).filter(
-        ([key, value]) => value || key === "username" || key === "email" || key.startsWith("password"),
-      ),
+      Object.entries(values).filter(([key, value]) => value || key === "username" || key === "email" || key.startsWith("password")),
     );
 
     try {
@@ -95,41 +101,128 @@ export default function CreateManagerPage() {
   }
 
   return (
-    <section className="content create-manager-page">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">{t("common.panel")}</p>
-            <h1>{t("managerCreate.title")}</h1>
-            <p className="products-subtitle">{t("managerCreate.subtitle")}</p>
+    <PageContainer narrow>
+      <PageHeader
+        eyebrow={t("common.panel")}
+        title={t("managerCreate.title")}
+        description={t("managerCreate.subtitle")}
+        secondaryActions={
+          <Button asChild variant="secondary">
+            <Link href="/manager/sellers">{t("managerCreate.back")}</Link>
+          </Button>
+        }
+      />
+
+      <form className="grid gap-4" onSubmit={submit}>
+        <SectionCard>
+          <SectionCardHeader eyebrow={t("managerCreate.account")} title={t("managerCreate.account")} />
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="username">{t("managerCreate.username")}</Label>
+              <Input required id="username" autoComplete="username" value={values.username} onChange={(event) => update("username", event.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="email">{t("managerCreate.email")}</Label>
+              <Input required id="email" type="email" autoComplete="email" value={values.email} onChange={(event) => update("email", event.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="password">{t("managerCreate.password")}</Label>
+              <div className="relative">
+                <Input
+                  required
+                  minLength={8}
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  className="pr-11"
+                  value={values.password}
+                  onChange={(event) => update("password", event.target.value)}
+                />
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-label={t("managerCreate.password")}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </Button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="password_confirm">{t("managerCreate.confirmPassword")}</Label>
+              <div className="relative">
+                <Input
+                  required
+                  minLength={8}
+                  id="password_confirm"
+                  type={showPasswordConfirm ? "text" : "password"}
+                  autoComplete="new-password"
+                  className="pr-11"
+                  value={values.password_confirm}
+                  onChange={(event) => update("password_confirm", event.target.value)}
+                />
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-label={t("managerCreate.confirmPassword")}
+                  aria-pressed={showPasswordConfirm}
+                  onClick={() => setShowPasswordConfirm((value) => !value)}
+                >
+                  {showPasswordConfirm ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </Button>
+              </div>
+            </div>
           </div>
-          <Link className="back-link" href="/manager/sellers">{t("managerCreate.back")}</Link>
-        </header>
+        </SectionCard>
 
-        <form className="manager-form" onSubmit={submit}>
-          <section>
-            <p className="eyebrow">{t("managerCreate.account")}</p>
-            <div className="manager-fields">
-              <label>{t("managerCreate.username")}<input required autoComplete="username" value={values.username} onChange={(event) => update("username", event.target.value)} /></label>
-              <label>{t("managerCreate.email")}<input required type="email" autoComplete="email" value={values.email} onChange={(event) => update("email", event.target.value)} /></label>
-              <label>{t("managerCreate.password")}<input required minLength={8} type="password" autoComplete="new-password" value={values.password} onChange={(event) => update("password", event.target.value)} /></label>
-              <label>{t("managerCreate.confirmPassword")}<input required minLength={8} type="password" autoComplete="new-password" value={values.password_confirm} onChange={(event) => update("password_confirm", event.target.value)} /></label>
+        <SectionCard>
+          <SectionCardHeader eyebrow={t("managerCreate.profile")} title={t("managerCreate.profile")} />
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="first_name">
+                {t("managerCreate.firstName")} <span className="normal-case tracking-normal text-muted-foreground">({t("common.optional")})</span>
+              </Label>
+              <Input id="first_name" autoComplete="given-name" value={values.first_name} onChange={(event) => update("first_name", event.target.value)} />
             </div>
-          </section>
-
-          <section>
-            <p className="eyebrow">{t("managerCreate.profile")}</p>
-            <div className="manager-fields">
-              <label>{t("managerCreate.firstName")} <small>{t("common.optional")}</small><input autoComplete="given-name" value={values.first_name} onChange={(event) => update("first_name", event.target.value)} /></label>
-              <label>{t("managerCreate.lastName")} <small>{t("common.optional")}</small><input autoComplete="family-name" value={values.last_name} onChange={(event) => update("last_name", event.target.value)} /></label>
-              <label>{t("managerCreate.phone")} <small>{t("common.optional")}</small><input type="tel" autoComplete="tel" value={values.phone} onChange={(event) => update("phone", event.target.value)} /></label>
-              <label>{t("managerCreate.preferredLanguage")} <small>{t("common.optional")}</small><select value={values.preferred_language} onChange={(event) => update("preferred_language", event.target.value)}><option value="de">Deutsch</option><option value="en">English</option><option value="tr">Türkçe</option><option value="ru">Русский</option></select></label>
+            <div>
+              <Label htmlFor="last_name">
+                {t("managerCreate.lastName")} <span className="normal-case tracking-normal text-muted-foreground">({t("common.optional")})</span>
+              </Label>
+              <Input id="last_name" autoComplete="family-name" value={values.last_name} onChange={(event) => update("last_name", event.target.value)} />
             </div>
-          </section>
+            <div>
+              <Label htmlFor="phone">
+                {t("managerCreate.phone")} <span className="normal-case tracking-normal text-muted-foreground">({t("common.optional")})</span>
+              </Label>
+              <Input id="phone" type="tel" autoComplete="tel" value={values.phone} onChange={(event) => update("phone", event.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="preferred_language">
+                {t("managerCreate.preferredLanguage")} <span className="normal-case tracking-normal text-muted-foreground">({t("common.optional")})</span>
+              </Label>
+              <FilterSelect id="preferred_language" value={values.preferred_language} onChange={(event) => update("preferred_language", event.target.value)}>
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+                <option value="tr">Türkçe</option>
+                <option value="ru">Русский</option>
+              </FilterSelect>
+            </div>
+          </div>
+        </SectionCard>
 
-          {error && <p className="form-feedback error" role="alert">{error}</p>}
-          {success && <p className="form-feedback success" role="status">{success}</p>}
-          <button className="create-manager-button" disabled={submitting} type="submit">{submitting ? t("managerCreate.submitting") : t("managerCreate.submit")}</button>
-        </form>
-      </section>
+        {error ? <Feedback>{error}</Feedback> : null}
+        {success ? <Feedback tone="success">{success}</Feedback> : null}
+        <div className="flex justify-end">
+          <Button type="submit" variant="accent" disabled={submitting}>
+            {submitting ? t("managerCreate.submitting") : t("managerCreate.submit")}
+          </Button>
+        </div>
+      </form>
+    </PageContainer>
   );
 }

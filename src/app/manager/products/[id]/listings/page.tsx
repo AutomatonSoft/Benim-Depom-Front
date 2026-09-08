@@ -5,15 +5,23 @@ import { useParams } from "next/navigation";
 import { Suspense, use, useState } from "react";
 
 import { ListingPrep } from "@/components/ListingPrep";
+import { ProductPublishPanel } from "@/components/ProductPublishPanel";
+import { EmptyState, PageContainer, PageHeader, SectionCard } from "@/components/manager/ui";
 import { OttoCategoryPicker } from "@/components/OttoCategoryPicker";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/i18n";
 import { authorizedFetch } from "@/lib/api";
 
 type ProductSummary = {
   id: number;
   title: string;
+  status?: string;
   otto_category_name: string | null;
   otto_category_group_name: string | null;
+  otto_category_id: number | null;
+  otto_category_group_id: number | null;
+  otto_attributes: Record<string, unknown>;
 };
 
 const productCache = new Map<number, Promise<ProductSummary | "unauthorized" | "missing">>();
@@ -37,14 +45,34 @@ export default function ProductListingsPage() {
   const productId = Number(params.id);
   if (!Number.isInteger(productId) || productId < 1) {
     return (
-      <section className="content products-page">
-        <p className="products-message">{t("product.notFound")}</p>
-      </section>
+      <PageContainer>
+        <EmptyState title={t("product.notFound")} />
+      </PageContainer>
     );
   }
 
   return (
-    <Suspense fallback={<section className="content products-page"><p className="products-message">{t("common.loading")}</p></section>}>
+    <Suspense
+      fallback={
+        <PageContainer>
+          <PageHeader
+            breadcrumbs={[
+              { label: t("nav.products"), href: "/manager/products" },
+              { label: `#${productId}`, href: `/manager/products/${productId}` },
+              { label: t("listing.eyebrow") },
+            ]}
+            title={t("common.loading")}
+          />
+          <SectionCard padded>
+            <div className="grid gap-3">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          </SectionCard>
+        </PageContainer>
+      }
+    >
       <ListingsLoaded productId={productId} />
     </Suspense>
   );
@@ -56,18 +84,26 @@ function ListingsLoaded({ productId }: { productId: number }) {
 
   if (product === "unauthorized") {
     return (
-      <section className="content products-page">
-        <p className="products-message">{t("login.headline")}</p>
-        <Link className="back-link" href="/manager/login">{t("login.submit")}</Link>
-      </section>
+      <PageContainer>
+        <EmptyState title={t("login.headline")} description={t("login.submit")} />
+        <div className="mt-4 flex justify-center">
+          <Button asChild variant="accent">
+            <Link href="/manager/login">{t("login.submit")}</Link>
+          </Button>
+        </div>
+      </PageContainer>
     );
   }
   if (product === "missing") {
     return (
-      <section className="content products-page">
-        <p className="products-message">{t("product.notFound")}</p>
-        <Link className="back-link" href="/manager/products">{t("product.backToList")}</Link>
-      </section>
+      <PageContainer>
+        <EmptyState title={t("product.notFound")} />
+        <div className="mt-4 flex justify-center">
+          <Button asChild variant="secondary">
+            <Link href="/manager/products">{t("product.backToList")}</Link>
+          </Button>
+        </div>
+      </PageContainer>
     );
   }
 
@@ -80,26 +116,30 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
   const [groupName, setGroupName] = useState(product.otto_category_group_name);
 
   return (
-    <section className="content listing-workspace">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">{t("listing.pageEyebrow")}</p>
-          <h1>{product.title}</h1>
-          <p className="products-subtitle">{t("listing.pageHint")}</p>
-        </div>
-        <div className="topbar-actions">
-          <Link className="back-link" href={`/manager/products/${product.id}`}>{t("listing.backToProduct")}</Link>
-        </div>
-      </header>
-      <div className="listing-workspace-grid">
-        <ListingPrep
-          productId={product.id}
-          publishHref={`/manager/marketplaces?product=${product.id}`}
-        />
+    <PageContainer>
+      <PageHeader
+        breadcrumbs={[
+          { label: t("nav.products"), href: "/manager/products" },
+          { label: `#${product.id}`, href: `/manager/products/${product.id}` },
+          { label: t("listing.eyebrow") },
+        ]}
+        title={product.title}
+        description={t("listing.pageHint")}
+        secondaryActions={
+          <Button asChild variant="secondary">
+            <Link href={`/manager/products/${product.id}`}>{t("listing.backToProduct")}</Link>
+          </Button>
+        }
+      />
+      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+        <ListingPrep productId={product.id} />
         <OttoCategoryPicker
           productId={product.id}
           categoryName={categoryName}
           groupName={groupName}
+          categoryId={product.otto_category_id}
+          groupId={product.otto_category_group_id}
+          attributes={product.otto_attributes || {}}
           onSaved={(next) => {
             setCategoryName(next.otto_category_name);
             setGroupName(next.otto_category_group_name);
@@ -107,6 +147,9 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
           }}
         />
       </div>
-    </section>
+      <div className="mt-4">
+        <ProductPublishPanel productId={product.id} productStatus={product.status} />
+      </div>
+    </PageContainer>
   );
 }
