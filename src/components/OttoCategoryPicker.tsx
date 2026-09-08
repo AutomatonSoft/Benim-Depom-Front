@@ -205,9 +205,12 @@ export function OttoCategoryPicker({
   }
 
   const groupSearchSeq = useRef(0);
+  const groupDataSeq = useRef(0);
 
   async function loadGroups(currentLanguage: OttoCatalogLanguage, search = "") {
     const seq = ++groupSearchSeq.current;
+    await Promise.resolve();
+    if (seq !== groupSearchSeq.current) return;
     setLoadingSheet(true);
     setError("");
     try {
@@ -229,16 +232,16 @@ export function OttoCategoryPicker({
   }
 
   async function loadGroupData(nextGroupId: number, currentLanguage: OttoCatalogLanguage) {
-    setSelectedGroupId(nextGroupId);
-    setCatalogReady(false);
-    setError("");
+    const seq = ++groupDataSeq.current;
     try {
       const [categoryResponse, attributeResponse] = await Promise.all([
         catalogGet(`category-groups/${nextGroupId}/categories`, currentLanguage, "?limit=200"),
         catalogGet(`category-groups/${nextGroupId}/attributes`, currentLanguage),
       ]);
+      if (seq !== groupDataSeq.current) return;
       const categoryData = await categoryResponse.json().catch(() => null);
       const attributeData = await attributeResponse.json().catch(() => null);
+      if (seq !== groupDataSeq.current) return;
       if (!categoryResponse.ok) {
         throw new Error(apiErrorMessage(categoryData, t("listing.categorySearchFailed")));
       }
@@ -247,25 +250,48 @@ export function OttoCategoryPicker({
       }
       setCategories(Array.isArray(categoryData?.results) ? categoryData.results : []);
       setCatalogAttributes(Array.isArray(attributeData) ? attributeData : []);
+      setError("");
+      setCatalogReady(true);
     } catch (cause) {
+      if (seq !== groupDataSeq.current) return;
       setError(cause instanceof Error ? cause.message : t("listing.categorySearchFailed"));
-    } finally {
       setCatalogReady(true);
     }
   }
 
   useEffect(() => {
-    void loadGroups(language).catch(() => undefined);
+    let cancelled = false;
+    void (async () => {
+      await loadGroups(language).catch(() => undefined);
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+      groupSearchSeq.current += 1;
+    };
+    // loadGroups reads latest language/t via closure; intentional language-only refresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
   useEffect(() => {
-    if (selectedGroupId === "") {
-      setCategories([]);
-      setCatalogAttributes([]);
-      setCatalogReady(true);
-      return;
-    }
-    void loadGroupData(Number(selectedGroupId), language);
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      if (selectedGroupId === "") {
+        setCategories([]);
+        setCatalogAttributes([]);
+        setCatalogReady(true);
+        return;
+      }
+      setCatalogReady(false);
+      await loadGroupData(Number(selectedGroupId), language);
+    })();
+    return () => {
+      cancelled = true;
+      groupDataSeq.current += 1;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, selectedGroupId]);
 
   useEffect(() => {

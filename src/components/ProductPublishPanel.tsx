@@ -46,20 +46,22 @@ export function ProductPublishPanel({
   const [previews, setPreviews] = useState<Array<{ key: string; label: string; ok: boolean; detail: string }>>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [status, setStatus] = useState(productStatus || "");
+  const [fetchedStatus, setFetchedStatus] = useState("");
+  const status = productStatus || fetchedStatus;
 
   useEffect(() => {
-    if (productStatus) {
-      setStatus(productStatus);
-      return;
-    }
+    if (productStatus) return;
+    let cancelled = false;
     async function loadStatus() {
       const response = await authorizedFetch(`/api/v1/products/${productId}/`);
-      if (redirectIfUnauthorized(response.status) || !response.ok) return;
+      if (cancelled || redirectIfUnauthorized(response.status) || !response.ok) return;
       const data = (await response.json()) as { status?: string };
-      if (data.status) setStatus(data.status);
+      if (!cancelled && data.status) setFetchedStatus(data.status);
     }
     void loadStatus();
+    return () => {
+      cancelled = true;
+    };
   }, [productId, productStatus]);
 
   const canPublish = status === "approved";

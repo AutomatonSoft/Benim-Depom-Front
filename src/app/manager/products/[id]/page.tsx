@@ -848,28 +848,6 @@ export default function ProductWorkspacePage() {
     finally { setSaving(false); }
   }
 
-  async function deleteGeneratedImage(sourceImageId: number, generatedId: number) {
-    if (!window.confirm(t("product.deleteGeneratedConfirm"))) return;
-    setSaving(true); setError(""); setFeedback("");
-    try {
-      const response = await authorizedFetch(
-        `/api/v1/products/${productId}/images/${sourceImageId}/generated/${generatedId}/`,
-        { method: "DELETE" },
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(apiErrorMessage(data, t("product.generatedDeleteFailed")));
-      }
-      if (selectedImageKey === `generated-${generatedId}`) setSelectedImageKey(`source-${sourceImageId}`);
-      setFeedback(t("product.generatedDeleted"));
-      await loadProduct({ silent: true });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("product.generatedDeleteFailed"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function persistImageOrder(nextImages: ProductImage[]) {
     if (!product) return;
     const previous = product.images;
