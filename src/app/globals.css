@@ -207,9 +207,12 @@ button { font: inherit; }
 .image-gallery-thumbs img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .image-gallery-card .image-workspace-list > article:first-of-type { border-top: 0; padding-top: 0; }
 .image-gallery-card .image-workspace-list > article > img { cursor: pointer; }
-.image-workspace-list .generated-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin: 3px 0 2px; }
-.image-workspace-list .generated-thumbs button { position: relative; width: 38px; height: 38px; margin: 0; padding: 0; overflow: hidden; border: 1px solid #e6edf5; border-radius: 8px; background: #f1f4f8; }
+.image-workspace-list .generated-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 5px 0 2px; }
+.image-workspace-list .generated-thumb { position: relative; width: 44px; height: 44px; }
+.image-workspace-list .generated-thumbs .generated-open { position: relative; width: 44px; height: 44px; min-height: 0; margin: 0; padding: 0; overflow: hidden; border: 1px solid #e6edf5; border-radius: 8px; background: #f1f4f8; }
 .image-workspace-list .generated-thumbs .ai-badge { top: 2px; left: 2px; padding: 1px 3px; font-size: 8px; }
+.image-workspace-list .generated-delete { position: absolute; top: 1px; right: 1px; z-index: 2; display: grid; place-items: center; width: 12px; height: 12px; min-width: 12px; min-height: 12px; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffffcc !important; color: #8b9bb0 !important; font-size: 10px; font-weight: 500; line-height: 1; }
+.image-workspace-list .generated-delete:hover { background: #fff !important; color: #5b6b7d !important; }
 .image-workspace-list .image-row-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 3px; }
 .image-workspace-list .image-row-actions button { margin-top: 0; }
 .image-workspace-list .image-delete-button { background: #fdeeed; color: #c33c33; }
@@ -294,5 +297,6 @@ button { font: inherit; }
 .image-gallery-thumbs button.is-primary { box-shadow: 0 0 0 1px #f7941d55; }
 .image-cover-dot { position: absolute; top: 5px; right: 5px; z-index: 1; width: 8px; height: 8px; border-radius: 50%; background: #f7941d; box-shadow: 0 0 0 2px #fff; }
 .image-gallery-meta .image-make-primary { min-height: 32px; padding: 0 12px; font-size: 12px; }
+.image-gallery-meta .image-delete-button { min-height: 32px; padding: 0 12px; font-size: 12px; background: #fdeeed; color: #c33c33; }
 
 

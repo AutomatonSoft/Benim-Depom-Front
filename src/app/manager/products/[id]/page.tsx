@@ -22,7 +22,6 @@ type Variant = {
 type ProductImage = {
   id: number;
   image: string;
-  processed_image: string | null;
   position?: number;
   is_primary: boolean;
   processing_status: string;
@@ -109,6 +108,7 @@ type GalleryItem = {
   label: string;
   generated: boolean;
   sourceImageId?: number;
+  generatedId?: number;
   isPrimary?: boolean;
 };
 
@@ -396,9 +396,15 @@ export default function ProductWorkspacePage() {
         sourceImageId: image.id,
         isPrimary: image.is_primary,
       });
-      if (image.processed_image) items.push({ key: `processed-${image.id}`, url: image.processed_image, label: t("product.processedImage"), generated: true });
       for (const generated of image.generated_images) {
-        items.push({ key: `generated-${generated.id}`, url: generated.image, label: `${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`, generated: true });
+        items.push({
+          key: `generated-${generated.id}`,
+          url: generated.image,
+          label: `${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`,
+          generated: true,
+          sourceImageId: image.id,
+          generatedId: generated.id,
+        });
       }
     }
     return items;
@@ -786,6 +792,28 @@ export default function ProductWorkspacePage() {
     finally { setSaving(false); }
   }
 
+  async function deleteGeneratedImage(sourceImageId: number, generatedId: number) {
+    if (!window.confirm(t("product.deleteGeneratedConfirm"))) return;
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(
+        `/api/v1/products/${productId}/images/${sourceImageId}/generated/${generatedId}/`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(apiErrorMessage(data, t("product.generatedDeleteFailed")));
+      }
+      if (selectedImageKey === `generated-${generatedId}`) setSelectedImageKey(`source-${sourceImageId}`);
+      setFeedback(t("product.generatedDeleted"));
+      await loadProduct({ silent: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("product.generatedDeleteFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function persistImageOrder(nextImages: ProductImage[]) {
     if (!product) return;
     const previous = product.images;
@@ -855,11 +883,15 @@ export default function ProductWorkspacePage() {
   }
 
   async function generateImage(imageId: number) {
+    const image = product?.images.find((item) => item.id === imageId);
     if (product?.status !== "approved") {
-      setError("Image generation is available after the product is approved.");
+      setError(t("product.imageGenAfterApprove"));
       return;
     }
-    const image = product?.images.find((item) => item.id === imageId);
+    if (!image?.is_primary) {
+      setError(t("product.generateCoverOnly"));
+      return;
+    }
     if (isImageGenerationInProgress(image)) return;
     setSaving(true); setError(""); setFeedback("");
     try {
