@@ -8,7 +8,22 @@ type RefreshResponse = {
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function canUseStorage() {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+function readToken(key: string) {
+  if (!canUseStorage()) return null;
+  return window.localStorage.getItem(key);
+}
+
+function writeToken(key: string, value: string) {
+  if (!canUseStorage()) return;
+  window.localStorage.setItem(key, value);
+}
+
 function clearTokens() {
+  if (!canUseStorage()) return;
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
@@ -24,7 +39,7 @@ async function refreshAccessToken() {
 }
 
 async function refreshAccessTokenRequest() {
-  const refresh = window.localStorage.getItem(REFRESH_TOKEN_KEY);
+  const refresh = readToken(REFRESH_TOKEN_KEY);
   if (!refresh) return null;
 
   const response = await fetch("/api/v1/auth/refresh/", {
@@ -38,8 +53,8 @@ async function refreshAccessTokenRequest() {
   }
 
   const tokens = (await response.json()) as RefreshResponse;
-  window.localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access);
-  if (tokens.refresh) window.localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh);
+  writeToken(ACCESS_TOKEN_KEY, tokens.access);
+  if (tokens.refresh) writeToken(REFRESH_TOKEN_KEY, tokens.refresh);
   return tokens.access;
 }
 
@@ -68,7 +83,7 @@ export async function authorizedFetch(input: RequestInfo | URL, init: RequestIni
     return fetch(input, { ...init, headers });
   };
 
-  const access = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+  const access = readToken(ACCESS_TOKEN_KEY);
   if (!access) return new Response(null, { status: 401 });
 
   const response = await request(access);

@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, Bell, Package } from "lucide-react";
+import { useEffect, useState } from "react";
+
+import { EmptyState, Feedback, MetricCard, PageContainer, PageHeader, SectionCard, SectionCardHeader, StatusBadge } from "@/components/manager/ui";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
-import { useEffect, useState } from "react";
-
-function Icon({ children }: { children: React.ReactNode }) {
-  return <span className="icon" aria-hidden="true">{children}</span>;
-}
 
 type QueueItem = {
   id: number;
@@ -187,63 +188,129 @@ export default function Home() {
   const heading = profile ? (name ? t("overview.helloName", { hello, name }) : hello) : hello;
 
   return (
-    <section className="content" id="overview">
-        <header className="topbar">
-          <div><p className="eyebrow">{t("common.panel")}</p><h1>{heading}</h1></div>
-          <Link className="notification" href="/manager/messages" aria-label={t("nav.messages")}>♢</Link>
-        </header>
+    <PageContainer>
+      <PageHeader
+        eyebrow={t("common.panel")}
+        title={heading}
+        secondaryActions={
+          <Button asChild variant="outline" size="icon" aria-label={t("nav.messages")}>
+            <Link href="/manager/messages">
+              <Bell className="size-4" />
+            </Link>
+          </Button>
+        }
+      />
 
-        {error && <p className="form-feedback error" role="alert">{error}</p>}
+      {error ? <Feedback className="mb-4">{error}</Feedback> : null}
 
-        <div className="summary-grid">
-          <article className="metric-card blue"><div><p>{t("overview.awaitingReview")}</p><strong>{loading ? "—" : dashboard?.awaiting_review ?? 0}</strong><small>{t("overview.today", { count: dashboard?.awaiting_review_today ?? 0 })}</small></div><Icon>▣</Icon></article>
-          <article className="metric-card orange"><div><p>{t("overview.publishedToday")}</p><strong>{loading ? "—" : dashboard?.published_today ?? 0}</strong><small>{(dashboard?.published_today_marketplaces ?? 0) === 0 ? t("overview.noListingsToday") : (dashboard?.published_today_marketplaces === 1 ? t("overview.acrossMarketplaces", { count: dashboard?.published_today_marketplaces ?? 0 }) : t("overview.acrossMarketplacesPlural", { count: dashboard?.published_today_marketplaces ?? 0 }))}</small></div><Icon>↗</Icon></article>
-          <article className="metric-card white"><div><p>{t("overview.activeSellers")}</p><strong>{loading ? "—" : dashboard?.active_sellers ?? 0}</strong><small>{t("overview.thisMonth", { count: dashboard?.sellers_joined_this_month ?? 0 })}</small></div><Icon>♙</Icon></article>
-        </div>
+      <div className="mb-4 grid gap-4 md:grid-cols-3">
+        <MetricCard
+          label={t("overview.awaitingReview")}
+          value={loading ? "—" : dashboard?.awaiting_review ?? 0}
+          hint={t("overview.today", { count: dashboard?.awaiting_review_today ?? 0 })}
+        />
+        <MetricCard
+          label={t("overview.publishedToday")}
+          value={loading ? "—" : dashboard?.published_today ?? 0}
+          hint={
+            (dashboard?.published_today_marketplaces ?? 0) === 0
+              ? t("overview.noListingsToday")
+              : dashboard?.published_today_marketplaces === 1
+                ? t("overview.acrossMarketplaces", { count: dashboard?.published_today_marketplaces ?? 0 })
+                : t("overview.acrossMarketplacesPlural", { count: dashboard?.published_today_marketplaces ?? 0 })
+          }
+        />
+        <MetricCard
+          label={t("overview.activeSellers")}
+          value={loading ? "—" : dashboard?.active_sellers ?? 0}
+          hint={t("overview.thisMonth", { count: dashboard?.sellers_joined_this_month ?? 0 })}
+        />
+      </div>
 
-        <div className="listing-grid">
-          {(dashboard?.active_listings ?? emptyActiveListings()).map((listing) => (
-            <article className="listing-card" key={`${listing.marketplace}-${listing.account}`}>
-              <p>{channelLabel(listing)}</p>
-              <strong>{loading ? "—" : listing.count}</strong>
-              <small>{t("overview.activeListings")}</small>
-            </article>
-          ))}
-          <article className="listing-card ean">
-            <p>{t("overview.freeEanJv")}</p>
-            <strong>{loading ? "—" : dashboard?.free_eans?.jv ?? 0}</strong>
-            <small>{t("overview.availableInPool")}</small>
-          </article>
-          <article className="listing-card ean">
-            <p>{t("overview.freeEanXl")}</p>
-            <strong>{loading ? "—" : dashboard?.free_eans?.xl ?? 0}</strong>
-            <small>{t("overview.availableInPool")}</small>
-          </article>
-        </div>
-
-        <section className="review-panel" id="products">
-          <div className="panel-heading"><div><p className="eyebrow">{t("overview.queueEyebrow")}</p><h2>{t("overview.queueTitle")}</h2></div><Link className="link-button" href="/manager/products">{t("overview.openProducts")} <span>→</span></Link></div>
-          {loading && <div className="dashboard-empty"><span>▣</span><div><strong>{t("overview.loadingQueue")}</strong><p>{t("overview.loadingQueueHint")}</p></div></div>}
-          {!loading && dashboard && dashboard.queue.length === 0 && (
-            <div className="dashboard-empty"><span>▣</span><div><strong>{t("overview.emptyQueue")}</strong><p>{t("overview.emptyQueueHint")}</p></div></div>
-          )}
-          {!loading && dashboard && dashboard.queue.length > 0 && (
-            <div className="product-list">
-              {dashboard.queue.map((item) => (
-                <Link className="product-row" href={`/manager/products/${item.id}`} key={item.id}>
-                  <div className="product-image">{item.image ? <img src={item.image} alt="" /> : <span>▣</span>}</div>
-                  <div className="product-main">
-                    <p>{item.product_type}</p>
-                    <h3>{item.title}</h3>
-                    <small>{item.seller_name || t("overview.sellerFallback")} · {formatDate(item.created_at, true)}</small>
-                  </div>
-                  <span className="status review">{t("status.submitted")}</span>
-                  <span className="more" aria-hidden="true">→</span>
-                </Link>
-              ))}
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {(dashboard?.active_listings ?? emptyActiveListings()).map((listing) => (
+          <article key={`${listing.marketplace}-${listing.account}`} className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgba(20,47,85,0.04)]">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.04em] text-muted-foreground">{channelLabel(listing)}</p>
+              <span
+                className={`size-2 rounded-full ${loading ? "bg-border" : listing.count > 0 ? "bg-[var(--ui-success)]" : "bg-border"}`}
+                aria-hidden
+              />
             </div>
-          )}
-        </section>
-      </section>
+            <strong className="text-2xl font-extrabold tabular-nums text-primary">{loading ? "—" : listing.count}</strong>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">{t("overview.activeListings")}</p>
+          </article>
+        ))}
+        <MetricCard
+          tone={(dashboard?.free_eans?.jv ?? 0) < 20 ? "warning" : "default"}
+          label={t("overview.freeEanJv")}
+          value={loading ? "—" : dashboard?.free_eans?.jv ?? 0}
+          hint={t("overview.availableInPool")}
+        />
+        <MetricCard
+          tone={(dashboard?.free_eans?.xl ?? 0) < 20 ? "warning" : "default"}
+          label={t("overview.freeEanXl")}
+          value={loading ? "—" : dashboard?.free_eans?.xl ?? 0}
+          hint={t("overview.availableInPool")}
+        />
+      </div>
+
+      <SectionCard>
+        <SectionCardHeader
+          eyebrow={t("overview.queueEyebrow")}
+          title={t("overview.queueTitle")}
+          actions={
+            <Button asChild variant="link">
+              <Link href="/manager/products">
+                {t("overview.openProducts")}
+                <ArrowRight />
+              </Link>
+            </Button>
+          }
+        />
+
+        {loading ? (
+          <div className="space-y-3 p-4">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : null}
+
+        {!loading && dashboard && dashboard.queue.length === 0 ? (
+          <EmptyState icon={Package} title={t("overview.emptyQueue")} description={t("overview.emptyQueueHint")} />
+        ) : null}
+
+        {!loading && dashboard && dashboard.queue.length > 0 ? (
+          <div className="divide-y divide-border">
+            {dashboard.queue.map((item) => (
+              <Link
+                key={item.id}
+                href={`/manager/products/${item.id}`}
+                className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-[#f8fafc]"
+              >
+                <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-muted-foreground">
+                  {item.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.image} alt="" className="size-full object-cover" />
+                  ) : (
+                    <Package className="size-4" aria-hidden />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-muted-foreground">{item.product_type}</p>
+                  <h3 className="truncate text-sm font-extrabold text-primary">{item.title}</h3>
+                  <small className="text-xs font-semibold text-muted-foreground">
+                    {item.seller_name || t("overview.sellerFallback")} · {formatDate(item.created_at, true)}
+                  </small>
+                </div>
+                <StatusBadge status="submitted">{t("status.submitted")}</StatusBadge>
+                <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--brand-accent)]" aria-hidden />
+              </Link>
+            ))}
+          </div>
+        ) : null}
+      </SectionCard>
+    </PageContainer>
   );
 }

@@ -1,10 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
+import { MoreHorizontal, Package, Trash2, Users } from "lucide-react";
+
+import { ConfirmDialog } from "@/components/manager/confirm-dialog";
+import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { FilterSelect } from "@/components/ui/filter-select";
 import { authorizedFetch, apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { useI18n } from "@/i18n";
-import { FormEvent, useEffect, useState } from "react";
 
 type Seller = {
   id: number;
@@ -123,55 +132,156 @@ export default function SellersPage() {
   }
 
   return (
-    <section className="content products-page">
-        <header className="topbar"><div><p className="eyebrow">{t("common.panel")}</p><h1>{t("sellers.title")}</h1><p className="products-subtitle">{t("sellers.subtitle", { count })}</p></div><Link className="primary-link" href="/manager/managers/new">{t("sellers.createManager")}</Link></header>
+    <PageContainer>
+      <PageHeader
+        eyebrow={t("common.panel")}
+        title={t("sellers.title")}
+        description={t("sellers.subtitle", { count })}
+        primaryAction={
+          <Button asChild variant="accent">
+            <Link href="/manager/managers/new">{t("sellers.createManager")}</Link>
+          </Button>
+        }
+      />
 
-        <section className="products-panel">
-          <form className="products-toolbar" onSubmit={applySearch}>
-            <input aria-label={t("sellers.searchAria")} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("sellers.searchPlaceholder")} />
-            <select aria-label={t("sellers.filterAria")} value={activity} onChange={(event) => { setPage(1); setActivity(event.target.value); }}>
+      <SectionCard>
+        <SectionToolbar>
+          <form className="flex w-full flex-wrap items-center gap-3" onSubmit={applySearch}>
+            <Input
+              className="min-w-[220px] flex-1"
+              aria-label={t("sellers.searchAria")}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("sellers.searchPlaceholder")}
+            />
+            <FilterSelect
+              className="w-[160px]"
+              aria-label={t("sellers.filterAria")}
+              value={activity}
+              onChange={(event) => {
+                setPage(1);
+                setActivity(event.target.value);
+              }}
+            >
               <option value="">{t("sellers.all")}</option>
               <option value="true">{t("common.active")}</option>
               <option value="false">{t("common.inactive")}</option>
-            </select>
-            <button type="submit">{t("common.search")}</button>
+            </FilterSelect>
+            <Button type="submit">{t("common.search")}</Button>
           </form>
+        </SectionToolbar>
 
-          {loading && <p className="products-message">{t("sellers.loading")}</p>}
-          {error && <p className="products-message error" role="alert">{error}</p>}
-          {actionError && !loading && <p className="form-feedback error" role="alert">{actionError}</p>}
-          {feedback && !error && !actionError && <p className="form-feedback success" role="status">{feedback}</p>}
-          {!loading && !error && sellers.length === 0 && <p className="products-message">{t("sellers.empty")}</p>}
+        {loading ? <p className="px-5 py-6 text-sm font-semibold text-muted-foreground">{t("sellers.loading")}</p> : null}
+        {error ? <Feedback className="px-5 py-4">{error}</Feedback> : null}
+        {actionError && !loading ? <Feedback className="px-5 py-2">{actionError}</Feedback> : null}
+        {feedback && !error && !actionError ? <Feedback tone="success" className="px-5 py-2">{feedback}</Feedback> : null}
+        {!loading && !error && sellers.length === 0 ? <EmptyState icon={Users} title={t("sellers.empty")} /> : null}
 
-          {!loading && !error && sellers.length > 0 && <div className="sellers-table">
-            <div className="seller-table-header"><span>{t("sellers.col.seller")}</span><span>{t("sellers.col.contact")}</span><span>{t("sellers.col.products")}</span><span>{t("sellers.col.joined")}</span><span /></div>
-            {sellers.map((seller) => <article className="seller-row" key={seller.id}>
-              <div className="seller-name"><span>{fullName(seller).slice(0, 1).toUpperCase()}</span><div><h2>{fullName(seller)}</h2><small>@{seller.username}</small></div></div>
-              <div className="seller-contact"><strong>{seller.email || t("sellers.noEmail")}</strong><small>{seller.phone || t("sellers.noPhone")}</small></div>
-              <Link className="seller-product-count" href={`/manager/sellers/${seller.id}/products`} aria-label={t("sellers.openProducts", { name: fullName(seller) })}>{seller.product_count ?? 0}</Link>
-              <time dateTime={seller.date_joined}>{formatDate(seller.date_joined)}</time>
-              <button type="button" className="seller-delete-button" aria-label={t("sellers.deleteAria", { name: fullName(seller) })} onClick={() => { setActionError(""); setFeedback(""); setPendingSeller(seller); }}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2m-7 3v9m4-9v9M6 7l1 14h10l1-14" /></svg>
-              </button>
-            </article>)}
-          </div>}
-
-          <footer className="pagination"><button disabled={!hasPrevious || loading} onClick={() => setPage((value) => value - 1)}>{t("common.previous")}</button><span>{t("common.page", { page })}</span><button disabled={!hasNext || loading} onClick={() => setPage((value) => value + 1)}>{t("common.next")}</button></footer>
-        </section>
-
-        {pendingSeller ? <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="seller-delete-title" onClick={() => { if (!deleting) setPendingSeller(null); }}>
-          <div className="price-help-dialog seller-delete-dialog" onClick={(event) => event.stopPropagation()}>
-            <h2 id="seller-delete-title">{t("sellers.deleteTitle")}</h2>
-            <p>{t("sellers.deleteWarning")}</p>
-            <p>{t("sellers.productCount", { count: pendingSeller.product_count ?? 0 })}</p>
-            <p>{t("sellers.confirm")}</p>
-            {actionError ? <p className="form-feedback error" role="alert">{actionError}</p> : null}
-            <div className="seller-delete-actions">
-              <button type="button" className="seller-delete-cancel" disabled={deleting} onClick={() => setPendingSeller(null)}>{t("sellers.no")}</button>
-              <button type="button" className="seller-delete-confirm" disabled={deleting} onClick={() => void confirmDelete()}>{deleting ? t("sellers.deleting") : t("sellers.yes")}</button>
+        {!loading && !error && sellers.length > 0 ? (
+          <>
+            <PaginationBar
+              page={page}
+              hasPrevious={hasPrevious}
+              hasNext={hasNext}
+              loading={loading}
+              onPrevious={() => setPage((value) => value - 1)}
+              onNext={() => setPage((value) => value + 1)}
+              previousLabel={t("common.previous")}
+              nextLabel={t("common.next")}
+              pageLabel={t("common.page", { page })}
+            />
+            <div className="overflow-x-auto">
+            <div className="grid min-w-[920px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_100px_140px_56px] gap-3 border-b border-border bg-[#f8fafc] px-5 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+              <span>{t("sellers.col.seller")}</span>
+              <span>{t("sellers.col.contact")}</span>
+              <span className="text-right">{t("sellers.col.products")}</span>
+              <span>{t("sellers.col.joined")}</span>
+              <span />
             </div>
+            {sellers.map((seller) => (
+              <article
+                key={seller.id}
+                className="grid min-w-[920px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_100px_140px_56px] items-center gap-3 border-b border-border px-5 py-3"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar className="size-9">
+                    <AvatarFallback className="bg-primary text-xs font-extrabold text-primary-foreground">
+                      {fullName(seller).slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-extrabold text-primary">{fullName(seller)}</h2>
+                    <small className="text-xs font-semibold text-muted-foreground">@{seller.username}</small>
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm font-semibold text-primary">{seller.email || t("sellers.noEmail")}</strong>
+                  <small className="text-xs text-muted-foreground">{seller.phone || t("sellers.noPhone")}</small>
+                </div>
+                <Link
+                  className="text-right text-sm font-extrabold text-primary hover:text-[var(--brand-accent)]"
+                  href={`/manager/sellers/${seller.id}/products`}
+                  aria-label={t("sellers.openProducts", { name: fullName(seller) })}
+                >
+                  {seller.product_count ?? 0}
+                </Link>
+                <time className="text-xs font-semibold text-muted-foreground" dateTime={seller.date_joined}>
+                  {formatDate(seller.date_joined)}
+                </time>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" size="icon-sm" variant="ghost" aria-label={t("sellers.deleteAria", { name: fullName(seller) })}>
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href={`/manager/sellers/${seller.id}/products`}>
+                        <Package />
+                        {t("sellers.openProducts", { name: fullName(seller) })}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => {
+                        setActionError("");
+                        setFeedback("");
+                        setPendingSeller(seller);
+                      }}
+                    >
+                      <Trash2 />
+                      {t("sellers.deleteTitle")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </article>
+            ))}
           </div>
-        </div> : null}
-      </section>
+          </>
+        ) : null}
+      </SectionCard>
+
+      <ConfirmDialog
+        open={Boolean(pendingSeller)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingSeller(null);
+        }}
+        title={t("sellers.deleteTitle")}
+        description={
+          pendingSeller ? (
+            <>
+              <p>{t("sellers.deleteWarning")}</p>
+              <p>{t("sellers.productCount", { count: pendingSeller.product_count ?? 0 })}</p>
+              <p>{t("sellers.confirm")}</p>
+              {actionError ? <Feedback>{actionError}</Feedback> : null}
+            </>
+          ) : null
+        }
+        cancelLabel={t("sellers.no")}
+        confirmLabel={deleting ? t("sellers.deleting") : t("sellers.yes")}
+        loading={deleting}
+        onConfirm={() => void confirmDelete()}
+      />
+    </PageContainer>
   );
 }

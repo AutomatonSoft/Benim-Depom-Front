@@ -25,10 +25,10 @@
   --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 24px;
-  --font-body: var(--font-montserrat), system-ui, -apple-system, sans-serif;
-  --font-cond: var(--font-montserrat), system-ui, sans-serif;
-  --font-display: var(--font-montserrat), system-ui, sans-serif;
-  --font-mono: var(--font-montserrat), system-ui, sans-serif;
+  --font-body: var(--font-montserrat), "Montserrat", system-ui, -apple-system, sans-serif;
+  --font-cond: var(--font-montserrat), "Montserrat", system-ui, sans-serif;
+  --font-display: var(--font-montserrat), "Montserrat", system-ui, sans-serif;
+  --font-mono: var(--font-montserrat), "Montserrat", system-ui, sans-serif;
 
   background: var(--bg);
   color: var(--ink);
