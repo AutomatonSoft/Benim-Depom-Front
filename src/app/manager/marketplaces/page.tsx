@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
@@ -104,7 +104,16 @@ function redirectIfUnauthorized(status: number) {
   return true;
 }
 
-export default function MarketplacesPage() {
+export default function MarketplacesRoute() {
+  const { t } = useI18n();
+  return (
+    <Suspense fallback={<section className="content products-page"><p className="products-message">{t("common.loading")}</p></section>}>
+      <MarketplacesPage />
+    </Suspense>
+  );
+}
+
+function MarketplacesPage() {
   const { t } = useI18n();
   const [publications, setPublications] = useState<Publication[]>([]);
   const [publicationCount, setPublicationCount] = useState(0);
