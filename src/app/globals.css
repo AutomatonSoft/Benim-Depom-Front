@@ -147,7 +147,21 @@ button { font: inherit; }
 .listing-channel-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .listing-channel-pills button { min-height: 32px; margin: 0; padding: 0 10px; border: 1px solid #e6edf5; border-radius: 999px; background: #f7f9fc; color: #29466f; font-size: 11px; font-weight: 800; cursor: pointer; }
 .listing-channel-pills button.is-active { border-color: #f7941d; background: #fff7ec; color: #d77d14; }
-.listing-prep-form { display: grid; gap: 10px; }
+.listing-prep-stage { min-height: 520px; }
+.listing-prep-form select, .listing-prep-card select, .listing-prep-form input, .listing-prep-form textarea { width: 100%; box-sizing: border-box; border: 1px solid #dbe3ed; border-radius: 9px; outline: none; background: #fff; color: #173968; font: inherit; }
+.listing-prep-form select, .listing-prep-card select { height: 42px; padding: 0 12px; }
+.listing-prep-form textarea { min-height: 0; }
+.listing-channel-fields { display: grid; gap: 10px; min-height: 160px; align-content: start; }
+.listing-prep-form .is-reserved { visibility: hidden; }
+.listing-workspace { max-width: 1180px; }
+.listing-workspace-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .7fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .listing-workspace-grid { grid-template-columns: 1fr; } }
+.listing-category-search { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.listing-category-search input { flex: 1; min-width: 180px; height: 42px; border: 1px solid #dbe3ed; border-radius: 9px; padding: 0 12px; }
+.listing-category-search .save-button { margin-top: 0; }
+.listing-category-current, .listing-category-missing { margin: 10px 0 0 !important; font-weight: 800; }
+.listing-category-current { color: #173968 !important; }
+.listing-category-missing { color: #c45a12 !important; }
 .listing-prep-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .listing-prep-actions .save-button { margin-top: 0; }
 .listing-preview-button, .ai-apply-button { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 9px; min-height: 42px; padding: 0 16px; background: #173968; color: #fff; font-weight: 800; cursor: pointer; }

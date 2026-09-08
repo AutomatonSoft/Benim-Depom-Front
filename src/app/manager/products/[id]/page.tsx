@@ -6,8 +6,7 @@ import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState
 
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
-import { listingTargets } from "@/lib/listings";
-import { ListingPrep } from "@/components/ListingPrep";
+import { listingTargetKey, listingTargets } from "@/lib/listings";
 import { useI18n, type MessageKey } from "@/i18n";
 
 type Variant = {
@@ -357,7 +356,6 @@ export default function ProductWorkspacePage() {
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [listingReloadToken, setListingReloadToken] = useState(0);
   const [priceHelpOpen, setPriceHelpOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ModerationDecision[]>([]);
@@ -474,20 +472,24 @@ export default function ProductWorkspacePage() {
     }
     setApplying(true); setError(""); setFeedback("");
     try {
-      const targets = generation.targets?.length ? generation.targets : listingTargets;
+      const allowed = generation.targets ?? [];
+      const allowedKeys = new Set(allowed.map((item) => `${item.marketplace}:${item.account}`));
+      const targets = allowed.length
+        ? listingTargets.filter((item) => allowedKeys.has(listingTargetKey(item)))
+        : listingTargets;
+      const applyTargets = targets.length ? targets : allowed;
       const response = await authorizedFetch(
         `/api/v1/orchestrator/products/${productId}/ai-content/generations/${generation.id}/apply/`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ targets, overwrite: true }),
+          body: JSON.stringify({ targets: applyTargets, overwrite: true }),
         },
       );
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiErrorMessage(data, t("listing.applyFailed")));
-      setListingReloadToken((value) => value + 1);
       const updated = Array.isArray(data.updated_targets) ? data.updated_targets.length : 0;
-      setFeedback(t("listing.applied", { count: updated || targets.length }));
+      setFeedback(t("listing.applied", { count: updated || applyTargets.length }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("listing.applyFailed"));
     } finally {
@@ -880,25 +882,6 @@ export default function ProductWorkspacePage() {
     setDropTargetId(null);
   }
 
-  async function makeImagePrimary(imageId: number) {
-    if (!product || product.images.some((image) => image.id === imageId && image.is_primary)) return;
-    setSaving(true); setError(""); setFeedback("");
-    try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/images/${imageId}/make-primary/`, { method: "POST" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.primaryFailed")));
-      setProduct((current) => current ? {
-        ...current,
-        images: current.images.map((image) => ({ ...image, is_primary: image.id === imageId })),
-      } : current);
-      setFeedback(t("product.primarySet"));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("product.primaryFailed"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function generateImage(imageId: number) {
     const image = product?.images.find((item) => item.id === imageId);
     if (product?.status !== "approved") {
@@ -1009,12 +992,6 @@ export default function ProductWorkspacePage() {
           {selectedGalleryItem && <div className="image-gallery-meta">
             <strong>{selectedGalleryItem.label}</strong>
             <span>{selectedImageIndex + 1} / {galleryItems.length}</span>
-            {selectedGalleryItem.sourceImageId && !selectedGalleryItem.isPrimary && !selectedGalleryItem.generatedId ? (
-              <button type="button" className="image-make-primary" disabled={saving} onClick={() => void makeImagePrimary(selectedGalleryItem.sourceImageId!)}>{t("product.makePrimary")}</button>
-            ) : null}
-            {selectedGalleryItem.generatedId && selectedGalleryItem.sourceImageId ? (
-              <button type="button" className="image-delete-button" disabled={saving} onClick={() => void deleteGeneratedImage(selectedGalleryItem.sourceImageId!, selectedGalleryItem.generatedId!)}>{t("product.deleteGenerated")}</button>
-            ) : null}
             <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">{t("product.openTab")}</a>
           </div>}
           {galleryItems.length > 1 && <div className="image-gallery-thumbs">
@@ -1062,16 +1039,12 @@ export default function ProductWorkspacePage() {
                       <div key={generated.id} className="generated-thumb">
                         <button type="button" className="generated-open" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}>
                           <img src={generated.image} alt={generated.mode} />
-                          <span className="ai-badge">AI</span>
                         </button>
-                        <button type="button" className="generated-delete" disabled={saving} aria-label={t("product.deleteGenerated")} onClick={() => void deleteGeneratedImage(image.id, generated.id)}>×</button>
                       </div>
                     ))}
                   </div>}
                   <div className="image-row-actions">
-                    {image.is_primary
-                      ? <span className="image-primary-pill">{t("product.coverBadge")}</span>
-                      : <button type="button" className="image-make-primary" disabled={saving} onClick={() => void makeImagePrimary(image.id)}>{t("product.makePrimary")}</button>}
+                    {image.is_primary ? <span className="image-primary-pill">{t("product.coverBadge")}</span> : null}
                     {image.is_primary ? (
                       <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? t("product.generating") : product.status !== "approved" ? t("product.generateAfterApprove") : image.generated_images.length ? t("product.generateAgain") : t("product.generateImage")}</button>
                     ) : (
@@ -1092,7 +1065,7 @@ export default function ProductWorkspacePage() {
         <h2>{t("product.aiTitle")}</h2>
         <p>{t("product.aiHint")}</p>
         <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? t("product.starting") : descriptionGenerationInProgress ? t("product.generating") : t("product.generateDescription")}</button>
-        {generation && <div className="generation-status"><strong>{t("product.generationStatus", { status: generation.status.replaceAll("_", " ") })}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>{t("product.refreshStatus")}</button>{generation.status === "succeeded" && <Link href="/manager/marketplaces">{t("product.reviewMarketplaces")}</Link>}</div>}
+        {generation && <div className="generation-status"><strong>{t("product.generationStatus", { status: generation.status.replaceAll("_", " ") })}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>{t("product.refreshStatus")}</button>{generation.status === "succeeded" && <Link href={`/manager/products/${product.id}/listings`}>{t("listing.openPage")}</Link>}</div>}
         {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || t("product.generationFailed")}</p>}
         {generationContent && draftForm && <form className="ai-draft" onSubmit={saveDraft}>
           <span className="ai-draft-heading">{t("product.draftHeading")}</span>
@@ -1105,7 +1078,13 @@ export default function ProductWorkspacePage() {
           <small className="ai-draft-hint">{t("listing.applyHint")}</small>
         </form>}
       </section>
-      <ListingPrep productId={product.id} reloadToken={listingReloadToken} />
+      <section className="workspace-card listing-prep-card">
+        <p className="eyebrow">{t("listing.eyebrow")}</p>
+        <h2>{t("listing.prepTitle")}</h2>
+        <p>{t("listing.prepHint")}</p>
+        <Link className="listing-open-marketplaces" href={`/manager/products/${product.id}/listings`}>{t("listing.openPage")}</Link>
+        <Link className="listing-open-marketplaces" href={`/manager/marketplaces?product=${product.id}`}>{t("product.openMarketplaces")}</Link>
+      </section>
       </aside></div>
   </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}
     {historyOpen ? <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" onClick={() => setHistoryOpen(false)}>
