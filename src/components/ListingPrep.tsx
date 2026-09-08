@@ -3,9 +3,20 @@
 import Link from "next/link";
 import { FormEvent, Suspense, use, useState } from "react";
 
+import { Feedback, SectionCard, SectionCardHeader } from "@/components/manager/ui";
+import { OttoShippingGuide } from "@/components/OttoShippingGuide";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/i18n";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import {
+  DEFAULT_OTTO_VAT,
+  defaultOttoShippingProfileId,
+  ensureOttoListingDefaults,
   formatListingErrors,
   listingChannelLabel,
   listingConfigPath,
@@ -15,6 +26,7 @@ import {
   type Account,
   type ListingTarget,
 } from "@/lib/listings";
+import { cn } from "@/lib/utils";
 
 type ConfigResponse = {
   configuration?: {
@@ -108,6 +120,7 @@ async function readJson(response: Response) {
 }
 
 async function loadBundle(productId: number, failMessage: string): Promise<Bundle> {
+  await ensureOttoListingDefaults(productId, authorizedFetch);
   const [publicationResponse, jvProfilesResponse, xlProfilesResponse, ...configResponses] = await Promise.all([
     authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`),
     authorizedFetch("/api/v1/catalog/otto/shipping-profiles/?account=jv"),
@@ -175,17 +188,22 @@ function ChannelPills({
   onSelect: (target: ListingTarget) => void;
 }) {
   return (
-    <div className="listing-channel-pills">
-      {listingTargets.map((target) => (
-        <button
-          key={listingTargetKey(target)}
-          type="button"
-          className={listingTargetKey(target) === listingTargetKey(channel) ? "is-active" : ""}
-          onClick={() => onSelect(target)}
-        >
-          {listingChannelLabel(target)}
-        </button>
-      ))}
+    <div className="flex flex-wrap gap-2">
+      {listingTargets.map((target) => {
+        const active = listingTargetKey(target) === listingTargetKey(channel);
+        return (
+          <Button
+            key={listingTargetKey(target)}
+            type="button"
+            size="sm"
+            variant={active ? "accent" : "secondary"}
+            className={cn(!active && "bg-secondary/80")}
+            onClick={() => onSelect(target)}
+          >
+            {listingChannelLabel(target)}
+          </Button>
+        );
+      })}
     </div>
   );
 }
@@ -193,30 +211,29 @@ function ChannelPills({
 export function ListingPrep({
   productId,
   reloadToken = 0,
-  publishHref = "/manager/marketplaces",
 }: {
   productId: number;
   reloadToken?: number;
-  publishHref?: string;
 }) {
   const { t } = useI18n();
   const [mountId] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   return (
-    <section className="workspace-card listing-prep-card">
-      <p className="eyebrow">{t("listing.eyebrow")}</p>
-      <h2>{t("listing.title")}</h2>
-      <p>{t("listing.hint")}</p>
-      <p className="ai-draft-hint">{t("listing.publishFieldsHint")}</p>
-      <div className="listing-prep-stage">
-        <Suspense fallback={<ListingPrepSkeleton />}>
-          <ListingPrepFields productId={productId} epoch={`${mountId}:${reloadToken}`} />
-        </Suspense>
+    <SectionCard>
+      <SectionCardHeader eyebrow={t("listing.eyebrow")} title={t("listing.title")} />
+      <div className="grid gap-4 p-4 md:p-5">
+        <p className="text-sm font-medium text-muted-foreground">{t("listing.hint")}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{t("listing.publishFieldsHint")}</p>
+        <div className="grid gap-4">
+          <Suspense fallback={<ListingPrepSkeleton />}>
+            <ListingPrepFields productId={productId} epoch={`${mountId}:${reloadToken}`} />
+          </Suspense>
+        </div>
+        <Button asChild variant="outline" className="justify-self-start">
+          <Link href={`/manager/marketplaces?q=${productId}`}>{t("listing.viewPublications")}</Link>
+        </Button>
       </div>
-      <Link className="listing-open-marketplaces" href={publishHref}>
-        {t("product.openMarketplaces")}
-      </Link>
-    </section>
+    </SectionCard>
   );
 }
 
@@ -225,21 +242,24 @@ function ListingPrepSkeleton() {
   return (
     <>
       <ChannelPills channel={listingTargets[0]} onSelect={() => undefined} />
-      <form className="listing-prep-form" aria-busy="true">
-        <label className="ai-draft-field">
-          <span>{t("listing.productLine")}</span>
-          <input disabled />
-        </label>
-        <label className="ai-draft-field">
-          <span>{t("product.draftDescription")}</span>
-          <textarea disabled rows={7} />
-        </label>
-        <label className="ai-draft-field">
-          <span>{t("product.draftBullets")}</span>
-          <textarea disabled rows={4} />
-        </label>
-        <div className="listing-channel-fields" />
-        <p>{t("common.loading")}</p>
+      <form className="grid gap-4" aria-busy="true">
+        <div>
+          <Label>{t("listing.productLine")}</Label>
+          <Input disabled />
+        </div>
+        <div>
+          <Label>{t("product.draftDescription")}</Label>
+          <Textarea disabled rows={7} />
+        </div>
+        <div>
+          <Label>{t("product.draftBullets")}</Label>
+          <Textarea disabled rows={4} />
+        </div>
+        <div className="grid gap-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-2/3" />
+        </div>
+        <p className="text-sm font-semibold text-muted-foreground">{t("common.loading")}</p>
       </form>
     </>
   );
@@ -270,7 +290,15 @@ function ListingPrepFields({
 
   const draft = drafts[key] || emptyDraft();
   const baseline = baselines[key] || emptyDraft();
-  const dirty = !draftsEqual(draft, baseline);
+  const profiles = view.profiles[channel.account] || [];
+  const defaultShippingId = channel.marketplace === "otto" ? defaultOttoShippingProfileId(profiles) : "";
+  const shippingValue =
+    channel.marketplace === "otto" ? draft.shippingProfileId || defaultShippingId : draft.shippingProfileId;
+  const vatValue = channel.marketplace === "otto" ? draft.vat || DEFAULT_OTTO_VAT : draft.vat;
+  const dirty =
+    channel.marketplace === "otto"
+      ? !draftsEqual({ ...draft, vat: vatValue, shippingProfileId: shippingValue }, baseline)
+      : !draftsEqual(draft, baseline);
 
   function selectChannel(target: ListingTarget) {
     if (listingTargetKey(target) === listingTargetKey(channel)) return;
@@ -299,21 +327,17 @@ function ListingPrepFields({
               product_line: draft.title.trim(),
               description: draft.description.trim(),
               bullet_points: draft.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
-              ...(draft.vat ? { vat: draft.vat } : {}),
-              shipping_profile_id: draft.shippingProfileId,
+              vat: vatValue,
+              shipping_profile_id: shippingValue,
             }
           : channel.marketplace === "hood"
             ? {
                 title: draft.title.trim(),
                 description: draft.description,
-                category_id: draft.hoodCategoryId.trim(),
               }
             : {
                 title: draft.title.trim(),
                 description: draft.description.trim(),
-                ...(Number.isFinite(Number(draft.delivery)) && draft.delivery.trim() !== ""
-                  ? { delivery: Number(draft.delivery) }
-                  : {}),
               };
       const response = await authorizedFetch(listingConfigPath(productId, channel), {
         method: "PATCH",
@@ -322,9 +346,18 @@ function ListingPrepFields({
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(apiErrorMessage(data, t("listing.saveFailed")));
-      const next = { ...draft, title: draft.title.trim() };
+      const next = {
+        ...draft,
+        title: draft.title.trim(),
+        ...(channel.marketplace === "otto"
+          ? { vat: vatValue, shippingProfileId: shippingValue }
+          : {}),
+      };
       setDrafts((current) => ({ ...current, [key]: next }));
       setBaselines((current) => ({ ...current, [key]: next }));
+      if (channel.marketplace === "otto") {
+        await ensureOttoListingDefaults(productId, authorizedFetch);
+      }
       setNotice(t("listing.saved"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("listing.saveFailed"));
@@ -338,6 +371,7 @@ function ListingPrepFields({
     setError("");
     setNotice("");
     try {
+      await ensureOttoListingDefaults(productId, authorizedFetch);
       const path = listingPreviewPath(
         productId,
         channel,
@@ -366,106 +400,94 @@ function ListingPrepFields({
     return (
       <>
         <ChannelPills channel={channel} onSelect={selectChannel} />
-        <p className="form-feedback error" role="alert">{loadError}</p>
+        <Feedback>{loadError}</Feedback>
       </>
     );
   }
 
-  const profiles = view.profiles[channel.account] || [];
-
   return (
     <>
       <ChannelPills channel={channel} onSelect={selectChannel} />
-      <form className="listing-prep-form" onSubmit={(event) => void save(event)}>
-        <label className="ai-draft-field">
-          <span>{channel.marketplace === "otto" ? t("listing.productLine") : t("product.draftTitle")}</span>
-          <input value={draft.title} onChange={(event) => updateDraft({ title: event.target.value })} />
-        </label>
-        <label className="ai-draft-field">
-          <span>{t("product.draftDescription")}</span>
-          <textarea rows={7} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
-        </label>
-        <label className={`ai-draft-field${channel.marketplace === "otto" ? "" : " is-reserved"}`}>
-          <span>{t("product.draftBullets")}</span>
-          <textarea
+      <form className="grid gap-4" onSubmit={(event) => void save(event)}>
+        <div>
+          <Label>{channel.marketplace === "otto" ? t("listing.productLine") : t("product.draftTitle")}</Label>
+          <Input value={draft.title} onChange={(event) => updateDraft({ title: event.target.value })} />
+        </div>
+        <div>
+          <Label>{t("product.draftDescription")}</Label>
+          <Textarea rows={7} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
+        </div>
+        <div className={cn(channel.marketplace !== "otto" && "opacity-55")}>
+          <Label>{t("product.draftBullets")}</Label>
+          <Textarea
             rows={4}
             value={channel.marketplace === "otto" ? draft.bullets : ""}
             disabled={channel.marketplace !== "otto"}
             onChange={(event) => updateDraft({ bullets: event.target.value })}
           />
-        </label>
-        <div className="listing-channel-fields">
           {channel.marketplace === "otto" ? (
-            <>
-              <label className="ai-draft-field">
-                <span>{t("listing.ottoVat")}</span>
-                <select value={draft.vat} onChange={(event) => updateDraft({ vat: event.target.value })}>
-                  <option value="">{t("listing.selectValue")}</option>
-                  <option value="FULL">{t("listing.ottoVatFull")}</option>
-                  <option value="REDUCED">{t("listing.ottoVatReduced")}</option>
-                  <option value="FREE">{t("listing.ottoVatFree")}</option>
-                </select>
-                <small className="ai-draft-hint">{t("listing.ottoVatHint")}</small>
-              </label>
-              <label className="ai-draft-field">
-                <span>{t("listing.ottoShipping")}</span>
-                <select
-                  value={draft.shippingProfileId}
-                  onChange={(event) => updateDraft({ shippingProfileId: event.target.value })}
-                >
-                  <option value="">{t("listing.selectValue")}</option>
-                  {profiles.map((profile) => (
-                    <option key={profile.shipping_profile_id} value={profile.shipping_profile_id}>
-                      {profile.shipping_profile_name}
-                    </option>
-                  ))}
-                </select>
-                <small className="ai-draft-hint">{t("listing.ottoShippingHint")}</small>
-              </label>
-            </>
-          ) : null}
-          {channel.marketplace === "hood" ? (
-            <label className="ai-draft-field">
-              <span>{t("listing.hoodCategory")}</span>
-              <input
-                value={draft.hoodCategoryId}
-                onChange={(event) => updateDraft({ hoodCategoryId: event.target.value })}
-              />
-              <small className="ai-draft-hint">{t("listing.hoodCategoryHint")}</small>
-            </label>
-          ) : null}
-          {channel.marketplace === "kaufland" ? (
-            <label className="ai-draft-field">
-              <span>{t("listing.kauflandDelivery")}</span>
-              <input
-                inputMode="numeric"
-                min={0}
-                type="number"
-                value={draft.delivery}
-                onChange={(event) => updateDraft({ delivery: event.target.value })}
-              />
-              <small className="ai-draft-hint">{t("listing.kauflandDeliveryHint")}</small>
-            </label>
+            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.bulletsHint")}</p>
           ) : null}
         </div>
-        <div className="listing-prep-actions">
-          <button className="save-button" type="submit" disabled={saving || !dirty}>
+        {channel.marketplace === "otto" ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>{t("listing.ottoVat")}</Label>
+              <FilterSelect value={vatValue} onChange={(event) => updateDraft({ vat: event.target.value })}>
+                <option value="">{t("listing.selectValue")}</option>
+                <option value="FULL">{t("listing.ottoVatFull")}</option>
+                <option value="REDUCED">{t("listing.ottoVatReduced")}</option>
+                <option value="FREE">{t("listing.ottoVatFree")}</option>
+              </FilterSelect>
+              <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.ottoVatHint")}</p>
+            </div>
+            <div>
+              <Label>{t("listing.ottoShipping")}</Label>
+              <FilterSelect
+                value={shippingValue}
+                onChange={(event) => updateDraft({ shippingProfileId: event.target.value })}
+              >
+                <option value="">{t("listing.selectValue")}</option>
+                {profiles.map((profile) => (
+                  <option key={profile.shipping_profile_id} value={profile.shipping_profile_id}>
+                    {profile.shipping_profile_name}
+                  </option>
+                ))}
+              </FilterSelect>
+              <OttoShippingGuide />
+              <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.ottoShippingHint")}</p>
+            </div>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" variant="accent" disabled={saving || !dirty}>
             {saving ? t("product.saving") : t("listing.saveChannel")}
-          </button>
-          <button type="button" className="listing-preview-button" disabled={previewing || dirty} onClick={() => void preview()}>
+          </Button>
+          <Button type="button" variant="secondary" disabled={previewing || dirty} onClick={() => void preview()}>
             {previewing ? t("listing.previewing") : t("listing.preview")}
-          </button>
+          </Button>
         </div>
-        {dirty && <small className="ai-draft-hint">{t("listing.saveBeforePreview")}</small>}
+        {dirty ? <p className="text-xs font-semibold text-muted-foreground">{t("listing.saveBeforePreview")}</p> : null}
       </form>
-      {error && <p className="form-feedback error" role="alert">{error}</p>}
-      {notice && <p className="form-feedback success">{notice}</p>}
-      {previewOk !== null && (
-        <div className={`listing-preview ${previewOk ? "is-ok" : "is-bad"}`}>
-          <strong>{previewOk ? t("listing.previewOk") : t("listing.previewBad")}</strong>
-          <pre>{previewText}</pre>
+      {error ? <Feedback>{error}</Feedback> : null}
+      {notice ? <Feedback tone="success">{notice}</Feedback> : null}
+      {previewOk !== null ? (
+        <div
+          className={cn(
+            "rounded-xl border px-4 py-3",
+            previewOk
+              ? "border-[rgba(34,140,90,0.28)] bg-[var(--ui-success-bg)]"
+              : "border-[rgba(196,64,56,0.28)] bg-[var(--ui-danger-bg)]",
+          )}
+        >
+          <strong className={cn("text-sm font-extrabold", previewOk ? "text-[var(--ui-success)]" : "text-[var(--ui-danger)]")}>
+            {previewOk ? t("listing.previewOk") : t("listing.previewBad")}
+          </strong>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs font-semibold text-primary">
+            {previewText}
+          </pre>
         </div>
-      )}
+      ) : null}
     </>
   );
 }
