@@ -4,9 +4,26 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  EmptyState,
+  Feedback,
+  PageFrame,
+  PageHeader,
+  Panel,
+  PanelHeader,
+  StatCard,
+  StatusBadge,
+} from "@/components/manager/ui";
+import { ConfirmDialog } from "@/components/manager/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FilterSelect } from "@/components/ui/filter-select";
+import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { listingTargetKey, listingTargets } from "@/lib/listings";
+import { cn } from "@/lib/utils";
 import { useI18n, type MessageKey } from "@/i18n";
 
 type Variant = {
@@ -149,24 +166,24 @@ function BackgroundProgress({ label, status }: { label: string; status: string }
   const isActive = !isComplete && !isFailed;
   const width = isComplete ? "100%" : isFailed ? "100%" : status === "queued" || status === "pending" ? "28%" : "68%";
 
-  return <>
-    <style>{`
-      .background-tasks-card { display: grid; gap: 15px; margin-bottom: 22px; }
-      .task-progress { display: grid; gap: 7px; color: #29466f; font-size: 12px; }
-      .task-progress > div { display: flex; justify-content: space-between; gap: 12px; }
-      .task-progress > div span { color: #71849d; }
-      .task-progress > div strong { text-transform: capitalize; }
-      .task-progress-track { display: block; height: 6px; overflow: hidden; border-radius: 999px; background: #e8eef6; }
-      .task-progress-track > span { display: block; height: 100%; border-radius: inherit; background: #f7941d; transition: width .35s ease; }
-      .task-progress.is-active .task-progress-track > span { animation: task-progress-pulse 1.4s ease-in-out infinite; }
-      .task-progress.is-failed .task-progress-track > span { background: #c33c33; }
-      @keyframes task-progress-pulse { 50% { opacity: .52; } }
-    `}</style>
-    <div className={`task-progress ${isActive ? "is-active" : ""} ${isFailed ? "is-failed" : ""}`} aria-live="polite">
-      <div><span>{label}</span><strong>{isComplete ? "Ready" : isFailed ? "Failed" : normalizedStatus}</strong></div>
-      <span className="task-progress-track"><span style={{ width }} /></span>
+  return (
+    <div className="grid gap-1.5 text-xs text-primary" aria-live="polite">
+      <div className="flex justify-between gap-3">
+        <span className="font-semibold text-muted-foreground">{label}</span>
+        <strong className="capitalize">{isComplete ? "Ready" : isFailed ? "Failed" : normalizedStatus}</strong>
     </div>
-  </>;
+      <span className="block h-1.5 overflow-hidden rounded-full bg-secondary">
+        <span
+          className={cn(
+            "block h-full rounded-full transition-[width] duration-300",
+            isFailed ? "bg-[var(--ui-danger)]" : "bg-[var(--brand-accent)]",
+            isActive && "animate-pulse",
+          )}
+          style={{ width }}
+        />
+      </span>
+    </div>
+  );
 }
 
 const warehouseLabels: Record<string, string> = {
@@ -247,58 +264,95 @@ function FormulaEditorDialog({
   }
 
   return (
-    <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="price-help-title" onClick={onClose}>
-      <form className="price-help-dialog price-formula-dialog" onClick={(event) => event.stopPropagation()} onSubmit={submit}>
-        <div className="price-help-heading">
-          <h2 id="price-help-title">{t("formula.title")}</h2>
-          <button type="button" className="price-calc-hint" onClick={onClose}>{t("common.close")}</button>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-[rgba(20,47,85,0.45)] p-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="price-help-title"
+      onClick={onClose}
+    >
+      <form
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-[0_18px_48px_rgba(20,47,85,0.16)]"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={submit}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-3">
+          <h2 id="price-help-title" className="text-lg font-extrabold text-primary">{t("formula.title")}</h2>
+          <Button type="button" variant="secondary" size="sm" onClick={onClose}>{t("common.close")}</Button>
         </div>
-        <p className="formula-intro">{t("formula.intro")}</p>
-        <p className="price-help-formula">
+        <p className="text-sm text-muted-foreground">{t("formula.intro")}</p>
+        <p className="mt-2 rounded-xl bg-secondary px-3 py-2 text-xs font-semibold leading-relaxed text-primary">
           {t("formula.listing")}<br />
           {t("formula.listingRest")}
         </p>
-        <div className="formula-sections">
-          <section className="formula-block">
-            <h3>{t("formula.percentages")}</h3>
-            <div className="formula-percent-grid">
-              <label>{t("formula.margin")}<input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} /></label>
-              <label>{t("formula.advertising")}<input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} /></label>
-              <label>{t("formula.vat")}<input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} /></label>
+        <div className="mt-4 grid gap-5">
+          <section className="grid gap-3">
+            <h3 className="text-sm font-extrabold text-primary">{t("formula.percentages")}</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label>{t("formula.margin")}</Label>
+                <Input required step="0.01" min="0" type="number" value={String(draft.margin)} onChange={(event) => setField("margin", event.target.value)} />
+              </div>
+              <div>
+                <Label>{t("formula.advertising")}</Label>
+                <Input required step="0.01" min="0" type="number" value={String(draft.adv_fee)} onChange={(event) => setField("adv_fee", event.target.value)} />
+              </div>
+              <div>
+                <Label>{t("formula.vat")}</Label>
+                <Input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} />
+              </div>
             </div>
           </section>
-          <section className="formula-block">
-            <h3>{t("formula.rates")}</h3>
-            <div className="formula-rates-grid">
-              <label>{t("formula.try")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} /></label>
-              <label>{t("formula.usd")}<input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} /></label>
+          <section className="grid gap-3">
+            <h3 className="text-sm font-extrabold text-primary">{t("formula.rates")}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label>{t("formula.try")}</Label>
+                <Input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_try ?? "")} onChange={(event) => setField("eur_to_try", event.target.value)} />
+              </div>
+              <div>
+                <Label>{t("formula.usd")}</Label>
+                <Input step="0.0001" min="0.0001" type="number" value={String(draft.eur_to_usd ?? "")} onChange={(event) => setField("eur_to_usd", event.target.value)} />
+              </div>
             </div>
           </section>
-          <section className="formula-block">
-            <h3>{t("formula.cityTariffs")}</h3>
-            <div className="formula-city-grid">
+          <section className="grid gap-3">
+            <h3 className="text-sm font-extrabold text-primary">{t("formula.cityTariffs")}</h3>
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
               {cityOrder.map((city) => (
-                <label key={city}>{warehouseLabels[city]}<input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} /></label>
+                <div key={city}>
+                  <Label>{warehouseLabels[city]}</Label>
+                  <Input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} />
+                </div>
               ))}
             </div>
           </section>
-          <section className="formula-block">
-            <h3>{t("formula.deDelivery")}</h3>
-            <div className="formula-tier-list">
+          <section className="grid gap-3">
+            <h3 className="text-sm font-extrabold text-primary">{t("formula.deDelivery")}</h3>
+            <div className="grid gap-2">
               {draft.de_size_tiers.map((tier, index) => (
-                <div className="formula-tier-row" key={tier.code}>
-                  <strong>{tier.code}</strong>
-                  <label>{t("formula.from")}<input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} /></label>
-                  <label>{t("formula.to")}<input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} /></label>
-                  <label>{t("formula.price")}<input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} /></label>
+                <div className="grid gap-2 rounded-xl border border-border bg-[#f8fafc] p-3 sm:grid-cols-[56px_1fr_1fr_1fr] sm:items-end" key={tier.code}>
+                  <strong className="text-sm font-extrabold text-primary">{tier.code}</strong>
+                  <div>
+                    <Label>{t("formula.from")}</Label>
+                    <Input required step="0.001" min="0" type="number" value={String(tier.min_cbm)} onChange={(event) => setTier(index, "min_cbm", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("formula.to")}</Label>
+                    <Input required step="0.001" min="0" type="number" value={String(tier.max_cbm)} onChange={(event) => setTier(index, "max_cbm", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("formula.price")}</Label>
+                    <Input required step="0.01" min="0" type="number" value={String(tier.price_eur)} onChange={(event) => setTier(index, "price_eur", event.target.value)} />
+                  </div>
                 </div>
               ))}
             </div>
           </section>
         </div>
-        <div className="price-help-actions">
-          <button type="button" className="price-calc-hint" disabled={saving} onClick={onReset}>{t("formula.useDefault")}</button>
-          <button className="save-button" disabled={saving} type="submit">{saving ? t("product.saving") : t("formula.save")}</button>
+        <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+          <Button type="button" variant="secondary" disabled={saving} onClick={onReset}>{t("formula.useDefault")}</Button>
+          <Button disabled={saving} type="submit">{saving ? t("product.saving") : t("formula.save")}</Button>
         </div>
       </form>
     </div>
@@ -365,6 +419,7 @@ export default function ProductWorkspacePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [dragImageId, setDragImageId] = useState<number | null>(null);
   const [dropTargetId, setDropTargetId] = useState<number | null>(null);
+  const [pendingDeleteImageId, setPendingDeleteImageId] = useState<number | null>(null);
   const dragImageIdRef = useRef<number | null>(null);
 
   const canModerate = product?.status === "submitted";
@@ -779,7 +834,6 @@ export default function ProductWorkspacePage() {
   }
 
   async function deleteImage(imageId: number) {
-    if (!window.confirm(t("product.deleteImageConfirm"))) return;
     setSaving(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(`/api/v1/products/${productId}/images/${imageId}/`, { method: "DELETE" });
@@ -787,31 +841,11 @@ export default function ProductWorkspacePage() {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.detail || "Image could not be deleted.");
       }
-      setFeedback(t("product.imageDeleted")); await loadProduct({ silent: true });
+      setFeedback(t("product.imageDeleted"));
+      setPendingDeleteImageId(null);
+      await loadProduct({ silent: true });
     } catch (cause) { setError(cause instanceof Error ? cause.message : t("product.imageDeleteFailed")); }
     finally { setSaving(false); }
-  }
-
-  async function deleteGeneratedImage(sourceImageId: number, generatedId: number) {
-    if (!window.confirm(t("product.deleteGeneratedConfirm"))) return;
-    setSaving(true); setError(""); setFeedback("");
-    try {
-      const response = await authorizedFetch(
-        `/api/v1/products/${productId}/images/${sourceImageId}/generated/${generatedId}/`,
-        { method: "DELETE" },
-      );
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(apiErrorMessage(data, t("product.generatedDeleteFailed")));
-      }
-      if (selectedImageKey === `generated-${generatedId}`) setSelectedImageKey(`source-${sourceImageId}`);
-      setFeedback(t("product.generatedDeleted"));
-      await loadProduct({ silent: true });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("product.generatedDeleteFailed"));
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function persistImageOrder(nextImages: ProductImage[]) {
@@ -950,173 +984,675 @@ export default function ProductWorkspacePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [descriptionGenerationInProgress, imageGenerationInProgress, generation?.id]);
 
-  if (loading) return <section className="content products-page"><p className="products-message">{t("product.loading")}</p></section>;
-  if (error && !product) return <section className="content products-page"><p className="products-message error">{error}</p><Link className="back-link" href="/manager/products">{t("product.backToList")}</Link></section>;
+  if (loading) {
+    return (
+      <PageFrame>
+        <p className="text-sm font-semibold text-muted-foreground">{t("product.loading")}</p>
+      </PageFrame>
+    );
+  }
+
+  if (error && !product) {
+    return (
+      <PageFrame>
+        <Feedback className="mb-4">{error}</Feedback>
+        <Button asChild variant="secondary">
+          <Link href="/manager/products">{t("product.backToList")}</Link>
+        </Button>
+      </PageFrame>
+    );
+  }
+
   if (!product || !form) return null;
   const sellerEur = sellerPriceEur(product);
   const previouslyRejected = product.status === "submitted" && product.last_moderation_decision === "rejected";
 
-  return <><section className="content product-workspace">
-    <header className="topbar"><div><p className="eyebrow">{t("product.workspace")}</p><h1>{product.title}</h1><p className="products-subtitle">{t("product.updated", { id: product.id, date: formatDate(product.updated_at, true) })}</p>{product.seller ? <p className="products-subtitle">{t("product.createdBy", { name: product.seller.username })}{product.seller.first_name ? ` · ${product.seller.first_name}` : ""}{product.seller.email ? ` · ${product.seller.email}` : ""}</p> : null}</div><div className="topbar-actions"><Link className="back-link" href="/manager/products">{t("product.back")}</Link></div></header>
-    {error && <p className="form-feedback error" role="alert">{error}</p>}{feedback && <p className="form-feedback success">{feedback}</p>}
-    {(descriptionGenerationInProgress || activeImageGenerationStatus) && <section className="workspace-card background-tasks-card"><div><p className="eyebrow">{t("product.background")}</p><h2>{t("product.backgroundTitle")}</h2><p>{t("product.backgroundHint")}</p></div>{descriptionGenerationInProgress && generation && <BackgroundProgress label={t("product.descGeneration")} status={generation.status} />}{activeImageGenerationStatus && <BackgroundProgress label={t("product.imageGeneration")} status={activeImageGenerationStatus} />}</section>}
-    <section className="workspace-summary"><article><span>{t("product.statusEyebrow")}</span><strong className={`manager-status ${product.status}`}>{t(`status.${product.status}` as MessageKey)}</strong>{previouslyRejected ? <small className="previous-decision">{t("products.previouslyRejected")}</small> : null}</article><article><span>{t("product.stock")}</span><strong>{t("products.pcs", { count: product.total_quantity })}</strong></article><article><span>{t("product.sellerPrice")}</span><strong>{formatMoney(product.unit_price, product.currency)}{sellerEur ? ` (${sellerEur})` : ""}</strong></article><article><span>{t("product.listingEur")}</span><strong>{product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}</strong></article></section>
-    <section className="workspace-summary workspace-ean"><article><span>EAN JV</span><strong>{product.ean_jv?.trim() || "—"}</strong></article><article><span>EAN XL</span><strong>{product.ean_xl?.trim() || "—"}</strong></article></section>
-    <div className="product-toolbar"><div className="availability-action"><button type="button" className="ask-availability-button" disabled={saving || product.status !== "approved"} title={product.status !== "approved" ? t("product.askAvailabilityHint") : undefined} onClick={() => void requestAvailability()}>{t("product.askAvailability")}</button>{product.availability_reminder_sent_at ? <small>{t("product.lastRequest", { date: formatDate(product.availability_reminder_sent_at, true) })}</small> : null}{product.availability_confirmed_at ? <small>{t("product.lastResponse")} <span className={product.is_available ? "availability-yes" : "availability-no"}>{product.is_available ? t("common.yes") : t("common.no")}</span>, {formatDate(product.availability_confirmed_at, true)}</small> : null}</div><button type="button" className="history-button" onClick={() => { setHistoryOpen(true); void loadHistory(1); }}>{t("product.history")}</button></div>
-    {sellerWithdrew && <section className="workspace-card withdrawal-card"><div><p className="eyebrow">{t("product.withdrawal")}</p><h2>{t("product.withdrawnTitle")}</h2><p>{t("product.withdrawnHint")}</p></div></section>}
-    {product.status === "rejected" && !sellerWithdrew && <section className="workspace-card rejection-card"><div><p className="eyebrow">{t("product.rejection")}</p><h2>{t("product.rejectedTitle")}</h2><p>{latestRejection?.comment?.trim() || t("product.noRejectReason")}</p></div></section>}
-    {pendingEntries.length > 0 && <section className="workspace-card pending-changes-card"><div><p className="eyebrow">{t("product.pendingChanges")}</p><h2>{t("product.pendingTitle")}</h2><p>{t("product.pendingHint")}</p></div><dl className="pending-changes-list">{pendingEntries.map(([field, value]) => <div key={field}><dt>{field}</dt><dd><small title={t("product.pendingOld")}>{currentFieldValue(product, field)}</small><strong title={t("product.pendingNew")}>{formatChangeValue(value)}</strong></dd></div>)}</dl><button className="approve-button" disabled={saving} onClick={() => void approveSellerChanges()}>{saving ? t("product.saving") : t("product.approveChanges")}</button></section>}
-    {canModerate && <section className="workspace-card moderation-card"><div><p className="eyebrow">{t("product.moderation")}</p><h2>{t("product.reviewTitle")}</h2><p>{t("product.reviewHint")}</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void moderate("approve")}>{t("product.approve")}</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder={t("product.rejectReason")} /><button className="reject-button" disabled={saving} onClick={() => void moderate("reject")}>{t("product.reject")}</button></div></section>}
-    {canChangeApprovedStatus && <section className="workspace-card moderation-card"><div><p className="eyebrow">{t("product.statusEyebrow")}</p><h2>{t("product.changeStatus")}</h2><p>{t("product.changeStatusHintBefore")}<Link href="/manager/marketplaces">{t("nav.marketplaces")}</Link>{t("product.changeStatusHintAfter")}</p></div><div className="moderation-actions"><button className="approve-button" disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>{t("product.returnToReview")}</button><input value={rejectComment} onChange={(event) => setRejectComment(event.target.value)} placeholder={t("product.rejectReason")} /><button className="reject-button" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>{t("product.reject")}</button></div></section>}
-    <section className="workspace-card image-gallery-card">
-      <div className="image-gallery-heading">
-        <div>
-          <p className="eyebrow">{t("product.images")}</p>
-          <h2>{t("product.imagesTitle")}</h2>
-          <p>{t("product.imagesHint")}</p>
+  return (
+    <>
+      <PageFrame>
+        <PageHeader
+          breadcrumbs={[
+            { label: t("nav.products"), href: "/manager/products" },
+            { label: `#${product.id}` },
+          ]}
+          eyebrow={t("product.workspace")}
+          title={product.title}
+          description={
+            <div className="grid gap-1">
+              <p>{t("product.updated", { id: product.id, date: formatDate(product.updated_at, true) })}</p>
+              {product.seller ? (
+                <p>
+                  {t("product.createdBy", { name: product.seller.username })}
+                  {product.seller.first_name ? ` · ${product.seller.first_name}` : ""}
+                  {product.seller.email ? ` · ${product.seller.email}` : ""}
+                </p>
+              ) : null}
+            </div>
+          }
+          secondaryActions={
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={product.status}>{t(`status.${product.status}` as MessageKey)}</StatusBadge>
+              <Button asChild variant="secondary">
+                <Link href="/manager/products">{t("product.back")}</Link>
+              </Button>
+            </div>
+          }
+        />
+
+        {error ? <Feedback className="mb-3">{error}</Feedback> : null}
+        {feedback ? <Feedback tone="success" className="mb-3">{feedback}</Feedback> : null}
+
+        {(descriptionGenerationInProgress || activeImageGenerationStatus) ? (
+          <Panel className="mb-4" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.background")}</p>
+            <h2 className="text-lg font-extrabold text-primary">{t("product.backgroundTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("product.backgroundHint")}</p>
+            <div className="mt-4 grid gap-3">
+              {descriptionGenerationInProgress && generation ? (
+                <BackgroundProgress label={t("product.descGeneration")} status={generation.status} />
+              ) : null}
+              {activeImageGenerationStatus ? (
+                <BackgroundProgress label={t("product.imageGeneration")} status={activeImageGenerationStatus} />
+              ) : null}
+            </div>
+          </Panel>
+        ) : null}
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label={t("product.statusEyebrow")}
+            value={t(`status.${product.status}` as MessageKey)}
+            hint={previouslyRejected ? t("products.previouslyRejected") : undefined}
+          />
+          <StatCard label={t("product.stock")} value={t("products.pcs", { count: product.total_quantity })} />
+          <StatCard
+            label={t("product.sellerPrice")}
+            value={`${formatMoney(product.unit_price, product.currency)}${sellerEur ? ` (${sellerEur})` : ""}`}
+          />
+          <StatCard
+            label={t("product.listingEur")}
+            value={product.listing_price_eur ? formatMoney(product.listing_price_eur, "EUR") : "—"}
+            tone="accent"
+          />
         </div>
-        <label className="upload-image-button">{t("product.addImage")}<input accept="image/jpeg,image/png,image/webp" disabled={saving} type="file" onChange={(event) => void uploadImage(event)} /></label>
-      </div>
-      <div className="image-gallery-layout">
-        <div className="image-gallery-viewer">
-          <div className="image-gallery-stage">
-            {selectedGalleryItem ? <>
-              <img src={selectedGalleryItem.url} alt={selectedGalleryItem.label} />
-              {selectedGalleryItem.generated && <span className="ai-badge">{t("product.aiGenerated")}</span>}
-              {galleryItems.length > 1 && <>
-                <button type="button" className="image-gallery-nav prev" aria-label={t("product.prevImage")} onClick={() => stepGallery(-1)}>‹</button>
-                <button type="button" className="image-gallery-nav next" aria-label={t("product.nextImage")} onClick={() => stepGallery(1)}>›</button>
-              </>}
-            </> : <p className="image-gallery-empty">{t("product.noImages")}</p>}
-          </div>
-          {selectedGalleryItem && <div className="image-gallery-meta">
-            <strong>{selectedGalleryItem.label}</strong>
-            <span>{selectedImageIndex + 1} / {galleryItems.length}</span>
-            <a href={selectedGalleryItem.url} target="_blank" rel="noreferrer">{t("product.openTab")}</a>
-          </div>}
-          {galleryItems.length > 1 && <div className="image-gallery-thumbs">
-            {galleryItems.map((item, index) => <button key={item.key} type="button" className={`${index === selectedImageIndex ? "is-active" : ""}${item.isPrimary ? " is-primary" : ""}`} title={item.label} onClick={() => setSelectedImageKey(item.key)}><img src={item.url} alt={item.label} />{item.isPrimary && <span className="image-cover-dot" aria-hidden="true" />}{item.generated && <span className="ai-badge">AI</span>}</button>)}
-          </div>}
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <StatCard label="EAN JV" value={product.ean_jv?.trim() || "—"} tone="navy" />
+          <StatCard label="EAN XL" value={product.ean_xl?.trim() || "—"} tone="navy" />
         </div>
-        <div className="image-workspace-list">
-          {product.images.length === 0 && <p>{t("product.noSourceImages")}</p>}
-          {product.images.length > 1 && <p className="image-order-hint">{t("product.reorderHint")}</p>}
-          {sortProductImages(product.images).map((image, index) => {
-            const canReorder = product.images.length > 1;
-            return (
-              <article
-                key={image.id}
-                className={`${image.is_primary ? "is-primary" : ""}${dragImageId === image.id ? " is-dragging" : ""}${dropTargetId === image.id && dragImageId !== image.id ? " is-drop-target" : ""}`}
-                onDragOver={(event) => onImageDragOver(event, image.id)}
-                onDrop={(event) => onImageDrop(event, image.id)}
-                onDragEnd={onImageDragEnd}
+
+        <Panel className="mb-4" padded>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <Button
+                type="button"
+                variant="accent"
+                disabled={saving || product.status !== "approved"}
+                title={product.status !== "approved" ? t("product.askAvailabilityHint") : undefined}
+                onClick={() => void requestAvailability()}
               >
-                {canReorder && (
-                  <div className="image-order-rail">
-                    <span
-                      className="image-drag-handle"
-                      title={t("product.dragToReorder")}
-                      aria-hidden="true"
-                      draggable
-                      onDragStart={(event) => onImageDragStart(event, image.id)}
-                    ><span /><span /><span /></span>
-                    <div className="image-order-buttons">
-                      <button type="button" disabled={saving || index === 0} aria-label={t("product.moveUp")} onClick={() => moveImageBy(image.id, -1)}>↑</button>
-                      <button type="button" disabled={saving || index === product.images.length - 1} aria-label={t("product.moveDown")} onClick={() => moveImageBy(image.id, 1)}>↓</button>
-                    </div>
-                  </div>
-                )}
-                <button type="button" className="image-preview-thumb" onClick={() => setSelectedImageKey(`source-${image.id}`)}>
-                  <img src={image.image} alt="" />
-                  <span className="image-order-index">{index + 1}</span>
-                </button>
-                <div>
-                  <strong>{image.is_primary ? t("product.primaryImage") : t("product.sourceImage")}</strong>
-                  <small>{image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}</small>
-                  {image.processing_error && <small className="image-error">{image.processing_error}</small>}
-                  {image.generated_images.length > 0 && <div className="generated-thumbs">
-                    {image.generated_images.map((generated) => (
-                      <div key={generated.id} className="generated-thumb">
-                        <button type="button" className="generated-open" title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`} onClick={() => setSelectedImageKey(`generated-${generated.id}`)}>
-                          <img src={generated.image} alt={generated.mode} />
+                {t("product.askAvailability")}
+              </Button>
+              {product.availability_reminder_sent_at ? (
+                <small className="text-xs font-semibold text-muted-foreground">
+                  {t("product.lastRequest", { date: formatDate(product.availability_reminder_sent_at, true) })}
+                </small>
+              ) : null}
+              {product.availability_confirmed_at ? (
+                <small className="text-xs font-semibold text-muted-foreground">
+                  {t("product.lastResponse")}{" "}
+                  <span className={product.is_available ? "font-extrabold text-[var(--ui-success)]" : "font-extrabold text-[var(--ui-danger)]"}>
+                    {product.is_available ? t("common.yes") : t("common.no")}
+                  </span>
+                  , {formatDate(product.availability_confirmed_at, true)}
+                </small>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setHistoryOpen(true);
+                void loadHistory(1);
+              }}
+            >
+              {t("product.history")}
+            </Button>
+          </div>
+        </Panel>
+
+        {sellerWithdrew ? (
+          <Panel className="mb-4 border-[rgba(247,148,29,0.35)] bg-gradient-to-b from-[#fffaf3] to-[#fff6ea]" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.withdrawal")}</p>
+            <h2 className="text-lg font-extrabold text-primary">{t("product.withdrawnTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("product.withdrawnHint")}</p>
+          </Panel>
+        ) : null}
+
+        {product.status === "rejected" && !sellerWithdrew ? (
+          <Panel className="mb-4 border-[rgba(195,60,51,0.25)] bg-gradient-to-b from-[#fff7f6] to-[#ffefed]" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ui-danger)]">{t("product.rejection")}</p>
+            <h2 className="text-lg font-extrabold text-[var(--ui-danger)]">{t("product.rejectedTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{latestRejection?.comment?.trim() || t("product.noRejectReason")}</p>
+          </Panel>
+        ) : null}
+
+        {pendingEntries.length > 0 ? (
+          <Panel className="mb-4" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.pendingChanges")}</p>
+            <h2 className="text-lg font-extrabold text-primary">{t("product.pendingTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("product.pendingHint")}</p>
+            <dl className="mt-4 grid gap-3">
+              {pendingEntries.map(([field, value]) => (
+                <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
+                  <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">{field}</dt>
+                  <dd className="mt-1 grid gap-1 text-sm">
+                    <small className="text-muted-foreground" title={t("product.pendingOld")}>{currentFieldValue(product, field)}</small>
+                    <strong className="font-bold text-primary" title={t("product.pendingNew")}>{formatChangeValue(value)}</strong>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <Button className="mt-4" disabled={saving} onClick={() => void approveSellerChanges()}>
+              {saving ? t("product.saving") : t("product.approveChanges")}
+            </Button>
+          </Panel>
+        ) : null}
+
+        {canModerate ? (
+          <Panel className="mb-4" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.moderation")}</p>
+            <h2 className="text-lg font-extrabold text-primary">{t("product.reviewTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("product.reviewHint")}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button disabled={saving} onClick={() => void moderate("approve")}>{t("product.approve")}</Button>
+              <Input
+                className="min-w-[220px] flex-1"
+                value={rejectComment}
+                onChange={(event) => setRejectComment(event.target.value)}
+                placeholder={t("product.rejectReason")}
+              />
+              <Button variant="destructive" disabled={saving} onClick={() => void moderate("reject")}>{t("product.reject")}</Button>
+            </div>
+          </Panel>
+        ) : null}
+
+        {canChangeApprovedStatus ? (
+          <Panel className="mb-4" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.statusEyebrow")}</p>
+            <h2 className="text-lg font-extrabold text-primary">{t("product.changeStatus")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("product.changeStatusHintBefore")}
+              <Link className="font-bold text-[var(--brand-accent)] hover:underline" href="/manager/marketplaces">{t("nav.marketplaces")}</Link>
+              {t("product.changeStatusHintAfter")}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button disabled={saving} onClick={() => void changeApprovedStatus("submitted")}>{t("product.returnToReview")}</Button>
+              <Input
+                className="min-w-[220px] flex-1"
+                value={rejectComment}
+                onChange={(event) => setRejectComment(event.target.value)}
+                placeholder={t("product.rejectReason")}
+              />
+              <Button variant="destructive" disabled={saving} onClick={() => void changeApprovedStatus("rejected")}>{t("product.reject")}</Button>
+            </div>
+          </Panel>
+        ) : null}
+
+        <Panel className="mb-4">
+          <PanelHeader
+            eyebrow={t("product.images")}
+            title={t("product.imagesTitle")}
+            actions={
+              <label className="inline-flex h-10 cursor-pointer items-center rounded-xl bg-secondary px-4 text-sm font-semibold text-secondary-foreground hover:bg-[#e4ebf4]">
+                {t("product.addImage")}
+                <input
+                  className="sr-only"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={saving}
+                  type="file"
+                  onChange={(event) => void uploadImage(event)}
+                />
+              </label>
+            }
+          />
+          <div className="border-b border-border px-4 py-2 text-sm text-muted-foreground">{t("product.imagesHint")}</div>
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+            <div className="grid gap-3">
+              <div className="relative grid min-h-[280px] place-items-center overflow-hidden rounded-2xl border border-border bg-[#f3f6fa]">
+                {selectedGalleryItem ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={selectedGalleryItem.url} alt={selectedGalleryItem.label} className="max-h-[420px] w-full object-contain" />
+                    {selectedGalleryItem.generated ? (
+                      <span className="absolute left-3 top-3 rounded-lg bg-[var(--brand-accent)] px-2 py-1 text-[11px] font-extrabold text-white">
+                        {t("product.aiGenerated")}
+                      </span>
+                    ) : null}
+                    {galleryItems.length > 1 ? (
+                      <>
+                        <button
+                          type="button"
+                          className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-primary text-lg font-bold text-primary-foreground"
+                          aria-label={t("product.prevImage")}
+                          onClick={() => stepGallery(-1)}
+                        >
+                          ‹
                         </button>
-                      </div>
-                    ))}
-                  </div>}
-                  <div className="image-row-actions">
-                    {image.is_primary ? <span className="image-primary-pill">{t("product.coverBadge")}</span> : null}
-                    {image.is_primary ? (
-                      <button disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)} onClick={() => void generateImage(image.id)}>{isImageGenerationInProgress(image) ? t("product.generating") : product.status !== "approved" ? t("product.generateAfterApprove") : image.generated_images.length ? t("product.generateAgain") : t("product.generateImage")}</button>
-                    ) : (
-                      <small>{t("product.generateCoverOnly")}</small>
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full bg-primary text-lg font-bold text-primary-foreground"
+                          aria-label={t("product.nextImage")}
+                          onClick={() => stepGallery(1)}
+                        >
+                          ›
+                        </button>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <EmptyState title={t("product.noImages")} />
+                )}
+              </div>
+              {selectedGalleryItem ? (
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <strong className="font-extrabold text-primary">{selectedGalleryItem.label}</strong>
+                  <span className="text-muted-foreground">{selectedImageIndex + 1} / {galleryItems.length}</span>
+                  <a className="font-bold text-[var(--brand-accent)] hover:underline" href={selectedGalleryItem.url} target="_blank" rel="noreferrer">
+                    {t("product.openTab")}
+                  </a>
+                </div>
+              ) : null}
+              {galleryItems.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  {galleryItems.map((item, index) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      title={item.label}
+                      onClick={() => setSelectedImageKey(item.key)}
+                      className={cn(
+                        "relative size-16 overflow-hidden rounded-xl border-2",
+                        index === selectedImageIndex ? "border-[var(--brand-accent)]" : "border-border",
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.url} alt={item.label} className="size-full object-cover" />
+                      {item.isPrimary ? <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--brand-accent)]" aria-hidden="true" /> : null}
+                      {item.generated ? (
+                        <span className="absolute bottom-1 left-1 rounded bg-[var(--brand-accent)] px-1 text-[9px] font-extrabold text-white">AI</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 content-start">
+              {product.images.length === 0 ? <p className="text-sm text-muted-foreground">{t("product.noSourceImages")}</p> : null}
+              {product.images.length > 1 ? <p className="text-xs font-semibold text-muted-foreground">{t("product.reorderHint")}</p> : null}
+              {sortProductImages(product.images).map((image, index) => {
+                const canReorder = product.images.length > 1;
+                return (
+                  <article
+                    key={image.id}
+                    className={cn(
+                      "flex gap-3 rounded-2xl border border-border bg-card p-3",
+                      image.is_primary && "border-[rgba(247,148,29,0.45)] bg-gradient-to-b from-[#fffaf3] to-card",
+                      dragImageId === image.id && "opacity-60",
+                      dropTargetId === image.id && dragImageId !== image.id && "ring-2 ring-[var(--brand-accent)]",
                     )}
-                    <button className="image-delete-button" disabled={saving || isImageGenerationInProgress(image)} onClick={() => void deleteImage(image.id)}>{t("product.delete")}</button>
+                    onDragOver={(event) => onImageDragOver(event, image.id)}
+                    onDrop={(event) => onImageDrop(event, image.id)}
+                    onDragEnd={onImageDragEnd}
+                  >
+                    {canReorder ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <span
+                          className="grid cursor-grab gap-0.5 px-1 py-2"
+                          title={t("product.dragToReorder")}
+                          aria-hidden="true"
+                          draggable
+                          onDragStart={(event) => onImageDragStart(event, image.id)}
+                        >
+                          <span className="block h-0.5 w-3 rounded bg-muted-foreground" />
+                          <span className="block h-0.5 w-3 rounded bg-muted-foreground" />
+                          <span className="block h-0.5 w-3 rounded bg-muted-foreground" />
+                        </span>
+                        <div className="grid gap-1">
+                          <Button type="button" size="sm" variant="secondary" className="h-7 px-2" disabled={saving || index === 0} aria-label={t("product.moveUp")} onClick={() => moveImageBy(image.id, -1)}>↑</Button>
+                          <Button type="button" size="sm" variant="secondary" className="h-7 px-2" disabled={saving || index === product.images.length - 1} aria-label={t("product.moveDown")} onClick={() => moveImageBy(image.id, 1)}>↓</Button>
+                        </div>
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="relative size-16 shrink-0 overflow-hidden rounded-xl border border-border"
+                      onClick={() => setSelectedImageKey(`source-${image.id}`)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.image} alt="" className="size-full object-cover" />
+                      <span className="absolute bottom-1 left-1 rounded bg-primary/80 px-1.5 text-[10px] font-bold text-white">{index + 1}</span>
+                    </button>
+                    <div className="min-w-0 flex-1 grid gap-1">
+                      <strong className="text-sm font-extrabold text-primary">{image.is_primary ? t("product.primaryImage") : t("product.sourceImage")}</strong>
+                      <small className="text-xs text-muted-foreground">
+                        {image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}
+                      </small>
+                      {image.processing_error ? <small className="text-xs font-semibold text-[var(--ui-danger)]">{image.processing_error}</small> : null}
+                      {image.generated_images.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {image.generated_images.map((generated) => (
+                            <button
+                              key={generated.id}
+                              type="button"
+                              className="size-11 overflow-hidden rounded-lg border border-border"
+                              title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`}
+                              onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={generated.image} alt={generated.mode} className="size-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {image.is_primary ? (
+                          <span className="rounded-lg bg-[var(--ui-warn-bg)] px-2 py-1 text-[11px] font-extrabold text-[var(--ui-warn)]">
+                            {t("product.coverBadge")}
+                          </span>
+                        ) : null}
+                        {image.is_primary ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={saving || product.status !== "approved" || isImageGenerationInProgress(image)}
+                            onClick={() => void generateImage(image.id)}
+                          >
+                            {isImageGenerationInProgress(image)
+                              ? t("product.generating")
+                              : product.status !== "approved"
+                                ? t("product.generateAfterApprove")
+                                : image.generated_images.length
+                                  ? t("product.generateAgain")
+                                  : t("product.generateImage")}
+                          </Button>
+                        ) : (
+                          <small className="text-xs text-muted-foreground">{t("product.generateCoverOnly")}</small>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={saving || isImageGenerationInProgress(image)}
+                          onClick={() => setPendingDeleteImageId(image.id)}
+                        >
+                          {t("product.delete")}
+                        </Button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </Panel>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
+          <Panel padded>
+            <form className="grid gap-4" onSubmit={saveProduct}>
+        <div>
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.data")}</p>
+                <h2 className="text-lg font-extrabold text-primary">{t("product.edit")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t("product.editHint")}</p>
+        </div>
+              <div>
+                <Label>{t("product.fieldTitle")}</Label>
+                <Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+      </div>
+              <div>
+                <Label>{t("product.fieldType")}</Label>
+                <Input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} />
+          </div>
+              <div className="grid gap-3 rounded-2xl border border-border bg-[#f8fafc] p-4">
+                <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setPriceHelpOpen(true)}>
+                  {t("product.changeFormula")}
+                </Button>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <Label>{t("product.sellerUnitPrice")}</Label>
+                    <Input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} />
+        </div>
+            <div>
+                    <Label>{t("product.currency")}</Label>
+                    <FilterSelect value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}>
+                      <option value="TRY">TRY</option>
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                    </FilterSelect>
+              </div>
+                  <div>
+                    <Label>{t("product.listingPrice")}</Label>
+                    <Input
+                      min="0.01"
+                      step="0.01"
+                      type="number"
+                      value={form.listing_price_eur}
+                      placeholder={product.listing_price_eur ? undefined : t("product.waitingRate")}
+                      onChange={(event) => setForm({ ...form, listing_price_eur: event.target.value })}
+                    />
+            </div>
+        </div>
+                {product.pricing_formula?.uses_product_formula ? (
+                  <small className="text-xs font-semibold text-[var(--brand-accent)]">{t("product.customFormula")}</small>
+                ) : null}
+                {product.pricing_formula?.uses_manual_listing ? (
+                  <small className="text-xs font-semibold text-[var(--brand-accent)]">{t("product.manualListing")}</small>
+                ) : null}
+      </div>
+              <p className="text-sm font-semibold text-muted-foreground">
+                {t("product.warehouse", { city: product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—" })}
+              </p>
+              <h3 className="text-base font-extrabold text-primary">{t("product.variants", { count: totalQuantity })}</h3>
+              {form.variants.map((variant, index) => (
+                <div className="grid gap-3 rounded-2xl border border-border p-4 sm:grid-cols-2 lg:grid-cols-3" key={variant.id || index}>
+                  <div>
+                    <Label>{t("product.colour")}</Label>
+                    <Input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("product.materials")}</Label>
+                    <Input
+                      required
+                      value={variant.materials.join(", ")}
+                      onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("product.length")}</Label>
+                    <Input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("product.width")}</Label>
+                    <Input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("product.height")}</Label>
+                    <Input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("product.quantity")}</Label>
+                    <Input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} />
                   </div>
                 </div>
-              </article>
-            );
-          })}
+              ))}
+              <Button disabled={saving} type="submit">{saving ? t("product.saving") : t("product.saveChanges")}</Button>
+            </form>
+          </Panel>
+
+          <aside className="grid gap-4 content-start">
+            <Panel padded>
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.ai")}</p>
+              <h2 className="text-lg font-extrabold text-primary">{t("product.aiTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("product.aiHint")}</p>
+              <Button
+                className="mt-4 w-full"
+                variant="accent"
+                disabled={generating || descriptionGenerationInProgress}
+                onClick={() => void generateDescription()}
+              >
+                {generating ? t("product.starting") : descriptionGenerationInProgress ? t("product.generating") : t("product.generateDescription")}
+              </Button>
+              {generation ? (
+                <div className="mt-3 grid gap-2 rounded-xl border border-border bg-[#f8fafc] p-3">
+                  <strong className="text-sm font-bold text-primary">
+                    {t("product.generationStatus", { status: generation.status.replaceAll("_", " ") })}
+                  </strong>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" disabled={generating} onClick={() => void refreshGeneration()}>
+                      {t("product.refreshStatus")}
+                    </Button>
+                    {generation.status === "succeeded" ? (
+                      <Button asChild size="sm" variant="link">
+                        <Link href={`/manager/products/${product.id}/listings`}>{t("listing.openPage")}</Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              {generation?.status === "failed" ? (
+                <Feedback className="mt-3">{generation.error?.detail || generation.error?.code || t("product.generationFailed")}</Feedback>
+              ) : null}
+              {generationContent && draftForm ? (
+                <form className="mt-4 grid gap-3" onSubmit={saveDraft}>
+                  <span className="text-sm font-extrabold text-primary">{t("product.draftHeading")}</span>
+                  <div>
+                    <Label>{t("product.draftTitle")}</Label>
+                    <Input required maxLength={100} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("product.draftDescription")}</Label>
+                    <Textarea required rows={9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("product.draftBullets")}</Label>
+                    <Textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} />
+                  </div>
+                  <small className="text-xs text-muted-foreground">{t("product.draftHint")}</small>
+                  <Button type="submit" disabled={draftSaving || !draftDirty}>
+                    {draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}
+                  </Button>
+                  <Button type="button" variant="accent" disabled={applying || draftDirty || draftSaving} onClick={() => void applyDraft()}>
+                    {applying ? t("listing.applying") : t("listing.apply")}
+                  </Button>
+                  <small className="text-xs text-muted-foreground">{t("listing.applyHint")}</small>
+                </form>
+              ) : null}
+            </Panel>
+
+            <Panel padded>
+              <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("listing.eyebrow")}</p>
+              <h2 className="text-lg font-extrabold text-primary">{t("listing.prepTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("listing.prepHint")}</p>
+              <div className="mt-4 grid gap-2">
+                <Button asChild variant="secondary">
+                  <Link href={`/manager/products/${product.id}/listings`}>{t("listing.openPage")}</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href={`/manager/marketplaces?product=${product.id}`}>{t("product.openMarketplaces")}</Link>
+                </Button>
+              </div>
+            </Panel>
+          </aside>
         </div>
-      </div>
-    </section>
-    <div className="workspace-grid"><form className="workspace-card product-edit-form" onSubmit={saveProduct}><div><p className="eyebrow">{t("product.data")}</p><h2>{t("product.edit")}</h2><p>{t("product.editHint")}</p></div><label>{t("product.fieldTitle")}<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label><label>{t("product.fieldType")}<input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} /></label><div className="form-price-block"><button type="button" className="price-calc-hint" onClick={() => setPriceHelpOpen(true)}>{t("product.changeFormula")}</button><div className="form-two-columns form-price-fields"><label>{t("product.sellerUnitPrice")}<input required min="0.01" step="0.01" type="number" value={form.unit_price} onChange={(event) => setForm({ ...form, unit_price: event.target.value })} /></label><label>{t("product.currency")}<select value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value as Product["currency"] })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><label>{t("product.listingPrice")}<input min="0.01" step="0.01" type="number" value={form.listing_price_eur} placeholder={product.listing_price_eur ? undefined : t("product.waitingRate")} onChange={(event) => setForm({ ...form, listing_price_eur: event.target.value })} /></label></div>{product.pricing_formula?.uses_product_formula ? <small className="price-calc-hint">{t("product.customFormula")}</small> : null}{product.pricing_formula?.uses_manual_listing ? <small className="price-calc-hint">{t("product.manualListing")}</small> : null}</div><p>{t("product.warehouse", { city: product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—" })}</p><h3>{t("product.variants", { count: totalQuantity })}</h3>{form.variants.map((variant, index) => <div className="variant-editor" key={variant.id || index}><label>{t("product.colour")}<input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} /></label><label>{t("product.materials")}<input required value={variant.materials.join(", ")} onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))} /></label><label>{t("product.length")}<input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} /></label><label>{t("product.width")}<input required type="number" min="0" value={variant.width_cm} onChange={(event) => updateVariant(index, "width_cm", event.target.value)} /></label><label>{t("product.height")}<input required type="number" min="0" value={variant.height_cm} onChange={(event) => updateVariant(index, "height_cm", event.target.value)} /></label><label>{t("product.quantity")}<input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} /></label></div>)}<button className="save-button" disabled={saving} type="submit">{saving ? t("product.saving") : t("product.saveChanges")}</button></form>
-      <aside className="workspace-side"><section className="workspace-card">
-        <p className="eyebrow">{t("product.ai")}</p>
-        <h2>{t("product.aiTitle")}</h2>
-        <p>{t("product.aiHint")}</p>
-        <button className="ai-button" disabled={generating || descriptionGenerationInProgress} onClick={() => void generateDescription()}>{generating ? t("product.starting") : descriptionGenerationInProgress ? t("product.generating") : t("product.generateDescription")}</button>
-        {generation && <div className="generation-status"><strong>{t("product.generationStatus", { status: generation.status.replaceAll("_", " ") })}</strong><button disabled={generating} onClick={() => void refreshGeneration()}>{t("product.refreshStatus")}</button>{generation.status === "succeeded" && <Link href={`/manager/products/${product.id}/listings`}>{t("listing.openPage")}</Link>}</div>}
-        {generation?.status === "failed" && <p className="ai-draft-error">{generation.error?.detail || generation.error?.code || t("product.generationFailed")}</p>}
-        {generationContent && draftForm && <form className="ai-draft" onSubmit={saveDraft}>
-          <span className="ai-draft-heading">{t("product.draftHeading")}</span>
-          <label className="ai-draft-field"><span>{t("product.draftTitle")}</span><input required maxLength={100} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
-          <label className="ai-draft-field"><span>{t("product.draftDescription")}</span><textarea required rows={9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} /></label>
-          <label className="ai-draft-field"><span>{t("product.draftBullets")}</span><textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} /></label>
-          <small className="ai-draft-hint">{t("product.draftHint")}</small>
-          <button className="save-button" type="submit" disabled={draftSaving || !draftDirty}>{draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}</button>
-          <button type="button" className="ai-apply-button" disabled={applying || draftDirty || draftSaving} onClick={() => void applyDraft()}>{applying ? t("listing.applying") : t("listing.apply")}</button>
-          <small className="ai-draft-hint">{t("listing.applyHint")}</small>
-        </form>}
-      </section>
-      <section className="workspace-card listing-prep-card">
-        <p className="eyebrow">{t("listing.eyebrow")}</p>
-        <h2>{t("listing.prepTitle")}</h2>
-        <p>{t("listing.prepHint")}</p>
-        <Link className="listing-open-marketplaces" href={`/manager/products/${product.id}/listings`}>{t("listing.openPage")}</Link>
-        <Link className="listing-open-marketplaces" href={`/manager/marketplaces?product=${product.id}`}>{t("product.openMarketplaces")}</Link>
-      </section>
-      </aside></div>
-  </section>{priceHelpOpen && product.pricing_formula ? <FormulaEditorDialog formula={product.pricing_formula} saving={saving} onClose={() => setPriceHelpOpen(false)} onSave={(overrides) => void saveProductFormula(overrides)} onReset={() => void resetProductFormula()} /> : null}
-    {historyOpen ? <div className="price-help-overlay" role="dialog" aria-modal="true" aria-labelledby="history-title" onClick={() => setHistoryOpen(false)}>
-      <div className="price-help-dialog history-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="price-help-heading">
-          <h2 id="history-title">{t("product.history")}</h2>
-          <button type="button" className="price-calc-hint" onClick={() => setHistoryOpen(false)}>{t("common.close")}</button>
+      </PageFrame>
+
+      {priceHelpOpen && product.pricing_formula ? (
+        <FormulaEditorDialog
+          formula={product.pricing_formula}
+          saving={saving}
+          onClose={() => setPriceHelpOpen(false)}
+          onSave={(overrides) => void saveProductFormula(overrides)}
+          onReset={() => void resetProductFormula()}
+        />
+      ) : null}
+
+      {historyOpen ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[rgba(20,47,85,0.45)] p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="history-title"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-[0_18px_48px_rgba(20,47,85,0.16)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-3">
+              <h2 id="history-title" className="text-lg font-extrabold text-primary">{t("product.history")}</h2>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setHistoryOpen(false)}>{t("common.close")}</Button>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("product.historyIntro")}</p>
+            {historyError ? <Feedback className="mt-3">{historyError}</Feedback> : null}
+            {!historyError && historyCount === 0 && !historyLoading ? (
+              <EmptyState className="py-8" title={t("product.historyEmpty")} />
+            ) : null}
+            {!historyError && historyCount > 0 ? (
+              <div className="mt-3 flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground" aria-label={t("product.historyPages")}>
+                <Button type="button" size="sm" variant="secondary" disabled={historyLoading || historyPage <= 1} onClick={() => void loadHistory(historyPage - 1)}>
+                  {t("common.previous")}
+                </Button>
+                <span>{t("common.page", { page: historyPage })}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={historyLoading || historyPage >= Math.ceil(historyCount / HISTORY_PAGE_SIZE)}
+                  onClick={() => void loadHistory(historyPage + 1)}
+                >
+                  {t("common.next")}
+                </Button>
+              </div>
+            ) : null}
+            {!historyError && history.length > 0 ? (
+              <ol className="mt-4 grid gap-3">
+                {history.map((item) => (
+                  <li key={item.id} className="rounded-xl border border-border bg-[#f8fafc] p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={item.decision}>{t(`status.${item.decision}` as MessageKey)}</StatusBadge>
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {formatDate(item.created_at, true)} · {item.decision === "withdrawn" ? t("product.historySeller") : item.manager_username}
+                      </span>
+                    </div>
+                    {item.decision === "withdrawn" ? (
+                      <p className="mt-2 text-sm text-primary">{t("product.historyWithdrawnComment")}</p>
+                    ) : item.comment ? (
+                      <p className="mt-2 text-sm text-primary">{item.comment}</p>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">{t("product.noComment")}</p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </div>
         </div>
-        <p>{t("product.historyIntro")}</p>
-        {historyError && <p className="form-feedback error" role="alert">{historyError}</p>}
-        {!historyError && historyCount === 0 && !historyLoading && <p>{t("product.historyEmpty")}</p>}
-        {!historyError && historyCount > 0 && (
-          <nav className="pagination" aria-label={t("product.historyPages")}>
-            <button type="button" disabled={historyLoading || historyPage <= 1} onClick={() => void loadHistory(historyPage - 1)}>{t("common.previous")}</button>
-            <span>{t("common.page", { page: historyPage })}</span>
-            <button type="button" disabled={historyLoading || historyPage >= Math.ceil(historyCount / HISTORY_PAGE_SIZE)} onClick={() => void loadHistory(historyPage + 1)}>{t("common.next")}</button>
-          </nav>
-        )}
-        {!historyError && history.length > 0 && (
-          <ol className="history-list">
-            {history.map((item) => (
-              <li key={item.id}>
-                <strong className={`manager-status ${item.decision}`}>{t(`status.${item.decision}` as MessageKey)}</strong>
-                <span>{formatDate(item.created_at, true)} · {item.decision === "withdrawn" ? t("product.historySeller") : item.manager_username}</span>
-                {item.decision === "withdrawn"
-                  ? <p>{t("product.historyWithdrawnComment")}</p>
-                  : item.comment ? <p>{item.comment}</p> : <p>{t("product.noComment")}</p>}
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </div> : null}
-  </>;
+      ) : null}
+
+      <ConfirmDialog
+        open={pendingDeleteImageId != null}
+        onOpenChange={(open) => {
+          if (!open && !saving) setPendingDeleteImageId(null);
+        }}
+        title={t("product.delete")}
+        description={t("product.deleteImageConfirm")}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={saving ? t("product.saving") : t("product.delete")}
+        loading={saving}
+        onConfirm={() => {
+          if (pendingDeleteImageId != null) void deleteImage(pendingDeleteImageId);
+        }}
+      />
+    </>
+  );
 }
