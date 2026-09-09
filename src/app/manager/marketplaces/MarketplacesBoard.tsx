@@ -276,11 +276,10 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
 
   async function runListingAction(
     publication: Publication,
-    action: "update" | "deactivate" | "activate" | "delete" | "publish",
+    action: "deactivate" | "activate" | "delete" | "publish",
   ) {
     const pair = { marketplace: publication.marketplace, account: publication.account };
     const confirms: Record<typeof action, string> = {
-      update: t("marketplaces.confirmUpdate", { marketplace: marketplaceName[publication.marketplace] }),
       deactivate:
         publication.marketplace === "otto"
           ? t("marketplaces.confirmDeactivateOtto")
@@ -331,18 +330,13 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
     return (
       <div className="listing-actions">
         {publication.status === "active" && (
-          <>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runListingAction(publication, "update")}>
-              {isBusy("update") ? t("marketplaces.queueing") : t("marketplaces.actionUpdate")}
-            </Button>
-            <Button size="sm" variant="destructive" disabled={busy} onClick={() => void runListingAction(publication, "deactivate")}>
-              {isBusy("deactivate")
-                ? t("marketplaces.queueing")
-                : publication.marketplace === "otto"
-                  ? t("marketplaces.actionDeactivate")
-                  : t("marketplaces.actionTakeDown")}
-            </Button>
-          </>
+          <Button size="sm" variant="destructive" disabled={busy} onClick={() => void runListingAction(publication, "deactivate")}>
+            {isBusy("deactivate")
+              ? t("marketplaces.queueing")
+              : publication.marketplace === "otto"
+                ? t("marketplaces.actionDeactivate")
+                : t("marketplaces.actionTakeDown")}
+          </Button>
         )}
         {publication.status === "deactivated" && publication.marketplace === "otto" && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runListingAction(publication, "activate")}>
