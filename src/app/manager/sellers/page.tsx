@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { MoreHorizontal, Package, Trash2, Users } from "lucide-react";
+import { BadgeCheck, MoreHorizontal, Package, Trash2, Users } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/manager/confirm-dialog";
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
@@ -24,6 +24,8 @@ type Seller = {
   phone: string;
   date_joined: string;
   product_count?: number;
+  is_active?: boolean;
+  is_email_verified?: boolean;
 };
 
 type SellerListResponse = {
@@ -33,8 +35,14 @@ type SellerListResponse = {
   results: Seller[];
 };
 
+type SellerFilter = "" | "active" | "pending";
+
 function fullName(seller: Seller) {
   return `${seller.first_name} ${seller.last_name}`.trim() || seller.username;
+}
+
+function isPendingEmail(seller: Seller) {
+  return seller.is_email_verified === false;
 }
 
 export default function SellersPage() {
@@ -42,7 +50,7 @@ export default function SellersPage() {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [activity, setActivity] = useState("");
+  const [activity, setActivity] = useState<SellerFilter>("");
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [hasNext, setHasNext] = useState(false);
@@ -51,8 +59,10 @@ export default function SellersPage() {
   const [error, setError] = useState("");
   const [pendingSeller, setPendingSeller] = useState<Seller | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState("");
   const [actionError, setActionError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const access = window.localStorage.getItem("benim_access_token");
@@ -62,7 +72,8 @@ export default function SellersPage() {
     }
 
     const params = new URLSearchParams({ page: String(page) });
-    if (activity) params.set("is_active", activity);
+    if (activity === "active") params.set("is_active", "true");
+    if (activity === "pending") params.set("is_email_verified", "false");
     if (appliedSearch) params.set("search", appliedSearch);
 
     async function loadSellers() {
@@ -94,12 +105,37 @@ export default function SellersPage() {
     }
 
     void loadSellers();
-  }, [page, activity, appliedSearch, t]);
+  }, [page, activity, appliedSearch, reloadKey, t]);
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(1);
     setAppliedSearch(search.trim());
+  }
+
+  async function confirmEmail(seller: Seller) {
+    if (confirmingId !== null) return;
+    setConfirmingId(seller.id);
+    setActionError("");
+    setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/manager/users/sellers/${seller.id}/confirm-email/`, {
+        method: "POST",
+      });
+      if (response.status === 401) return void window.location.replace("/manager/login");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(apiErrorMessage(data, t("sellers.confirmEmailFailed")));
+      }
+      const updated = data as Seller;
+      setSellers((items) => items.map((item) => (item.id === seller.id ? { ...item, ...updated } : item)));
+      setFeedback(t("sellers.confirmEmailDone", { name: fullName(seller) }));
+      if (activity === "pending") setReloadKey((value) => value + 1);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : t("sellers.confirmEmailFailed"));
+    } finally {
+      setConfirmingId(null);
+    }
   }
 
   async function confirmDelete() {
@@ -155,17 +191,17 @@ export default function SellersPage() {
               placeholder={t("sellers.searchPlaceholder")}
             />
             <FilterSelect
-              className="w-[160px]"
+              className="w-[200px]"
               aria-label={t("sellers.filterAria")}
               value={activity}
               onChange={(event) => {
                 setPage(1);
-                setActivity(event.target.value);
+                setActivity(event.target.value as SellerFilter);
               }}
             >
               <option value="">{t("sellers.all")}</option>
-              <option value="true">{t("common.active")}</option>
-              <option value="false">{t("common.inactive")}</option>
+              <option value="active">{t("common.active")}</option>
+              <option value="pending">{t("sellers.pendingEmail")}</option>
             </FilterSelect>
             <Button type="submit">{t("common.search")}</Button>
           </form>
@@ -198,7 +234,9 @@ export default function SellersPage() {
               <span>{t("sellers.col.joined")}</span>
               <span />
             </div>
-            {sellers.map((seller) => (
+            {sellers.map((seller) => {
+              const pending = isPendingEmail(seller);
+              return (
               <article
                 key={seller.id}
                 className="grid min-w-[920px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_100px_140px_56px] items-center gap-3 border-b border-border px-5 py-3"
@@ -210,7 +248,14 @@ export default function SellersPage() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <h2 className="truncate text-sm font-extrabold text-primary">{fullName(seller)}</h2>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h2 className="truncate text-sm font-extrabold text-primary">{fullName(seller)}</h2>
+                      {pending ? (
+                        <span className="rounded-md bg-[var(--ui-warning-bg,rgba(247,148,29,0.14))] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent,#f7941d)]">
+                          {t("sellers.pendingEmailBadge")}
+                        </span>
+                      ) : null}
+                    </div>
                     <small className="text-xs font-semibold text-muted-foreground">@{seller.username}</small>
                   </div>
                 </div>
@@ -230,7 +275,7 @@ export default function SellersPage() {
                 </time>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button type="button" size="icon-sm" variant="ghost" aria-label={t("sellers.deleteAria", { name: fullName(seller) })}>
+                    <Button type="button" size="icon-sm" variant="ghost" aria-label={t("sellers.actionsAria", { name: fullName(seller) })}>
                       <MoreHorizontal />
                     </Button>
                   </DropdownMenuTrigger>
@@ -241,6 +286,15 @@ export default function SellersPage() {
                         {t("sellers.openProducts", { name: fullName(seller) })}
                       </Link>
                     </DropdownMenuItem>
+                    {pending ? (
+                      <DropdownMenuItem
+                        disabled={confirmingId === seller.id}
+                        onClick={() => void confirmEmail(seller)}
+                      >
+                        <BadgeCheck />
+                        {confirmingId === seller.id ? t("sellers.confirmEmailWorking") : t("sellers.confirmEmail")}
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem
                       variant="destructive"
                       onClick={() => {
@@ -255,7 +309,8 @@ export default function SellersPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </article>
-            ))}
+            );
+            })}
           </div>
           </>
         ) : null}

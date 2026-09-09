@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, Inbox, Layers, Mail, PackageSearch, Search } from "lucide-react";
+import { ClipboardCheck, Inbox, Mail, PackageSearch, Search, Send } from "lucide-react";
 
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { formatDate } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-type Category = "all" | "review" | "availability" | "other";
+type Category = "all" | "review" | "availability" | "outgoing";
 
 type Notification = {
   id: number;
@@ -22,9 +22,13 @@ type Notification = {
   notification_type: string;
   product_id: number | null;
   product_title: string | null;
+  product_status: string | null;
   seller_username: string | null;
   seller_email: string | null;
   seller_name: string | null;
+  sender_username: string | null;
+  sender_email: string | null;
+  sender_name: string | null;
   is_read: boolean;
   created_at: string;
 };
@@ -40,10 +44,10 @@ type NotificationSummary = {
   all: number;
   review: number;
   availability: number;
-  other: number;
+  outgoing: number;
   unread_review: number;
   unread_availability: number;
-  unread_other: number;
+  unread_outgoing: number;
 };
 
 const emptySummary: NotificationSummary = {
@@ -51,10 +55,10 @@ const emptySummary: NotificationSummary = {
   all: 0,
   review: 0,
   availability: 0,
-  other: 0,
+  outgoing: 0,
   unread_review: 0,
   unread_availability: 0,
-  unread_other: 0,
+  unread_outgoing: 0,
 };
 
 const TYPE_KEYS = new Set([
@@ -73,29 +77,46 @@ const TYPE_KEYS = new Set([
   "manager_message",
 ]);
 
-function typeTone(type: string) {
-  if (type === "product_submitted_for_review" || type === "product_change_requested") {
-    return "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]";
-  }
-  if (type === "product_availability_reminder" || type === "product_deactivation_requested") {
-    return "bg-[var(--ui-orange-soft)] text-[#c56a12]";
-  }
-  if (type === "product_approved" || type === "image_processing_completed") {
-    return "bg-[var(--ui-success-bg)] text-[var(--ui-success)]";
-  }
-  if (type === "product_rejected" || type === "image_processing_failed" || type === "product_deactivated") {
-    return "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]";
-  }
-  return "bg-secondary text-muted-foreground";
+const REVIEW_TYPES = new Set(["product_submitted_for_review", "product_change_requested"]);
+const AVAILABILITY_TYPES = new Set([
+  "product_confirmation",
+  "product_availability_reminder",
+  "product_deactivation_requested",
+]);
+
+function isUnavailableConfirmation(message: Notification) {
+  return /not available/i.test(message.title) || /is not available/i.test(message.body);
+}
+
+function personLine(name: string | null, username: string | null, email: string | null) {
+  const parts = [name, username ? `@${username}` : null, email].filter(Boolean);
+  return parts.join(" · ");
 }
 
 function sellerLine(message: Notification) {
-  const parts = [
-    message.seller_name,
-    message.seller_username ? `@${message.seller_username}` : null,
-    message.seller_email,
-  ].filter(Boolean);
-  return parts.join(" · ");
+  return personLine(message.seller_name, message.seller_username, message.seller_email);
+}
+
+function managerLine(message: Notification) {
+  return personLine(message.sender_name, message.sender_username, message.sender_email);
+}
+
+function productLabel(message: Notification) {
+  return message.product_title?.trim() || (message.product_id ? `#${message.product_id}` : "");
+}
+
+function highlightProduct(text: string, product: string): ReactNode {
+  const needle = product.trim();
+  if (!needle || !text.includes(needle)) return text;
+  const parts = text.split(needle);
+  return parts.map((part, index) => (
+    <Fragment key={`${index}-${part.slice(0, 12)}`}>
+      {part}
+      {index < parts.length - 1 ? (
+        <strong className="font-extrabold text-[#142f55]">{needle}</strong>
+      ) : null}
+    </Fragment>
+  ));
 }
 
 export default function MessagesPage() {
@@ -116,7 +137,12 @@ export default function MessagesPage() {
   const tabs = useMemo(
     () =>
       [
-        { id: "all" as const, label: t("messages.tabAll"), count: unreadOnly ? summary.unread_total : summary.all, icon: Inbox },
+        {
+          id: "all" as const,
+          label: t("messages.tabAll"),
+          count: unreadOnly ? summary.unread_total : summary.all,
+          icon: Inbox,
+        },
         {
           id: "review" as const,
           label: t("messages.tabReview"),
@@ -129,7 +155,12 @@ export default function MessagesPage() {
           count: unreadOnly ? summary.unread_availability : summary.availability,
           icon: PackageSearch,
         },
-        { id: "other" as const, label: t("messages.tabOther"), count: unreadOnly ? summary.unread_other : summary.other, icon: Layers },
+        {
+          id: "outgoing" as const,
+          label: t("messages.tabOutgoing"),
+          count: unreadOnly ? summary.unread_outgoing : summary.outgoing,
+          icon: Send,
+        },
       ] as const,
     [summary, t, unreadOnly],
   );
@@ -186,29 +217,20 @@ export default function MessagesPage() {
   async function openMessage(message: Notification) {
     const token = localStorage.getItem("benim_access_token");
     if (!token) return;
-    if (!message.is_read) {
+    const isOutgoing = category === "outgoing";
+    if (!isOutgoing && !message.is_read) {
       const response = await authorizedFetch(`/api/v1/notifications/${message.id}/read/`, { method: "POST" });
       if (response.ok) {
         setMessages((items) => items.map((item) => (item.id === message.id ? { ...item, is_read: true } : item)));
         setSummary((current) => ({
           ...current,
           unread_total: Math.max(0, current.unread_total - 1),
-          unread_review:
-            message.notification_type === "product_submitted_for_review" || message.notification_type === "product_change_requested"
-              ? Math.max(0, current.unread_review - 1)
-              : current.unread_review,
-          unread_availability:
-            message.notification_type === "product_availability_reminder" ||
-            message.notification_type === "product_deactivation_requested"
-              ? Math.max(0, current.unread_availability - 1)
-              : current.unread_availability,
-          unread_other:
-            message.notification_type !== "product_submitted_for_review" &&
-            message.notification_type !== "product_change_requested" &&
-            message.notification_type !== "product_availability_reminder" &&
-            message.notification_type !== "product_deactivation_requested"
-              ? Math.max(0, current.unread_other - 1)
-              : current.unread_other,
+          unread_review: REVIEW_TYPES.has(message.notification_type)
+            ? Math.max(0, current.unread_review - 1)
+            : current.unread_review,
+          unread_availability: AVAILABILITY_TYPES.has(message.notification_type)
+            ? Math.max(0, current.unread_availability - 1)
+            : current.unread_availability,
         }));
       }
     }
@@ -226,7 +248,6 @@ export default function MessagesPage() {
       unread_total: 0,
       unread_review: 0,
       unread_availability: 0,
-      unread_other: 0,
     }));
   }
 
@@ -235,6 +256,142 @@ export default function MessagesPage() {
     return t(`messages.type.${type}` as MessageKey);
   }
 
+  function reviewBadge(status: string | null | undefined) {
+    if (status === "approved") {
+      return {
+        badge: t("messages.badge.reviewedApproved"),
+        badgeClass: "bg-[var(--ui-success-bg)] text-[var(--ui-success)]",
+      };
+    }
+    if (status === "rejected") {
+      return {
+        badge: t("messages.badge.reviewedRejected"),
+        badgeClass: "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]",
+      };
+    }
+    if (status === "withdrawn") {
+      return {
+        badge: t("messages.badge.withdrawn"),
+        badgeClass: "bg-secondary text-muted-foreground",
+      };
+    }
+    return {
+      badge: t("messages.type.product_submitted_for_review"),
+      badgeClass: "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]",
+    };
+  }
+
+  function messagePresentation(message: Notification) {
+    const seller = message.seller_name || message.seller_username || t("messages.sellerFallback");
+    const product = productLabel(message) || t("messages.productFallback");
+
+    if (message.notification_type === "product_confirmation") {
+      if (isUnavailableConfirmation(message)) {
+        return {
+          badge: t("messages.badge.unavailable"),
+          badgeClass: "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]",
+          title: t("messages.copy.unavailableTitle"),
+          body: t("messages.copy.unavailableBody", { seller, product }),
+        };
+      }
+      return {
+        badge: t("messages.badge.available"),
+        badgeClass: "bg-[var(--ui-success-bg)] text-[var(--ui-success)]",
+        title: t("messages.copy.availableTitle"),
+        body: t("messages.copy.availableBody", { seller, product }),
+      };
+    }
+
+    if (REVIEW_TYPES.has(message.notification_type)) {
+      const reviewed = reviewBadge(message.product_status);
+      const templates: Record<string, { title: MessageKey; body: MessageKey }> = {
+        product_submitted_for_review: {
+          title: "messages.copy.submittedTitle",
+          body: "messages.copy.submittedBody",
+        },
+        product_change_requested: {
+          title: "messages.copy.changeTitle",
+          body: "messages.copy.changeBody",
+        },
+      };
+      const template = templates[message.notification_type];
+      return {
+        ...reviewed,
+        badge:
+          message.notification_type === "product_change_requested" &&
+          message.product_status !== "approved" &&
+          message.product_status !== "rejected" &&
+          message.product_status !== "withdrawn"
+            ? typeLabel(message.notification_type)
+            : reviewed.badge,
+        badgeClass:
+          message.notification_type === "product_change_requested" &&
+          message.product_status !== "approved" &&
+          message.product_status !== "rejected" &&
+          message.product_status !== "withdrawn"
+            ? "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]"
+            : reviewed.badgeClass,
+        title: t(template.title),
+        body: t(template.body, { seller, product }),
+      };
+    }
+
+    const templates: Partial<Record<string, { title: MessageKey; body: MessageKey }>> = {
+      product_availability_reminder: {
+        title: "messages.copy.reminderTitle",
+        body: "messages.copy.reminderBody",
+      },
+      product_deactivation_requested: {
+        title: "messages.copy.deactivationTitle",
+        body: "messages.copy.deactivationBody",
+      },
+      product_withdrawn_from_review: {
+        title: "messages.copy.withdrawnTitle",
+        body: "messages.copy.withdrawnBody",
+      },
+    };
+
+    const template = templates[message.notification_type];
+    if (template) {
+      return {
+        badge: typeLabel(message.notification_type),
+        badgeClass: badgeTone(message.notification_type),
+        title: t(template.title),
+        body: t(template.body, { seller, product }),
+      };
+    }
+
+    return {
+      badge: typeLabel(message.notification_type),
+      badgeClass: badgeTone(message.notification_type),
+      title: message.title || typeLabel(message.notification_type),
+      body: message.body || t("messages.noDetails"),
+    };
+  }
+
+  function badgeTone(type: string) {
+    if (REVIEW_TYPES.has(type)) return "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]";
+    if (type === "product_availability_reminder" || type === "product_deactivation_requested") {
+      return "bg-[var(--ui-orange-soft)] text-[#c56a12]";
+    }
+    if (type === "product_approved" || type === "image_processing_completed") {
+      return "bg-[var(--ui-success-bg)] text-[var(--ui-success)]";
+    }
+    if (type === "product_rejected" || type === "image_processing_failed" || type === "product_deactivated") {
+      return "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]";
+    }
+    return "bg-secondary text-muted-foreground";
+  }
+
+  const unreadHint =
+    category === "outgoing"
+      ? summary.unread_outgoing
+      : category === "review"
+        ? summary.unread_review
+        : category === "availability"
+          ? summary.unread_availability
+          : summary.unread_total;
+
   return (
     <PageContainer>
       <PageHeader
@@ -242,9 +399,11 @@ export default function MessagesPage() {
         title={t("messages.title")}
         description={t("messages.subtitle")}
         primaryAction={
-          <Button variant="secondary" disabled={!summary.unread_total} onClick={() => void readAll()}>
-            {t("messages.markAll")}
-          </Button>
+          category === "outgoing" ? null : (
+            <Button variant="secondary" disabled={!summary.unread_total} onClick={() => void readAll()}>
+              {t("messages.markAll")}
+            </Button>
+          )
         }
       />
 
@@ -272,9 +431,9 @@ export default function MessagesPage() {
               }}
             />
             <span>
-              {t("messages.unreadOnly")}
-              {summary.unread_total > 0 ? (
-                <span className="ml-1.5 tabular-nums text-[var(--brand-accent)]">({summary.unread_total})</span>
+              {category === "outgoing" ? t("messages.unreadBySeller") : t("messages.unreadOnly")}
+              {unreadHint > 0 ? (
+                <span className="ml-1.5 tabular-nums text-[var(--brand-accent)]">({unreadHint})</span>
               ) : null}
             </span>
           </label>
@@ -336,6 +495,10 @@ export default function MessagesPage() {
             <div className="divide-y divide-border">
               {messages.map((message) => {
                 const seller = sellerLine(message);
+                const manager = managerLine(message);
+                const product = productLabel(message);
+                const presentation = messagePresentation(message);
+                const outgoingUnread = category === "outgoing" && !message.is_read;
                 return (
                   <article
                     key={message.id}
@@ -346,7 +509,7 @@ export default function MessagesPage() {
                   >
                     <button
                       type="button"
-                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                      className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 text-left"
                       onClick={() => void openMessage(message)}
                     >
                       <span
@@ -358,25 +521,57 @@ export default function MessagesPage() {
                       />
                       <span className="min-w-0 space-y-1.5">
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-extrabold", typeTone(message.notification_type))}>
-                            {typeLabel(message.notification_type)}
+                          <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-extrabold", presentation.badgeClass)}>
+                            {presentation.badge}
                           </span>
-                          {!message.is_read ? (
+                          {category === "outgoing" ? (
+                            <span
+                              className={cn(
+                                "rounded-md px-2 py-0.5 text-[11px] font-extrabold",
+                                message.is_read
+                                  ? "bg-[var(--ui-success-bg)] text-[var(--ui-success)]"
+                                  : "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]",
+                              )}
+                            >
+                              {message.is_read ? t("messages.sellerRead") : t("messages.sellerUnread")}
+                            </span>
+                          ) : null}
+                          {!message.is_read && category !== "outgoing" ? (
                             <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[var(--brand-accent)]">
                               {t("messages.newBadge")}
                             </span>
                           ) : null}
+                          {outgoingUnread ? (
+                            <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[var(--brand-accent)]">
+                              {t("messages.awaitingSeller")}
+                            </span>
+                          ) : null}
                         </span>
-                        <strong className="block text-sm font-extrabold text-primary">
-                          {message.title || typeLabel(message.notification_type)}
-                        </strong>
-                        <small className="block text-sm text-muted-foreground">{message.body || t("messages.noDetails")}</small>
-                        {seller ? <span className="block text-xs font-semibold text-muted-foreground">{seller}</span> : null}
+                        <strong className="block text-sm font-extrabold text-primary">{presentation.title}</strong>
+                        <small className="block text-sm text-muted-foreground">
+                          {highlightProduct(presentation.body, product)}
+                        </small>
+                        {manager ? (
+                          <span className="block text-xs font-semibold text-muted-foreground">
+                            <span className="font-extrabold text-primary">{t("messages.managerLabel")}</span>{" "}
+                            {manager}
+                          </span>
+                        ) : null}
+                        {seller ? (
+                          <span className="block text-xs font-semibold text-muted-foreground">
+                            <span className="font-extrabold text-primary">{t("messages.sellerLabel")}</span>{" "}
+                            {seller}
+                          </span>
+                        ) : null}
                         {message.product_id ? (
                           <em className="block text-xs font-bold not-italic text-[var(--brand-accent)]">
-                            {message.product_title
-                              ? t("messages.openProductNamed", { id: message.product_id, title: message.product_title })
-                              : t("messages.openProduct", { id: message.product_id })}
+                            #{message.product_id}
+                            {message.product_title ? (
+                              <>
+                                {" · "}
+                                <strong className="font-extrabold text-[#142f55]">{message.product_title}</strong>
+                              </>
+                            ) : null}
                           </em>
                         ) : null}
                       </span>
