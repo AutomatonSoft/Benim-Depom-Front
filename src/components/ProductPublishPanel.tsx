@@ -1,14 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ExternalLink, Send } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ExternalLink, RefreshCw, Send } from "lucide-react";
 
 import { Feedback, SectionCard, SectionCardHeader } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
-import { formatListingErrors, listingChannelLabel, listingPreviewPath, listingTargets, listingTargetKey, ensureOttoListingDefaults } from "@/lib/listings";
+import {
+  ensureOttoListingDefaults,
+  formatListingErrors,
+  listingChannelLabel,
+  listingPreviewPath,
+  listingTargetKey,
+  listingTargets,
+} from "@/lib/listings";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +39,10 @@ function redirectIfUnauthorized(status: number) {
   return true;
 }
 
+function isLivePublication(status: string) {
+  return status === "active";
+}
+
 export function ProductPublishPanel({
   productId,
   productStatus,
@@ -42,12 +53,23 @@ export function ProductPublishPanel({
   const { t } = useI18n();
   const [selectedTargets, setSelectedTargets] = useState(() => listingTargets.map(listingTargetKey));
   const [publishing, setPublishing] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [previews, setPreviews] = useState<Array<{ key: string; label: string; ok: boolean; detail: string }>>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [fetchedStatus, setFetchedStatus] = useState("");
+  const [publications, setPublications] = useState<Publication[]>([]);
   const status = productStatus || fetchedStatus;
+
+  async function loadPublications() {
+    const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+    if (redirectIfUnauthorized(response.status) || !response.ok) return [] as Publication[];
+    const body = await response.json();
+    const rows: Publication[] = Array.isArray(body) ? body : body.results ?? [];
+    setPublications(rows);
+    return rows;
+  }
 
   useEffect(() => {
     if (productStatus) return;
@@ -64,7 +86,50 @@ export function ProductPublishPanel({
     };
   }, [productId, productStatus]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      // Defer state updates past the effect body (react-hooks/set-state-in-effect).
+      await Promise.resolve();
+      if (cancelled) return;
+      const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+      if (cancelled || redirectIfUnauthorized(response.status) || !response.ok) return;
+      const body = await response.json();
+      if (cancelled) return;
+      const rows: Publication[] = Array.isArray(body) ? body : body.results ?? [];
+      setPublications(rows);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
+
   const canPublish = status === "approved";
+  const publicationByTarget = useMemo(() => {
+    const map = new Map<string, Publication>();
+    for (const publication of publications) {
+      map.set(`${publication.marketplace}:${publication.account}`, publication);
+    }
+    return map;
+  }, [publications]);
+
+  const selectedLiveTargets = useMemo(
+    () =>
+      listingTargets.filter((target) => {
+        const key = listingTargetKey(target);
+        if (!selectedTargets.includes(key)) return false;
+        const publication = publicationByTarget.get(key);
+        return Boolean(publication && isLivePublication(publication.status));
+      }),
+    [publicationByTarget, selectedTargets],
+  );
+
+  const hasAnyLivePublication = useMemo(
+    () => publications.some((publication) => isLivePublication(publication.status)),
+    [publications],
+  );
+
+  const canUpdate = canPublish && hasAnyLivePublication && selectedLiveTargets.length > 0;
 
   function toggleTarget(target: Target) {
     const key = listingTargetKey(target);
@@ -74,6 +139,25 @@ export function ProductPublishPanel({
     );
   }
 
+  async function queueJob(operation: "publish" | "update", targets: Target[]) {
+    const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/${operation}/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify({ targets }),
+    });
+    if (redirectIfUnauthorized(response.status)) return null;
+    if (!response.ok) {
+      setError(
+        apiErrorMessage(
+          await response.json().catch(() => null),
+          operation === "update" ? t("listing.updateError") : t("marketplaces.publishError"),
+        ),
+      );
+      return null;
+    }
+    return (await response.json()) as Job;
+  }
+
   async function publish() {
     if (!canPublish || selectedTargets.length === 0) return;
     setPublishing(true);
@@ -81,29 +165,48 @@ export function ProductPublishPanel({
     setNotice("");
     try {
       await ensureOttoListingDefaults(productId, authorizedFetch);
-      const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publish/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({
-          targets: listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target))),
-        }),
-      });
-      if (redirectIfUnauthorized(response.status)) return;
-      if (!response.ok) {
-        setError(apiErrorMessage(await response.json().catch(() => null), t("marketplaces.publishError")));
-        return;
-      }
-      const job = (await response.json()) as Job;
+      const job = await queueJob(
+        "publish",
+        listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target))),
+      );
+      if (!job) return;
       setNotice(
         t("marketplaces.jobQueued", {
           id: job.id.slice(0, 8),
           operation: t(`job.op.${job.operation}` as MessageKey),
         }),
       );
+      await loadPublications();
     } catch {
       setError(t("common.apiUnreachable"));
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function updateLive() {
+    if (!canUpdate) return;
+    if (!window.confirm(t("listing.confirmUpdate"))) return;
+    setUpdating(true);
+    setError("");
+    setNotice("");
+    try {
+      await ensureOttoListingDefaults(productId, authorizedFetch);
+      // OTTO update still uses the marketplace upsert under the hood, but the
+      // Benim job operation is `update` so Marketplaces history shows it correctly.
+      const job = await queueJob("update", selectedLiveTargets);
+      if (!job) return;
+      setNotice(
+        t("marketplaces.jobQueued", {
+          id: job.id.slice(0, 8),
+          operation: t(`job.op.${job.operation}` as MessageKey),
+        }),
+      );
+      await loadPublications();
+    } catch {
+      setError(t("common.apiUnreachable"));
+    } finally {
+      setUpdating(false);
     }
   }
 
@@ -119,6 +222,7 @@ export function ProductPublishPanel({
       const productPublications: Publication[] = Array.isArray(publicationBody)
         ? publicationBody
         : publicationBody.results ?? [];
+      setPublications(productPublications);
       const selected = listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target)));
       const rows = await Promise.all(
         selected.map(async (target) => {
@@ -199,6 +303,8 @@ export function ProductPublishPanel({
           {listingTargets.map((target) => {
             const key = listingTargetKey(target);
             const checked = selectedTargets.includes(key);
+            const publication = publicationByTarget.get(key);
+            const live = Boolean(publication && isLivePublication(publication.status));
             return (
               <label
                 key={key}
@@ -212,8 +318,13 @@ export function ProductPublishPanel({
                   onCheckedChange={() => toggleTarget(target)}
                   aria-label={listingChannelLabel(target)}
                 />
-                <span>
-                  {listingChannelLabel(target)}
+                <span className="min-w-0 flex-1">
+                  <span className="block">{listingChannelLabel(target)}</span>
+                  {live ? (
+                    <span className="text-[10px] font-extrabold uppercase tracking-[0.04em] text-[var(--ui-success)]">
+                      {t("listing.channelActive")}
+                    </span>
+                  ) : null}
                 </span>
               </label>
             );
@@ -221,6 +332,7 @@ export function ProductPublishPanel({
         </div>
 
         <p className="text-xs font-semibold text-muted-foreground">{t("listing.previewAllHint")}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{t("listing.updateHint")}</p>
 
         <div className="flex flex-wrap items-center gap-3">
           <Button
@@ -233,7 +345,7 @@ export function ProductPublishPanel({
           </Button>
           <Button
             variant="accent"
-            disabled={!canPublish || selectedTargets.length === 0 || publishing}
+            disabled={!canPublish || selectedTargets.length === 0 || publishing || updating}
             onClick={() => void publish()}
           >
             <Send className="size-4" />
@@ -242,6 +354,26 @@ export function ProductPublishPanel({
               : selectedTargets.length === 1
                 ? t("marketplaces.publish", { count: selectedTargets.length })
                 : t("marketplaces.publishPlural", { count: selectedTargets.length })}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!canUpdate || publishing || updating}
+            title={
+              !hasAnyLivePublication
+                ? t("listing.updateDisabledNoActive")
+                : selectedLiveTargets.length === 0
+                  ? t("listing.updateDisabledNoSelected")
+                  : undefined
+            }
+            onClick={() => void updateLive()}
+          >
+            <RefreshCw className="size-4" />
+            {updating
+              ? t("marketplaces.queueing")
+              : selectedLiveTargets.length > 0
+                ? t("listing.update", { count: selectedLiveTargets.length })
+                : t("listing.updateIdle")}
           </Button>
           <span className="text-xs font-semibold text-muted-foreground">{t("marketplaces.queuedHint")}</span>
         </div>
