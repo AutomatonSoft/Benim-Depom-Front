@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Send } from "lucide-react";
 
 import { Feedback, SectionCard, SectionCardHeader } from "@/components/manager/ui";
@@ -62,13 +62,14 @@ export function ProductPublishPanel({
   const [publications, setPublications] = useState<Publication[]>([]);
   const status = productStatus || fetchedStatus;
 
-  const loadPublications = useCallback(async () => {
+  async function loadPublications() {
     const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
-    if (redirectIfUnauthorized(response.status) || !response.ok) return;
+    if (redirectIfUnauthorized(response.status) || !response.ok) return [] as Publication[];
     const body = await response.json();
     const rows: Publication[] = Array.isArray(body) ? body : body.results ?? [];
     setPublications(rows);
-  }, [productId]);
+    return rows;
+  }
 
   useEffect(() => {
     if (productStatus) return;
@@ -86,8 +87,22 @@ export function ProductPublishPanel({
   }, [productId, productStatus]);
 
   useEffect(() => {
-    void loadPublications();
-  }, [loadPublications]);
+    let cancelled = false;
+    void (async () => {
+      // Defer state updates past the effect body (react-hooks/set-state-in-effect).
+      await Promise.resolve();
+      if (cancelled) return;
+      const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+      if (cancelled || redirectIfUnauthorized(response.status) || !response.ok) return;
+      const body = await response.json();
+      if (cancelled) return;
+      const rows: Publication[] = Array.isArray(body) ? body : body.results ?? [];
+      setPublications(rows);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
 
   const canPublish = status === "approved";
   const publicationByTarget = useMemo(() => {
