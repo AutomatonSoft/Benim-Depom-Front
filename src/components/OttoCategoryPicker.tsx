@@ -497,14 +497,28 @@ export function OttoCategoryPicker({
             </header>
             {filledAttributes.length > 0 ? (
               <ul className="mb-3 grid gap-2">
-                {filledAttributes.map((attribute) => (
+                {filledAttributes.map((attribute) => {
+                  const freeText = attribute.allowed_values.length === 0;
+                  return (
                   <li key={attribute.attribute_id} className="flex items-stretch gap-2">
                     <button
                       type="button"
-                      className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border border-border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30"
+                      className={cn(
+                        "flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30",
+                        freeText
+                          ? "border-[rgba(247,148,29,0.45)]"
+                          : "border-border",
+                      )}
                       onClick={() => openAttributeValue(attribute)}
                     >
-                      <strong className="truncate text-sm font-extrabold text-primary">{attribute.name}</strong>
+                      <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+                        <strong className="truncate text-sm font-extrabold text-primary">{attribute.name}</strong>
+                        {freeText ? (
+                          <span className="rounded-md bg-[rgba(247,148,29,0.16)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent,#f7941d)]">
+                            {t("listing.ottoFreeTextBadge")}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className="truncate text-xs font-semibold text-muted-foreground">
                         {formatAttributeValue(attribute, values[String(attribute.attribute_id)] || "")}
                       </span>
@@ -520,7 +534,8 @@ export function OttoCategoryPicker({
                       ×
                     </Button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             ) : null}
             <Button
@@ -699,6 +714,7 @@ function AttributeValueEditor({
   saveLabel: string;
   cancelLabel: string;
 }) {
+  const { t } = useI18n();
   const labels = attribute.allowed_value_labels?.length
     ? attribute.allowed_value_labels
     : attribute.allowed_values;
@@ -749,13 +765,24 @@ function AttributeValueEditor({
           ))}
         </div>
       ) : (
-        <Input
-          autoFocus
-          type={attribute.type === "STRING" ? "text" : "number"}
-          step={attribute.type === "FLOAT" ? "any" : "1"}
-          value={Array.isArray(value) ? value.join(", ") : value}
-          onChange={(event) => onChange(event.target.value)}
-        />
+        <div className="grid gap-2">
+          <div
+            role="status"
+            className="rounded-xl border-2 border-[rgba(247,148,29,0.55)] bg-[rgba(247,148,29,0.14)] px-3 py-2.5"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent,#f7941d)]">
+              {t("listing.ottoFreeTextWarnTitle")}
+            </p>
+            <p className="mt-1 text-sm font-bold leading-snug text-primary">{t("listing.ottoFreeTextWarn")}</p>
+          </div>
+          <Input
+            autoFocus
+            type={attribute.type === "STRING" ? "text" : "number"}
+            step={attribute.type === "FLOAT" ? "any" : "1"}
+            value={Array.isArray(value) ? value.join(", ") : value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </div>
       )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onCancel}>

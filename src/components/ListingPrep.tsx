@@ -321,10 +321,17 @@ function ListingPrepFields({
     setError("");
     setNotice("");
     try {
+      const title = draft.title.trim();
+      if (!title) {
+        throw new Error(t("listing.titleRequired"));
+      }
+      if (title.length > 70) {
+        throw new Error(t("listing.titleTooLong"));
+      }
       const payload =
         channel.marketplace === "otto"
           ? {
-              product_line: draft.title.trim(),
+              product_line: title,
               description: draft.description.trim(),
               bullet_points: draft.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
               vat: vatValue,
@@ -332,11 +339,11 @@ function ListingPrepFields({
             }
           : channel.marketplace === "hood"
             ? {
-                title: draft.title.trim(),
+                title,
                 description: draft.description,
               }
             : {
-                title: draft.title.trim(),
+                title,
                 description: draft.description.trim(),
               };
       const response = await authorizedFetch(listingConfigPath(productId, channel), {
@@ -348,7 +355,7 @@ function ListingPrepFields({
       if (!response.ok) throw new Error(apiErrorMessage(data, t("listing.saveFailed")));
       const next = {
         ...draft,
-        title: draft.title.trim(),
+        title,
         ...(channel.marketplace === "otto"
           ? { vat: vatValue, shippingProfileId: shippingValue }
           : {}),
@@ -411,7 +418,14 @@ function ListingPrepFields({
       <form className="grid gap-4" onSubmit={(event) => void save(event)}>
         <div>
           <Label>{channel.marketplace === "otto" ? t("listing.productLine") : t("product.draftTitle")}</Label>
-          <Input value={draft.title} onChange={(event) => updateDraft({ title: event.target.value })} />
+          <Input
+            maxLength={70}
+            value={draft.title}
+            onChange={(event) => updateDraft({ title: event.target.value })}
+          />
+          <p className="mt-1.5 text-xs font-semibold text-muted-foreground">
+            {t("listing.titleHint", { count: draft.title.trim().length })}
+          </p>
         </div>
         <div>
           <Label>{t("product.draftDescription")}</Label>

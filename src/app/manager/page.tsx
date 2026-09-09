@@ -91,7 +91,7 @@ function isSameLocalDay(value: string) {
 }
 
 function queueFromProducts(results: FallbackProduct[]): QueueItem[] {
-  return results.slice(0, 6).map((product) => ({
+  return results.slice(0, 8).map((product) => ({
     id: product.id,
     title: product.title,
     product_type: product.product_type,
@@ -283,7 +283,7 @@ export default function Home() {
 
         {!loading && dashboard && dashboard.queue.length > 0 ? (
           <div className="divide-y divide-border">
-            {dashboard.queue.map((item) => (
+            {dashboard.queue.slice(0, 8).map((item) => (
               <Link
                 key={item.id}
                 href={`/manager/products/${item.id}`}
