@@ -1527,7 +1527,7 @@ export default function ProductWorkspacePage() {
                   <span className="text-sm font-extrabold text-primary">{t("product.draftHeading")}</span>
                   <div>
                     <Label>{t("product.draftTitle")}</Label>
-                    <Input required maxLength={100} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
+                    <Input required maxLength={70} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
                   </div>
                   <div>
                     <Label>{t("product.draftDescription")}</Label>
