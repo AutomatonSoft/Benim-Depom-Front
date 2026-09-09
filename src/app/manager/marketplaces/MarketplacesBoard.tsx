@@ -12,11 +12,19 @@ import {
   StatusBadge,
 } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 type Marketplace = "hood" | "otto" | "kaufland";
 type Account = "jv" | "xl";
@@ -35,6 +43,16 @@ type Publication = {
   updated_at: string;
 };
 
+type JobResult = {
+  marketplace?: string;
+  account?: string;
+  ok?: boolean;
+  awaiting_marketplace_confirmation?: boolean;
+  status_code?: number;
+  details?: unknown;
+  error?: unknown;
+};
+
 type Job = {
   id: string;
   product_id: number;
@@ -44,6 +62,7 @@ type Job = {
   in_progress: boolean;
   requested_channels: string[];
   requested_targets: Target[];
+  results?: JobResult[];
   error: unknown;
   created_at: string;
   finished_at: string | null;
@@ -95,6 +114,29 @@ function jsonHint(value: unknown) {
   }
 }
 
+function detailText(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value !== "object") return String(value);
+  const record = value as Record<string, unknown>;
+  for (const key of ["detail", "reason", "message", "error", "code"]) {
+    const item = record[key];
+    if (typeof item === "string" && item.trim()) return item;
+  }
+  if (Array.isArray(record.errors)) {
+    return record.errors.map(String).filter(Boolean).join(" · ");
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+function jobCanShowDetails(job: Job) {
+  return job.status === "failed" || job.status === "partial";
+}
+
 function redirectIfUnauthorized(status: number) {
   if (status !== 401) return false;
   window.localStorage.removeItem("benim_access_token");
@@ -127,6 +169,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [detailJob, setDetailJob] = useState<Job | null>(null);
   const silentReload = useRef(false);
 
   const listingBusy = useMemo(
@@ -560,7 +603,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
               <span>{t("marketplaces.col.started")}</span>
             </div>
             {jobs.map((job) => {
-              const hint = jsonHint(job.error);
+              const canShowDetails = jobCanShowDetails(job);
               return (
                 <article key={job.id}>
                   <div>
@@ -573,9 +616,19 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                   <span>
                     {(job.requested_targets || []).map(targetKey).join(" · ") || job.requested_channels.join(", ")}
                   </span>
-                  <span title={hint || undefined}>
+                  {canShowDetails ? (
+                    <button
+                      type="button"
+                      className="cursor-pointer text-left underline decoration-dotted decoration-current/40 underline-offset-4"
+                      onClick={() => setDetailJob(job)}
+                      aria-label={t("marketplaces.jobDetailsAria")}
+                      title={t("marketplaces.jobDetailsAria")}
+                    >
+                      <StatusBadge status={job.status}>{t(`job.${job.status}` as MessageKey)}</StatusBadge>
+                    </button>
+                  ) : (
                     <StatusBadge status={job.status}>{t(`job.${job.status}` as MessageKey)}</StatusBadge>
-                  </span>
+                  )}
                   <time dateTime={job.created_at}>{formatDate(job.created_at, true)}</time>
                 </article>
               );
@@ -583,6 +636,77 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
           </div>
         ) : null}
       </section>
+
+      <Dialog open={Boolean(detailJob)} onOpenChange={(open) => !open && setDetailJob(null)}>
+        <DialogContent className="sm:max-w-md" showCloseButton>
+          {detailJob ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="pr-8 font-extrabold text-primary">
+                  {t(`job.${detailJob.status}` as MessageKey)}
+                  {" · "}
+                  {t(`job.op.${detailJob.operation}` as MessageKey)}
+                </DialogTitle>
+                <DialogDescription>
+                  {detailJob.product_title || `#${detailJob.product_id}`} · #{detailJob.product_id}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid max-h-[60vh] gap-3 overflow-y-auto">
+                {(detailJob.results || []).length > 0 ? (
+                  detailJob.results!.map((result, index) => {
+                    const channel = [
+                      result.marketplace ? marketplaceName[result.marketplace as Marketplace] || result.marketplace : null,
+                      result.account ? String(result.account).toUpperCase() : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+                    const text =
+                      detailText(result.details) ||
+                      detailText(result.error) ||
+                      (result.ok
+                        ? t("marketplaces.jobTargetOk")
+                        : result.awaiting_marketplace_confirmation
+                          ? t("marketplaces.jobTargetWaiting")
+                          : t("marketplaces.jobTargetFailed"));
+                    return (
+                      <div
+                        key={`${channel}-${index}`}
+                        className={cn(
+                          "rounded-xl border px-3 py-2.5",
+                          result.ok
+                            ? "border-[rgba(31,138,91,0.28)] bg-[var(--ui-success-bg)]"
+                            : "border-[rgba(194,59,59,0.28)] bg-[var(--ui-danger-bg)]",
+                        )}
+                      >
+                        <p className="text-xs font-extrabold text-primary">{channel || t("marketplaces.jobTargetUnknown")}</p>
+                        <p
+                          className={cn(
+                            "mt-1 text-sm font-semibold break-words",
+                            result.ok ? "text-[var(--ui-success)]" : "text-[var(--ui-danger)]",
+                          )}
+                        >
+                          {text}
+                        </p>
+                      </div>
+                    );
+                  })
+                ) : null}
+                {detailText(detailJob.error) ? (
+                  <div className="rounded-xl border border-[rgba(194,59,59,0.28)] bg-[var(--ui-danger-bg)] px-3 py-2.5">
+                    <p className="text-sm font-semibold break-words text-[var(--ui-danger)]">{detailText(detailJob.error)}</p>
+                  </div>
+                ) : null}
+                {(detailJob.results || []).length === 0 && !detailText(detailJob.error) ? (
+                  <div className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
+                    <p className="text-sm font-semibold break-words text-primary">{t("marketplaces.jobDetailsEmpty")}</p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
