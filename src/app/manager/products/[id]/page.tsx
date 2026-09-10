@@ -29,7 +29,7 @@ import { useI18n, type MessageKey } from "@/i18n";
 
 type Variant = {
   id: number;
-  color_hex: string;
+  color: string;
   materials: string[];
   width_cm: string;
   height_cm: string;
@@ -110,7 +110,7 @@ type FormState = {
   variants: Variant[];
 };
 
-type GenerationContent = { title?: string; description?: string; bullet_points?: string[]; materials?: string[] };
+type GenerationContent = { title?: string; description?: string; bullet_points?: string[]; materials?: string[]; color?: string };
 
 type Generation = {
   id: string;
@@ -145,7 +145,7 @@ function moveImageInList(images: ProductImage[], fromId: number, toId: number) {
   return next.map((image, position) => ({ ...image, position }));
 }
 
-type DraftForm = { title: string; description: string; bullets: string; material1: string; material2: string };
+type DraftForm = { title: string; description: string; bullets: string; material1: string; material2: string; color: string };
 
 const HISTORY_PAGE_SIZE = 5;
 
@@ -406,6 +406,7 @@ export default function ProductWorkspacePage() {
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [rejectComment, setRejectComment] = useState("");
+  const [pendingRejectComment, setPendingRejectComment] = useState("");
   const [selectedImageKey, setSelectedImageKey] = useState<string | null>(null);
   const [draftForm, setDraftForm] = useState<DraftForm | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
@@ -489,6 +490,7 @@ export default function ProductWorkspacePage() {
         bullets: (generationContent.bullet_points ?? []).join("\n"),
         material1,
         material2,
+        color: generationContent.color ?? "",
       });
     }
   }
@@ -508,13 +510,14 @@ export default function ProductWorkspacePage() {
         description: draftForm.description.trim(),
         bullet_points: draftForm.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
         materials: materialsPayload(draftForm.material1, draftForm.material2),
+        color: draftForm.color.trim(),
       };
       const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${generation.id}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const fieldErrors = [data.title, data.description, data.bullet_points, data.materials].flat().filter(Boolean).join(" ");
+        const fieldErrors = [data.title, data.description, data.bullet_points, data.materials, data.color].flat().filter(Boolean).join(" ");
         throw new Error(data.detail || fieldErrors || "Draft could not be saved.");
       }
       setGeneration(data as Generation);
@@ -681,7 +684,7 @@ export default function ProductWorkspacePage() {
         product_type: form.product_type,
         unit_price: form.unit_price,
         currency: form.currency,
-        variants: form.variants.map(({ color_hex, materials, width_cm, height_cm, length_cm, quantity }) => ({ color_hex, materials, width_cm, height_cm, length_cm, quantity: Number(quantity) })),
+        variants: form.variants.map(({ color, materials, width_cm, height_cm, length_cm, quantity }) => ({ color, materials, width_cm, height_cm, length_cm, quantity: Number(quantity) })),
       };
       if (form.listing_price_eur && form.listing_price_eur !== (product?.listing_price_eur ?? "")) {
         payload.listing_price_eur_override = form.listing_price_eur;
@@ -813,6 +816,48 @@ export default function ProductWorkspacePage() {
         return;
       }
       setError(cause instanceof Error ? cause.message : t("product.pendingApproveFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function rejectSellerChanges() {
+    if (!product) return;
+    const reason = pendingRejectComment.trim();
+    if (!reason) {
+      setError(t("product.pendingRejectReasonRequired"));
+      return;
+    }
+    const hadPending = Object.keys(product.pending_changes ?? {}).length > 0;
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/seller-changes/reject/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expected_catalog_revision: product.catalog_revision,
+          comment: reason,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 409) {
+        await loadProduct({ silent: true });
+        throw new Error(apiErrorMessage(data, t("product.sellerChanged")));
+      }
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.pendingRejectFailed")));
+      setPendingRejectComment("");
+      await loadProduct({ silent: true });
+      setFeedback(t("product.pendingRejected"));
+    } catch (cause) {
+      const reloaded = await loadProduct({ silent: true });
+      const pendingGone = Object.keys(reloaded?.pending_changes ?? {}).length === 0;
+      if (hadPending && reloaded?.status === "approved" && pendingGone) {
+        setError("");
+        setPendingRejectComment("");
+        setFeedback(t("product.pendingRejected"));
+        return;
+      }
+      setError(cause instanceof Error ? cause.message : t("product.pendingRejectFailed"));
     } finally {
       setSaving(false);
     }
@@ -1165,9 +1210,20 @@ export default function ProductWorkspacePage() {
                 </div>
               ))}
             </dl>
-            <Button className="mt-4" disabled={saving} onClick={() => void approveSellerChanges()}>
-              {saving ? t("product.saving") : t("product.approveChanges")}
-            </Button>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button disabled={saving} onClick={() => void approveSellerChanges()}>
+                {saving ? t("product.saving") : t("product.approveChanges")}
+              </Button>
+              <Input
+                className="min-w-[220px] flex-1"
+                value={pendingRejectComment}
+                onChange={(event) => setPendingRejectComment(event.target.value)}
+                placeholder={t("product.pendingRejectReason")}
+              />
+              <Button variant="destructive" disabled={saving} onClick={() => void rejectSellerChanges()}>
+                {t("product.rejectChanges")}
+              </Button>
+            </div>
           </Panel>
         ) : null}
 
@@ -1470,7 +1526,7 @@ export default function ProductWorkspacePage() {
                 <div className="grid gap-3 rounded-2xl border border-border p-4 sm:grid-cols-2 lg:grid-cols-3" key={variant.id || index}>
                   <div>
                     <Label>{t("product.colour")}</Label>
-                    <Input required value={variant.color_hex} onChange={(event) => updateVariant(index, "color_hex", event.target.value)} />
+                    <Input required value={variant.color} onChange={(event) => updateVariant(index, "color", event.target.value)} />
                   </div>
                   <div>
                     <Label>{t("product.materials")}</Label>
@@ -1556,6 +1612,15 @@ export default function ProductWorkspacePage() {
                   <div>
                     <Label>{t("product.draftBullets")}</Label>
                     <Textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} />
+                  </div>
+                  <div>
+                    <Label>{t("listing.color")}</Label>
+                    <Input value={draftForm.color} onChange={(event) => updateDraft("color", event.target.value)} />
+                    <small className="mt-1.5 block text-xs text-muted-foreground">
+                      {(form?.variants[0]?.color || "").trim()
+                        ? t("listing.colorHintWithSeller", { color: form?.variants[0]?.color || "" })
+                        : t("listing.colorHint")}
+                    </small>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
