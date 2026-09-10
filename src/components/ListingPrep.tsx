@@ -36,6 +36,7 @@ type ConfigResponse = {
     description?: string;
     bullet_points?: string[];
     materials?: string[];
+    color?: string;
     vat?: string;
     shipping_profile_id?: string;
     category_id?: string;
@@ -56,6 +57,7 @@ type ChannelDraft = {
   bullets: string;
   material1: string;
   material2: string;
+  color: string;
   vat: string;
   shippingProfileId: string;
   hoodCategoryId: string;
@@ -69,6 +71,7 @@ type Bundle = {
   profiles: Record<Account, ShippingProfile[]>;
   channels: Record<string, ChannelRecord>;
   sellerMaterials: string;
+  sellerColor: string;
 };
 
 const bundleCache = new Map<string, Promise<Bundle>>();
@@ -79,6 +82,7 @@ function emptyDraft(): ChannelDraft {
     bullets: "",
     material1: "",
     material2: "",
+    color: "",
     vat: "",
     shippingProfileId: "",
     hoodCategoryId: "",
@@ -94,6 +98,7 @@ function draftFromConfig(config: ConfigResponse["configuration"]): ChannelDraft 
     bullets: (source.bullet_points || []).join("\n"),
     material1: materialPair(source.materials)[0],
     material2: materialPair(source.materials)[1],
+    color: String(source.color || "").trim(),
     vat: String(source.vat || "").trim(),
     shippingProfileId: String(source.shipping_profile_id || "").trim(),
     hoodCategoryId: String(source.category_id || "").trim(),
@@ -108,6 +113,7 @@ function draftsEqual(left: ChannelDraft, right: ChannelDraft) {
     left.bullets === right.bullets &&
     left.material1 === right.material1 &&
     left.material2 === right.material2 &&
+    left.color === right.color &&
     left.vat === right.vat &&
     left.shippingProfileId === right.shippingProfileId &&
     left.hoodCategoryId === right.hoodCategoryId &&
@@ -152,11 +158,13 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
   };
 
   let sellerMaterials = "";
+  let sellerColor = "";
   if (productResponse.ok) {
     const product = (await readJson(productResponse)) as {
-      variants?: Array<{ materials?: string[] }>;
+      variants?: Array<{ materials?: string[]; color?: string }>;
     } | null;
     sellerMaterials = (product?.variants?.[0]?.materials || []).filter(Boolean).join(", ");
+    sellerColor = (product?.variants?.[0]?.color || "").trim();
   }
 
   const channels: Record<string, ChannelRecord> = {};
@@ -176,7 +184,7 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
     }),
   );
 
-  return { publications, profiles, channels, sellerMaterials };
+  return { publications, profiles, channels, sellerMaterials, sellerColor };
 }
 
 function getBundle(productId: number, epoch: string, failMessage: string) {
@@ -195,6 +203,7 @@ function toDraft(item: ChannelRecord | ChannelDraft): ChannelDraft {
     bullets: item.bullets,
     material1: item.material1,
     material2: item.material2,
+    color: item.color,
     vat: item.vat,
     shippingProfileId: item.shippingProfileId,
     hoodCategoryId: item.hoodCategoryId,
@@ -361,6 +370,7 @@ function ListingPrepFields({
         throw new Error(t("listing.titleTooLong"));
       }
       const materials = materialsPayload(draft.material1, draft.material2);
+      const color = draft.color.trim();
       const payload =
         channel.marketplace === "otto"
           ? {
@@ -368,6 +378,7 @@ function ListingPrepFields({
               description: draft.description.trim(),
               bullet_points: draft.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
               materials,
+              color,
               vat: vatValue,
               shipping_profile_id: shippingValue,
             }
@@ -376,11 +387,13 @@ function ListingPrepFields({
                 title,
                 description: draft.description,
                 materials,
+                color,
               }
             : {
                 title,
                 description: draft.description.trim(),
                 materials,
+                color,
               };
       const response = await authorizedFetch(listingConfigPath(productId, channel), {
         method: "PATCH",
@@ -461,6 +474,15 @@ function ListingPrepFields({
           />
           <p className="mt-1.5 text-xs font-semibold text-muted-foreground">
             {t("listing.titleHint", { count: draft.title.trim().length })}
+          </p>
+        </div>
+        <div>
+          <Label>{t("listing.color")}</Label>
+          <Input value={draft.color} onChange={(event) => updateDraft({ color: event.target.value })} />
+          <p className="mt-1.5 text-xs font-semibold text-muted-foreground">
+            {view.sellerColor
+              ? t("listing.colorHintWithSeller", { color: view.sellerColor })
+              : t("listing.colorHint")}
           </p>
         </div>
         <div>
