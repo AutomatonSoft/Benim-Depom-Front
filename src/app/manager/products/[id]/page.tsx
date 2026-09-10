@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { listingTargetKey, listingTargets } from "@/lib/listings";
+import { materialPair, materialsPayload } from "@/lib/materials";
 import { cn } from "@/lib/utils";
 import { useI18n, type MessageKey } from "@/i18n";
 
@@ -109,7 +110,7 @@ type FormState = {
   variants: Variant[];
 };
 
-type GenerationContent = { title?: string; description?: string; bullet_points?: string[] };
+type GenerationContent = { title?: string; description?: string; bullet_points?: string[]; materials?: string[] };
 
 type Generation = {
   id: string;
@@ -144,7 +145,7 @@ function moveImageInList(images: ProductImage[], fromId: number, toId: number) {
   return next.map((image, position) => ({ ...image, position }));
 }
 
-type DraftForm = { title: string; description: string; bullets: string };
+type DraftForm = { title: string; description: string; bullets: string; material1: string; material2: string };
 
 const HISTORY_PAGE_SIZE = 5;
 
@@ -481,10 +482,13 @@ export default function ProductWorkspacePage() {
     if (!generationContent) {
       setDraftForm(null);
     } else if (!draftDirty) {
+      const [material1, material2] = materialPair(generationContent.materials);
       setDraftForm({
         title: generationContent.title ?? "",
         description: generationContent.description ?? "",
         bullets: (generationContent.bullet_points ?? []).join("\n"),
+        material1,
+        material2,
       });
     }
   }
@@ -503,13 +507,14 @@ export default function ProductWorkspacePage() {
         title: draftForm.title.trim(),
         description: draftForm.description.trim(),
         bullet_points: draftForm.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
+        materials: materialsPayload(draftForm.material1, draftForm.material2),
       };
       const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${generation.id}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const fieldErrors = [data.title, data.description, data.bullet_points].flat().filter(Boolean).join(" ");
+        const fieldErrors = [data.title, data.description, data.bullet_points, data.materials].flat().filter(Boolean).join(" ");
         throw new Error(data.detail || fieldErrors || "Draft could not be saved.");
       }
       setGeneration(data as Generation);
@@ -1537,6 +1542,21 @@ export default function ProductWorkspacePage() {
                     <Label>{t("product.draftBullets")}</Label>
                     <Textarea required rows={5} value={draftForm.bullets} onChange={(event) => updateDraft("bullets", event.target.value)} />
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label>{t("listing.material1")}</Label>
+                      <Input value={draftForm.material1} onChange={(event) => updateDraft("material1", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>{t("listing.material2")}</Label>
+                      <Input value={draftForm.material2} onChange={(event) => updateDraft("material2", event.target.value)} />
+                    </div>
+                  </div>
+                  <small className="text-xs text-muted-foreground">
+                    {(form?.variants[0]?.materials || []).filter(Boolean).length
+                      ? t("listing.materialsHintWithSeller", { materials: (form?.variants[0]?.materials || []).join(", ") })
+                      : t("listing.materialsHint")}
+                  </small>
                   <small className="text-xs text-muted-foreground">{t("product.draftHint")}</small>
                   <Button type="submit" disabled={draftSaving || !draftDirty}>
                     {draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}

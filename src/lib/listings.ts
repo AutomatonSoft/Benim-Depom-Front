@@ -115,7 +115,6 @@ export async function ensureOttoListingDefaults(
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...configuration,
           vat: nextVat,
           shipping_profile_id: nextShipping,
         }),
