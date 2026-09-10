@@ -24,17 +24,21 @@ type ProductSummary = {
   otto_attributes: Record<string, unknown>;
 };
 
-const productCache = new Map<number, Promise<ProductSummary | "unauthorized" | "missing">>();
+type ProductLoad = ProductSummary | "unauthorized" | "missing" | "failed";
+
+const productCache = new Map<number, Promise<ProductLoad>>();
 
 function getProduct(productId: number) {
   const cached = productCache.get(productId);
   if (cached) return cached;
-  const request = authorizedFetch(`/api/v1/products/${productId}/`).then(async (response) => {
-    if (response.status === 401) return "unauthorized" as const;
-    if (response.status === 404) return "missing" as const;
-    if (!response.ok) throw new Error("failed");
-    return (await response.json()) as ProductSummary;
-  });
+  const request = authorizedFetch(`/api/v1/products/${productId}/`)
+    .then(async (response) => {
+      if (response.status === 401) return "unauthorized" as const;
+      if (response.status === 404) return "missing" as const;
+      if (!response.ok) return "failed" as const;
+      return (await response.json()) as ProductSummary;
+    })
+    .catch(() => "failed" as const);
   productCache.set(productId, request);
   return request;
 }
@@ -94,10 +98,13 @@ function ListingsLoaded({ productId }: { productId: number }) {
       </PageContainer>
     );
   }
-  if (product === "missing") {
+  if (product === "missing" || product === "failed") {
     return (
       <PageContainer>
-        <EmptyState title={t("product.notFound")} />
+        <EmptyState
+          title={product === "missing" ? t("product.notFound") : t("listing.loadFailed")}
+          description={product === "failed" ? t("common.apiUnreachable") : undefined}
+        />
         <div className="mt-4 flex justify-center">
           <Button asChild variant="secondary">
             <Link href="/manager/products">{t("product.backToList")}</Link>
