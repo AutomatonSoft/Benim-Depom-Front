@@ -22,10 +22,27 @@ function writeToken(key: string, value: string) {
   window.localStorage.setItem(key, value);
 }
 
-function clearTokens() {
+export function clearTokens() {
   if (!canUseStorage()) return;
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export async function logoutSession() {
+  const refresh = readToken(REFRESH_TOKEN_KEY);
+  const access = readToken(ACCESS_TOKEN_KEY);
+  if (refresh && access) {
+    try {
+      await authorizedFetch("/api/v1/auth/logout/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+      });
+    } catch {
+      // Tokens are still cleared locally so the panel cannot stay signed in.
+    }
+  }
+  clearTokens();
 }
 
 async function refreshAccessToken() {
