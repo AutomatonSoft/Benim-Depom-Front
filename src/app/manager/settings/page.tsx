@@ -1,14 +1,15 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, LogOut } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/manager/confirm-dialog";
 import { Feedback, PageContainer, PageHeader, SectionCard, SectionCardHeader } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { authorizedFetch } from "@/lib/api";
+import { authorizedFetch, logoutSession } from "@/lib/api";
 import { TIMEZONE_STORAGE_KEY } from "@/lib/date";
 import { localeLabels, useI18n, type Locale } from "@/i18n";
 
@@ -41,6 +42,8 @@ export default function SettingsPage() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("benim_access_token");
@@ -108,6 +111,16 @@ export default function SettingsPage() {
       setPasswordError(t("common.apiUnreachable"));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function confirmLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logoutSession();
+    } finally {
+      window.location.replace("/manager/login");
     }
   }
 
@@ -252,7 +265,32 @@ export default function SettingsPage() {
             </div>
           </form>
         </SectionCard>
+
+        <SectionCard>
+          <SectionCardHeader eyebrow={t("settings.account")} title={t("settings.logout")} />
+          <div className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <p className="max-w-md text-sm text-muted-foreground">{t("settings.logoutCopy")}</p>
+            <Button type="button" variant="destructive" onClick={() => setLogoutOpen(true)}>
+              <LogOut className="size-4" />
+              {t("settings.logout")}
+            </Button>
+          </div>
+        </SectionCard>
       </div>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        onOpenChange={(open) => {
+          if (!open && !loggingOut) setLogoutOpen(false);
+        }}
+        title={t("settings.logout")}
+        description={<p>{t("settings.logoutConfirm")}</p>}
+        cancelLabel={t("common.no")}
+        confirmLabel={loggingOut ? t("settings.loggingOut") : t("common.yes")}
+        loading={loggingOut}
+        destructive
+        onConfirm={() => void confirmLogout()}
+      />
     </PageContainer>
   );
 }
