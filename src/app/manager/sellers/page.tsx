@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { BadgeCheck, MoreHorizontal, Package, Trash2, Users } from "lucide-react";
+import { BadgeCheck, MoreHorizontal, Package, Shield, Trash2, Users } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/manager/confirm-dialog";
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { authorizedFetch, apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
 type Seller = {
@@ -23,6 +24,7 @@ type Seller = {
   last_name: string;
   phone: string;
   date_joined: string;
+  role?: string;
   product_count?: number;
   is_active?: boolean;
   is_email_verified?: boolean;
@@ -36,6 +38,7 @@ type SellerListResponse = {
 };
 
 type SellerFilter = "" | "active" | "pending";
+type DirectoryTab = "sellers" | "managers";
 
 function fullName(seller: Seller) {
   return `${seller.first_name} ${seller.last_name}`.trim() || seller.username;
@@ -47,6 +50,7 @@ function isPendingEmail(seller: Seller) {
 
 export default function SellersPage() {
   const { t } = useI18n();
+  const [tab, setTab] = useState<DirectoryTab>("sellers");
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -63,6 +67,7 @@ export default function SellersPage() {
   const [feedback, setFeedback] = useState("");
   const [actionError, setActionError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const isManagers = tab === "managers";
 
   useEffect(() => {
     const access = window.localStorage.getItem("benim_access_token");
@@ -72,8 +77,8 @@ export default function SellersPage() {
     }
 
     const params = new URLSearchParams({ page: String(page) });
-    if (activity === "active") params.set("is_active", "true");
-    if (activity === "pending") params.set("is_email_verified", "false");
+    if (!isManagers && activity === "active") params.set("is_active", "true");
+    if (!isManagers && activity === "pending") params.set("is_email_verified", "false");
     if (appliedSearch) params.set("search", appliedSearch);
 
     async function loadSellers() {
@@ -81,7 +86,8 @@ export default function SellersPage() {
       setError("");
 
       try {
-        const response = await authorizedFetch(`/api/v1/manager/users/sellers/?${params}`);
+        const path = isManagers ? "/api/v1/manager/users/managers/" : "/api/v1/manager/users/sellers/";
+        const response = await authorizedFetch(`${path}?${params}`);
 
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
@@ -98,19 +104,27 @@ export default function SellersPage() {
         setHasNext(Boolean(data.next));
         setHasPrevious(Boolean(data.previous));
       } catch {
-        setError(t("sellers.loadError"));
+        setError(isManagers ? t("sellers.managersLoadError") : t("sellers.loadError"));
       } finally {
         setLoading(false);
       }
     }
 
     void loadSellers();
-  }, [page, activity, appliedSearch, reloadKey, t]);
+  }, [page, activity, appliedSearch, reloadKey, isManagers, t]);
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(1);
     setAppliedSearch(search.trim());
+  }
+
+  function selectTab(next: DirectoryTab) {
+    setTab(next);
+    setPage(1);
+    setActivity("");
+    setActionError("");
+    setFeedback("");
   }
 
   async function confirmEmail(seller: Seller) {
@@ -167,12 +181,16 @@ export default function SellersPage() {
     }
   }
 
+  const gridClass = isManagers
+    ? "grid min-w-[820px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_120px_140px] gap-3"
+    : "grid min-w-[920px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_100px_140px_56px] gap-3";
+
   return (
     <PageContainer>
       <PageHeader
         eyebrow={t("common.panel")}
-        title={t("sellers.title")}
-        description={t("sellers.subtitle", { count })}
+        title={isManagers ? t("sellers.managersTitle") : t("sellers.title")}
+        description={isManagers ? t("sellers.managersSubtitle", { count }) : t("sellers.subtitle", { count })}
         primaryAction={
           <Button asChild variant="accent">
             <Link href="/manager/managers/new">{t("sellers.createManager")}</Link>
@@ -181,37 +199,72 @@ export default function SellersPage() {
       />
 
       <SectionCard>
+        <div className="flex gap-1 overflow-x-auto border-b border-border px-3 pt-3 sm:px-5">
+          {(
+            [
+              { id: "sellers" as const, label: t("sellers.tabSellers"), icon: Users },
+              { id: "managers" as const, label: t("sellers.tabManagers"), icon: Shield },
+            ] as const
+          ).map((item) => {
+            const active = tab === item.id;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => selectTab(item.id)}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-bold transition-colors",
+                  active
+                    ? "border-[var(--brand-accent)] text-primary"
+                    : "border-transparent text-muted-foreground hover:text-primary",
+                )}
+              >
+                <Icon className="size-3.5" aria-hidden />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
         <SectionToolbar>
           <form className="flex w-full flex-wrap items-center gap-3" onSubmit={applySearch}>
             <Input
               className="min-w-[220px] flex-1"
-              aria-label={t("sellers.searchAria")}
+              aria-label={isManagers ? t("sellers.managersSearchAria") : t("sellers.searchAria")}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("sellers.searchPlaceholder")}
+              placeholder={isManagers ? t("sellers.managersSearchPlaceholder") : t("sellers.searchPlaceholder")}
             />
-            <FilterSelect
-              className="w-[200px]"
-              aria-label={t("sellers.filterAria")}
-              value={activity}
-              onChange={(event) => {
-                setPage(1);
-                setActivity(event.target.value as SellerFilter);
-              }}
-            >
-              <option value="">{t("sellers.all")}</option>
-              <option value="active">{t("common.active")}</option>
-              <option value="pending">{t("sellers.pendingEmail")}</option>
-            </FilterSelect>
+            {isManagers ? null : (
+              <FilterSelect
+                className="w-[200px]"
+                aria-label={t("sellers.filterAria")}
+                value={activity}
+                onChange={(event) => {
+                  setPage(1);
+                  setActivity(event.target.value as SellerFilter);
+                }}
+              >
+                <option value="">{t("sellers.all")}</option>
+                <option value="active">{t("common.active")}</option>
+                <option value="pending">{t("sellers.pendingEmail")}</option>
+              </FilterSelect>
+            )}
             <Button type="submit">{t("common.search")}</Button>
           </form>
         </SectionToolbar>
 
-        {loading ? <p className="px-5 py-6 text-sm font-semibold text-muted-foreground">{t("sellers.loading")}</p> : null}
+        {loading ? (
+          <p className="px-5 py-6 text-sm font-semibold text-muted-foreground">
+            {isManagers ? t("sellers.managersLoading") : t("sellers.loading")}
+          </p>
+        ) : null}
         {error ? <Feedback className="px-5 py-4">{error}</Feedback> : null}
         {actionError && !loading ? <Feedback className="px-5 py-2">{actionError}</Feedback> : null}
         {feedback && !error && !actionError ? <Feedback tone="success" className="px-5 py-2">{feedback}</Feedback> : null}
-        {!loading && !error && sellers.length === 0 ? <EmptyState icon={Users} title={t("sellers.empty")} /> : null}
+        {!loading && !error && sellers.length === 0 ? (
+          <EmptyState icon={isManagers ? Shield : Users} title={isManagers ? t("sellers.managersEmpty") : t("sellers.empty")} />
+        ) : null}
 
         {!loading && !error && sellers.length > 0 ? (
           <>
@@ -227,19 +280,19 @@ export default function SellersPage() {
               pageLabel={t("common.page", { page })}
             />
             <div className="overflow-x-auto">
-            <div className="grid min-w-[920px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_100px_140px_56px] gap-3 border-b border-border bg-[#f8fafc] px-5 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
-              <span>{t("sellers.col.seller")}</span>
+            <div className={`${gridClass} border-b border-border bg-[#f8fafc] px-5 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground`}>
+              <span>{isManagers ? t("sellers.col.manager") : t("sellers.col.seller")}</span>
               <span>{t("sellers.col.contact")}</span>
-              <span className="text-right">{t("sellers.col.products")}</span>
+              {isManagers ? <span>{t("sellers.col.role")}</span> : <span className="text-right">{t("sellers.col.products")}</span>}
               <span>{t("sellers.col.joined")}</span>
-              <span />
+              {isManagers ? null : <span />}
             </div>
             {sellers.map((seller) => {
-              const pending = isPendingEmail(seller);
+              const pending = !isManagers && isPendingEmail(seller);
               return (
               <article
                 key={seller.id}
-                className="grid min-w-[920px] grid-cols-[minmax(220px,1.4fr)_minmax(200px,1fr)_100px_140px_56px] items-center gap-3 border-b border-border px-5 py-3"
+                className={`${gridClass} items-center border-b border-border px-5 py-3`}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar className="size-9">
@@ -263,6 +316,9 @@ export default function SellersPage() {
                   <strong className="block truncate text-sm font-semibold text-primary">{seller.email || t("sellers.noEmail")}</strong>
                   <small className="text-xs text-muted-foreground">{seller.phone || t("sellers.noPhone")}</small>
                 </div>
+                {isManagers ? (
+                  <span className="text-sm font-semibold capitalize text-primary">{seller.role || "manager"}</span>
+                ) : (
                 <Link
                   className="text-right text-sm font-extrabold text-primary hover:text-[var(--brand-accent)]"
                   href={`/manager/sellers/${seller.id}/products`}
@@ -270,9 +326,11 @@ export default function SellersPage() {
                 >
                   {seller.product_count ?? 0}
                 </Link>
+                )}
                 <time className="text-xs font-semibold text-muted-foreground" dateTime={seller.date_joined}>
                   {formatDate(seller.date_joined)}
                 </time>
+                {isManagers ? null : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button type="button" size="icon-sm" variant="ghost" aria-label={t("sellers.actionsAria", { name: fullName(seller) })}>
@@ -308,6 +366,7 @@ export default function SellersPage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                )}
               </article>
             );
             })}

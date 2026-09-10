@@ -26,6 +26,7 @@ import {
   type Account,
   type ListingTarget,
 } from "@/lib/listings";
+import { materialPair, materialsPayload } from "@/lib/materials";
 import { cn } from "@/lib/utils";
 
 type ConfigResponse = {
@@ -34,6 +35,7 @@ type ConfigResponse = {
     title?: string;
     description?: string;
     bullet_points?: string[];
+    materials?: string[];
     vat?: string;
     shipping_profile_id?: string;
     category_id?: string;
@@ -52,6 +54,8 @@ type ChannelDraft = {
   title: string;
   description: string;
   bullets: string;
+  material1: string;
+  material2: string;
   vat: string;
   shippingProfileId: string;
   hoodCategoryId: string;
@@ -64,6 +68,7 @@ type Bundle = {
   publications: Publication[];
   profiles: Record<Account, ShippingProfile[]>;
   channels: Record<string, ChannelRecord>;
+  sellerMaterials: string;
 };
 
 const bundleCache = new Map<string, Promise<Bundle>>();
@@ -72,6 +77,8 @@ function emptyDraft(): ChannelDraft {
     title: "",
     description: "",
     bullets: "",
+    material1: "",
+    material2: "",
     vat: "",
     shippingProfileId: "",
     hoodCategoryId: "",
@@ -85,6 +92,8 @@ function draftFromConfig(config: ConfigResponse["configuration"]): ChannelDraft 
     title: (source.product_line || source.title || "").trim(),
     description: source.description || "",
     bullets: (source.bullet_points || []).join("\n"),
+    material1: materialPair(source.materials)[0],
+    material2: materialPair(source.materials)[1],
     vat: String(source.vat || "").trim(),
     shippingProfileId: String(source.shipping_profile_id || "").trim(),
     hoodCategoryId: String(source.category_id || "").trim(),
@@ -97,6 +106,8 @@ function draftsEqual(left: ChannelDraft, right: ChannelDraft) {
     left.title === right.title &&
     left.description === right.description &&
     left.bullets === right.bullets &&
+    left.material1 === right.material1 &&
+    left.material2 === right.material2 &&
     left.vat === right.vat &&
     left.shippingProfileId === right.shippingProfileId &&
     left.hoodCategoryId === right.hoodCategoryId &&
@@ -121,10 +132,11 @@ async function readJson(response: Response) {
 
 async function loadBundle(productId: number, failMessage: string): Promise<Bundle> {
   await ensureOttoListingDefaults(productId, authorizedFetch);
-  const [publicationResponse, jvProfilesResponse, xlProfilesResponse, ...configResponses] = await Promise.all([
+  const [publicationResponse, jvProfilesResponse, xlProfilesResponse, productResponse, ...configResponses] = await Promise.all([
     authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`),
     authorizedFetch("/api/v1/catalog/otto/shipping-profiles/?account=jv"),
     authorizedFetch("/api/v1/catalog/otto/shipping-profiles/?account=xl"),
+    authorizedFetch(`/api/v1/products/${productId}/`),
     ...listingTargets.map((target) => authorizedFetch(listingConfigPath(productId, target))),
   ]);
 
@@ -138,6 +150,14 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
     jv: jvProfilesResponse.ok ? ((await readJson(jvProfilesResponse)) as ShippingProfile[]) || [] : [],
     xl: xlProfilesResponse.ok ? ((await readJson(xlProfilesResponse)) as ShippingProfile[]) || [] : [],
   };
+
+  let sellerMaterials = "";
+  if (productResponse.ok) {
+    const product = (await readJson(productResponse)) as {
+      variants?: Array<{ materials?: string[] }>;
+    } | null;
+    sellerMaterials = (product?.variants?.[0]?.materials || []).filter(Boolean).join(", ");
+  }
 
   const channels: Record<string, ChannelRecord> = {};
   await Promise.all(
@@ -156,7 +176,7 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
     }),
   );
 
-  return { publications, profiles, channels };
+  return { publications, profiles, channels, sellerMaterials };
 }
 
 function getBundle(productId: number, epoch: string, failMessage: string) {
@@ -173,6 +193,8 @@ function toDraft(item: ChannelRecord | ChannelDraft): ChannelDraft {
     title: item.title,
     description: item.description,
     bullets: item.bullets,
+    material1: item.material1,
+    material2: item.material2,
     vat: item.vat,
     shippingProfileId: item.shippingProfileId,
     hoodCategoryId: item.hoodCategoryId,
@@ -255,6 +277,16 @@ function ListingPrepSkeleton() {
           <Label>{t("product.draftBullets")}</Label>
           <Textarea disabled rows={4} />
         </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>{t("listing.material1")}</Label>
+            <Input disabled />
+          </div>
+          <div>
+            <Label>{t("listing.material2")}</Label>
+            <Input disabled />
+          </div>
+        </div>
         <div className="grid gap-2">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-2/3" />
@@ -328,12 +360,14 @@ function ListingPrepFields({
       if (title.length > 70) {
         throw new Error(t("listing.titleTooLong"));
       }
+      const materials = materialsPayload(draft.material1, draft.material2);
       const payload =
         channel.marketplace === "otto"
           ? {
               product_line: title,
               description: draft.description.trim(),
               bullet_points: draft.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
+              materials,
               vat: vatValue,
               shipping_profile_id: shippingValue,
             }
@@ -341,10 +375,12 @@ function ListingPrepFields({
             ? {
                 title,
                 description: draft.description,
+                materials,
               }
             : {
                 title,
                 description: draft.description.trim(),
+                materials,
               };
       const response = await authorizedFetch(listingConfigPath(productId, channel), {
         method: "PATCH",
@@ -431,6 +467,27 @@ function ListingPrepFields({
           <Label>{t("product.draftDescription")}</Label>
           <Textarea rows={7} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
         </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>{t("listing.material1")}</Label>
+            <Input
+              value={draft.material1}
+              onChange={(event) => updateDraft({ material1: event.target.value })}
+            />
+          </div>
+          <div>
+            <Label>{t("listing.material2")}</Label>
+            <Input
+              value={draft.material2}
+              onChange={(event) => updateDraft({ material2: event.target.value })}
+            />
+          </div>
+        </div>
+        <p className="-mt-2 text-xs font-semibold text-muted-foreground">
+          {view.sellerMaterials
+            ? t("listing.materialsHintWithSeller", { materials: view.sellerMaterials })
+            : t("listing.materialsHint")}
+        </p>
         <div className={cn(channel.marketplace !== "otto" && "opacity-55")}>
           <Label>{t("product.draftBullets")}</Label>
           <Textarea
