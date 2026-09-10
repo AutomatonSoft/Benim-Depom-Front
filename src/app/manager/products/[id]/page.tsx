@@ -657,10 +657,17 @@ export default function ProductWorkspacePage() {
     void restoreGeneration();
   }, [productId]);
 
-  function updateVariant(index: number, field: keyof Variant, value: string | number | string[]) {
+    function updateVariant(index: number, field: keyof Variant, value: string | number | string[]) {
     setForm((current) => current && {
       ...current,
       variants: current.variants.map((variant, itemIndex) => itemIndex === index ? { ...variant, [field]: value } : variant),
+    });
+  }
+
+  function removeVariant(index: number) {
+    setForm((current) => {
+      if (!current || current.variants.length < 2) return current;
+      return { ...current, variants: current.variants.filter((_, itemIndex) => itemIndex !== index) };
     });
   }
 
@@ -1458,6 +1465,7 @@ export default function ProductWorkspacePage() {
                 {t("product.warehouse", { city: product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—" })}
               </p>
               <h3 className="text-base font-extrabold text-primary">{t("product.variants", { count: totalQuantity })}</h3>
+              <p className="text-xs font-semibold text-muted-foreground">{t("product.oneColorHint")}</p>
               {form.variants.map((variant, index) => (
                 <div className="grid gap-3 rounded-2xl border border-border p-4 sm:grid-cols-2 lg:grid-cols-3" key={variant.id || index}>
                   <div>
@@ -1488,6 +1496,13 @@ export default function ProductWorkspacePage() {
                     <Label>{t("product.quantity")}</Label>
                     <Input required type="number" min="0" value={variant.quantity} onChange={(event) => updateVariant(index, "quantity", event.target.value)} />
                   </div>
+                  {form.variants.length > 1 ? (
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <Button type="button" variant="secondary" size="sm" onClick={() => removeVariant(index)}>
+                        {t("product.removeVariant")}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               ))}
               <Button disabled={saving} type="submit">{saving ? t("product.saving") : t("product.saveChanges")}</Button>
@@ -1532,7 +1547,7 @@ export default function ProductWorkspacePage() {
                   <span className="text-sm font-extrabold text-primary">{t("product.draftHeading")}</span>
                   <div>
                     <Label>{t("product.draftTitle")}</Label>
-                    <Input required maxLength={70} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
+                    <Input required maxLength={65} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
                   </div>
                   <div>
                     <Label>{t("product.draftDescription")}</Label>
