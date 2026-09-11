@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { BadgeCheck, MoreHorizontal, Package, Shield, Trash2, Users } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/manager/confirm-dialog";
+import { WhatsAppLink } from "@/components/manager/whatsapp-link";
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { authorizedFetch, apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { whatsappChatUrl } from "@/lib/whatsapp";
 import { useI18n } from "@/i18n";
 
 type Seller = {
@@ -314,7 +316,17 @@ export default function SellersPage() {
                 </div>
                 <div className="min-w-0">
                   <strong className="block truncate text-sm font-semibold text-primary">{seller.email || t("sellers.noEmail")}</strong>
-                  <small className="text-xs text-muted-foreground">{seller.phone || t("sellers.noPhone")}</small>
+                  {whatsappChatUrl(seller.phone) ? (
+                    <WhatsAppLink
+                      phone={seller.phone}
+                      className="text-muted-foreground hover:bg-transparent hover:text-[#128C7E]"
+                      iconClassName="size-3.5 text-[#25D366]"
+                    >
+                      <small className="truncate text-xs">{seller.phone}</small>
+                    </WhatsAppLink>
+                  ) : (
+                    <small className="text-xs text-muted-foreground">{t("sellers.noPhone")}</small>
+                  )}
                 </div>
                 {isManagers ? (
                   <span className="text-sm font-semibold capitalize text-primary">{seller.role || "manager"}</span>
