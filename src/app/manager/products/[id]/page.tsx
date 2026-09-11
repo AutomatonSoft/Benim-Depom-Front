@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { X } from "lucide-react";
 import { WhatsAppLink } from "@/components/manager/whatsapp-link";
 import {
   EmptyState,
@@ -423,6 +424,7 @@ export default function ProductWorkspacePage() {
   const [dragImageId, setDragImageId] = useState<number | null>(null);
   const [dropTargetId, setDropTargetId] = useState<number | null>(null);
   const [pendingDeleteImageId, setPendingDeleteImageId] = useState<number | null>(null);
+  const [pendingDeleteGenerated, setPendingDeleteGenerated] = useState<{ imageId: number; generatedId: number } | null>(null);
   const dragImageIdRef = useRef<number | null>(null);
 
   const canModerate = product?.status === "submitted";
@@ -661,7 +663,7 @@ export default function ProductWorkspacePage() {
     void restoreGeneration();
   }, [productId]);
 
-    function updateVariant(index: number, field: keyof Variant, value: string | number | string[]) {
+  function updateVariant(index: number, field: keyof Variant, value: string | number | string[]) {
     setForm((current) => current && {
       ...current,
       variants: current.variants.map((variant, itemIndex) => itemIndex === index ? { ...variant, [field]: value } : variant),
@@ -889,6 +891,30 @@ export default function ProductWorkspacePage() {
       setFeedback("Image uploaded."); await loadProduct();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Image upload failed."); }
     finally { setSaving(false); event.target.value = ""; }
+  }
+
+  async function deleteGeneratedImage(imageId: number, generatedId: number) {
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(
+        `/api/v1/products/${productId}/images/${imageId}/generated/${generatedId}/`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(apiErrorMessage(data, t("product.generatedDeleteFailed")));
+      }
+      if (selectedImageKey === `generated-${generatedId}`) {
+        setSelectedImageKey(`source-${imageId}`);
+      }
+      setFeedback(t("product.generatedDeleted"));
+      setPendingDeleteGenerated(null);
+      await loadProduct({ silent: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("product.generatedDeleteFailed"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteImage(imageId: number) {
@@ -1352,7 +1378,29 @@ export default function ProductWorkspacePage() {
                       <img src={item.url} alt={item.label} className="size-full object-cover" />
                       {item.isPrimary ? <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--brand-accent)]" aria-hidden="true" /> : null}
                       {item.generated ? (
-                        <span className="absolute bottom-1 left-1 rounded bg-[var(--brand-accent)] px-1 text-[9px] font-extrabold text-white">AI</span>
+                        <>
+                          <span className="absolute bottom-1 left-1 rounded bg-[var(--brand-accent)] px-1 text-[9px] font-extrabold text-white">AI</span>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label={t("product.deleteGenerated")}
+                            className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-[#8b96a8] text-white hover:bg-[#6d7788]"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (saving || !item.sourceImageId || !item.generatedId) return;
+                              setPendingDeleteGenerated({ imageId: item.sourceImageId, generatedId: item.generatedId });
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter" && event.key !== " ") return;
+                              event.preventDefault();
+                              event.stopPropagation();
+                              if (saving || !item.sourceImageId || !item.generatedId) return;
+                              setPendingDeleteGenerated({ imageId: item.sourceImageId, generatedId: item.generatedId });
+                            }}
+                          >
+                            <X className="size-2.5" strokeWidth={3} />
+                          </span>
+                        </>
                       ) : null}
                     </button>
                   ))}
@@ -1415,16 +1463,29 @@ export default function ProductWorkspacePage() {
                       {image.generated_images.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {image.generated_images.map((generated) => (
-                            <button
-                              key={generated.id}
-                              type="button"
-                              className="size-11 overflow-hidden rounded-lg border border-border"
-                              title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`}
-                              onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={generated.image} alt={generated.mode} className="size-full object-cover" />
-                            </button>
+                            <div key={generated.id} className="relative">
+                              <button
+                                type="button"
+                                className="size-11 overflow-hidden rounded-lg border border-border"
+                                title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`}
+                                onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={generated.image} alt={generated.mode} className="size-full object-cover" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={saving}
+                                aria-label={t("product.deleteGenerated")}
+                                className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-[#8b96a8] text-white shadow-sm hover:bg-[#6d7788] disabled:opacity-50"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setPendingDeleteGenerated({ imageId: image.id, generatedId: generated.id });
+                                }}
+                              >
+                                <X className="size-2.5" strokeWidth={3} />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       ) : null}
@@ -1755,6 +1816,22 @@ export default function ProductWorkspacePage() {
         loading={saving}
         onConfirm={() => {
           if (pendingDeleteImageId != null) void deleteImage(pendingDeleteImageId);
+        }}
+      />
+      <ConfirmDialog
+        open={pendingDeleteGenerated != null}
+        onOpenChange={(open) => {
+          if (!open && !saving) setPendingDeleteGenerated(null);
+        }}
+        title={t("product.deleteGenerated")}
+        description={t("product.deleteGeneratedConfirm")}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={saving ? t("product.saving") : t("product.delete")}
+        loading={saving}
+        onConfirm={() => {
+          if (pendingDeleteGenerated != null) {
+            void deleteGeneratedImage(pendingDeleteGenerated.imageId, pendingDeleteGenerated.generatedId);
+          }
         }}
       />
     </>
