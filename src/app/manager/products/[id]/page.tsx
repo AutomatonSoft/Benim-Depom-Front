@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { WhatsAppLink } from "@/components/manager/whatsapp-link";
 import {
   EmptyState,
   Feedback,
@@ -87,7 +88,7 @@ type Product = {
   availability_reminder_sent_at?: string | null;
   availability_confirmed_at?: string | null;
   is_available?: boolean;
-  seller?: { id: number; username: string; first_name: string; email: string };
+  seller?: { id: number; username: string; first_name: string; email: string; phone?: string };
   catalog_revision?: number;
   pending_changes?: Record<string, unknown> | null;
   pending_changes_submitted_at?: string | null;
@@ -1078,10 +1079,13 @@ export default function ProductWorkspacePage() {
             <div className="grid gap-1">
               <p>{t("product.updated", { id: product.id, date: formatDate(product.updated_at, true) })}</p>
               {product.seller ? (
-                <p>
-                  {t("product.createdBy", { name: product.seller.username })}
-                  {product.seller.first_name ? ` · ${product.seller.first_name}` : ""}
-                  {product.seller.email ? ` · ${product.seller.email}` : ""}
+                <p className="inline-flex flex-wrap items-center gap-x-1">
+                  <span>
+                    {t("product.createdBy", { name: product.seller.username })}
+                    {product.seller.first_name ? ` · ${product.seller.first_name}` : ""}
+                    {product.seller.email ? ` · ${product.seller.email}` : ""}
+                  </span>
+                  <WhatsAppLink phone={product.seller.phone} className="-my-1" />
                 </p>
               ) : null}
             </div>
