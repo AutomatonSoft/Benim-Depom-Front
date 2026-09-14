@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Benim Depom">
-  <rect width="32" height="32" rx="8" fill="#16294F"/>
-  <path fill="#F2611D" d="M5.5 14.2 16 6.4l10.5 7.8H5.5Z"/>
-  <path fill="#F4F7FB" d="M7.4 14.2h17.2V25.2H7.4Z"/>
-  <rect x="13.4" y="17.6" width="5.2" height="7.6" rx="0.6" fill="#16294F"/>
-  <rect x="9.2" y="17.2" width="3.2" height="3.2" rx="0.4" fill="#2F6FED"/>
-  <rect x="19.6" y="17.2" width="3.2" height="3.2" rx="0.4" fill="#2F6FED"/>
-</svg>

@@ -620,6 +620,13 @@ export default function LandingPage() {
             <div className="footer-brand">
               <div className="footer-logo-text">Benim<span className="accent">Depom</span></div>
               <p>{t.footer.tagline}</p>
+              <img
+                alt="Benim Depom"
+                className="footer-mark"
+                height={229}
+                src="/landing/benim-depom-logo.png"
+                width={284}
+              />
             </div>
             <div>
               <h5>{t.footer.navTitle}</h5>
