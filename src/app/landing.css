@@ -136,6 +136,17 @@
 .bd-landing .lang-switch button.active { background: var(--blue); color: #fff; }
 .bd-landing .wa-nav-btn { width: 38px; height: 38px; border-radius: 999px; background: #25d366; display: flex; align-items: center; justify-content: center; flex: none; }
 .bd-landing .wa-nav-btn svg { width: 19px; height: 19px; color: #06331a; }
+.bd-landing .privacy-nav-btn {
+  width: 38px; height: 38px; border-radius: 999px; background: #fff;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 80%, transparent);
+  color: var(--blue); display: flex; align-items: center; justify-content: center; flex: none;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.bd-landing .privacy-nav-btn:hover { background: var(--surface-alt); border-color: var(--blue-mid); transform: translateY(-1px); }
+.bd-landing .privacy-nav-btn svg { width: 18px; height: 18px; }
+.bd-landing .btn-privacy { background: #fff; color: var(--blue); border-color: transparent; }
+.bd-landing .btn-privacy:hover { background: #f3f5f8; color: var(--blue-mid); }
 .bd-landing .menu-toggle { display: none; width: 42px; height: 42px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); align-items: center; justify-content: center; flex: none; }
 .bd-landing .menu-toggle svg { width: 20px; height: 20px; }
 
@@ -151,7 +162,8 @@
   .bd-landing .menu-toggle { display: flex; }
 }
 @media (max-width: 560px) {
-  .bd-landing .wa-nav-btn { display: none; }
+  .bd-landing .wa-nav-btn,
+  .bd-landing .privacy-nav-btn { display: none; }
 }
 
 /* hero */
@@ -506,9 +518,20 @@
 .bd-landing .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
 @media (max-width: 820px) { .bd-landing .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .bd-landing .footer-grid { grid-template-columns: 1fr; } }
+.bd-landing .footer-brand { max-width: 260px; }
 .bd-landing .footer-logo-text { font-family: var(--font-display); font-weight: 800; font-size: 2rem; letter-spacing: -0.01em; color: #fff; line-height: 1; }
 .bd-landing .footer-logo-text .accent { color: var(--orange); }
-.bd-landing .footer-brand p { margin-top: 12px; color: rgba(255, 255, 255, 0.55); font-size: 0.92rem; max-width: 260px; }
+.bd-landing .footer-brand p { margin-top: 12px; color: rgba(255, 255, 255, 0.55); font-size: 0.92rem; }
+.bd-landing .footer-mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 20px;
+  padding: 14px 16px 12px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
 .bd-landing .site-footer h5 { font-family: var(--font-cond); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255, 255, 255, 0.5); margin-bottom: 14px; }
 .bd-landing .site-footer ul li { margin-bottom: 10px; }
 .bd-landing .site-footer ul li a { font-size: 0.92rem; color: rgba(255, 255, 255, 0.8); }

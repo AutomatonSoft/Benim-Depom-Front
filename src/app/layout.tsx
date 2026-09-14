@@ -14,7 +14,8 @@ export const metadata: Metadata = {
   description:
     "Benim Depom, Türkiye'deki mobilya üreticilerinin stoklarını mobil ürün girişi, AI görselleri, pazaryerleri ve lojistik desteği ile Avrupa pazarına sunmalarını kolaylaştırır.",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png", type: "image/png" }],
   },
 };
 
