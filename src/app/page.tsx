@@ -49,6 +49,9 @@ export default function LandingPage() {
             <LangSwitch lang={lang} onChange={setLang} />
             <a className="btn btn-primary" href="#download"><Ic name="download" />{t.nav.cta}</a>
             <a aria-label="WhatsApp" className="wa-nav-btn" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" /></a>
+            <Link aria-label={t.privacyAria} className="privacy-nav-btn" href="/privacy_policy">
+              <Ic name="shield" />
+            </Link>
             <button aria-label="Menu" className="menu-toggle" onClick={() => setMenuOpen((open) => !open)} type="button">
               <Ic name={menuOpen ? "x" : "menu"} />
             </button>
@@ -64,6 +67,9 @@ export default function LandingPage() {
         </nav>
         <div className="mn-actions">
           <a className="btn btn-primary btn-block" href="#download" onClick={closeMenu}><Ic name="download" />{t.nav.cta}</a>
+          <Link className="btn btn-outline btn-block" href="/privacy_policy" onClick={closeMenu}>
+            <Ic name="shield" />{t.finalcta.privacyBtn}
+          </Link>
         </div>
       </div>
 
@@ -607,6 +613,7 @@ export default function LandingPage() {
               <div className="fc-actions">
                 <a className="btn btn-primary" href="#download"><Ic name="download" />{t.finalcta.btn1}</a>
                 <a className="btn btn-ghost-light" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" />{t.finalcta.btn2}</a>
+                <Link className="btn btn-privacy" href="/privacy_policy"><Ic name="shield" />{t.finalcta.privacyBtn}</Link>
               </div>
             </div>
           </div>
@@ -644,7 +651,11 @@ export default function LandingPage() {
               <h5>{t.footer.legalTitle}</h5>
               <ul>
                 <li><Link href="/impressum">{t.impr.title}</Link></li>
-                {t.legalDocs.map((doc) => <li key={doc.n}><Link href="/impressum">{doc.n}</Link></li>)}
+                {t.legalDocs.map((doc) => (
+                  <li key={doc.n}>
+                    <Link href={doc.href ?? "/impressum"}>{doc.n}</Link>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
