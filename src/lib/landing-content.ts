@@ -148,9 +148,9 @@ export type LandingDict = {
     mailBtn: string;
     mapNote: string;
   };
-  finalcta: { title: string; sub: string; btn1: string; btn2: string };
+  finalcta: { title: string; sub: string; btn1: string; btn2: string; privacyBtn: string };
   impr: { eyebrow: string; title: string; company: string; address: string; back: string };
-  legalDocs: { n: string; s: string }[];
+  legalDocs: { n: string; s: string; href?: string }[];
   footer: {
     tagline: string;
     navTitle: string;
@@ -160,6 +160,7 @@ export type LandingDict = {
     appLink: string;
   };
   waFloat: string;
+  privacyAria: string;
 };
 
 export const CONTACT = {
@@ -458,10 +459,11 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       sub: "Bringen Sie Ihre Produkte digital auf den europäischen Markt.",
       btn1: "App herunterladen",
       btn2: "Über WhatsApp sprechen",
+      privacyBtn: "Datenschutz",
     },
     impr: { eyebrow: "Rechtliches", title: "Impressum", company: "Unternehmen", address: "Adresse", back: "← Zurück zur Startseite" },
     legalDocs: [
-      { n: "Datenschutz", s: "Wird ergänzt" },
+      { n: "Datenschutz", s: "Privacy Policy", href: "/privacy_policy" },
       { n: "Cookie-Richtlinie", s: "Wird ergänzt" },
       { n: "Nutzungsbedingungen", s: "Wird ergänzt" },
       { n: "Widerrufs-/Verkaufsbedingungen", s: "Wird ergänzt, soweit relevant" },
@@ -475,6 +477,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       appLink: "App herunterladen",
     },
     waFloat: "Über WhatsApp kontaktieren",
+    privacyAria: "Datenschutzerklärung",
   },
 
   /* ============================ ENGLISH ============================ */
@@ -753,10 +756,11 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       sub: "Bring your products to the European market digitally.",
       btn1: "Get the App",
       btn2: "Talk to Us on WhatsApp",
+      privacyBtn: "Privacy Policy",
     },
     impr: { eyebrow: "Legal", title: "Legal Notice", company: "Company", address: "Address", back: "← Back to home" },
     legalDocs: [
-      { n: "Privacy Policy", s: "To be added" },
+      { n: "Privacy Policy", s: "Available", href: "/privacy_policy" },
       { n: "Cookie Policy", s: "To be added" },
       { n: "Terms of Use", s: "To be added" },
       { n: "Withdrawal / Sales Terms", s: "To be added, where relevant" },
@@ -770,6 +774,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       appLink: "Download the app",
     },
     waFloat: "Contact us on WhatsApp",
+    privacyAria: "Privacy Policy",
   },
 
   /* ============================ TÜRKÇE ============================ */
@@ -1047,10 +1052,11 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       sub: "Ürünlerinizi dijital olarak Avrupa pazarına taşıyın.",
       btn1: "Uygulamayı İndir",
       btn2: "WhatsApp'tan Bilgi Al",
+      privacyBtn: "Gizlilik Politikası",
     },
     impr: { eyebrow: "Yasal Bilgiler", title: "Yasal Bildirim", company: "Şirket", address: "Adres", back: "← Ana sayfaya dön" },
     legalDocs: [
-      { n: "Gizlilik Politikası", s: "Yakında eklenecek" },
+      { n: "Gizlilik Politikası", s: "Mevcut", href: "/privacy_policy" },
       { n: "Çerez Politikası", s: "Yakında eklenecek" },
       { n: "Kullanım Şartları", s: "Yakında eklenecek" },
       { n: "İptal / Satış Koşulları", s: "İlgili olduğu ölçüde yakında eklenecek" },
@@ -1064,5 +1070,6 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       appLink: "Uygulamayı indir",
     },
     waFloat: "WhatsApp'tan Bilgi Al",
+    privacyAria: "Gizlilik Politikası",
   },
 };
