@@ -262,6 +262,8 @@ const STATUS_VARIANT: Record<string, VariantProps<typeof badgeVariants>["variant
   publishing: "warning",
   running: "warning",
   "in-flight": "warning",
+  accepted: "success",
+  superseded: "secondary",
   approved: "success",
   succeeded: "success",
   completed: "success",
