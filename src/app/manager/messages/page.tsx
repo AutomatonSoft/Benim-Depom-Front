@@ -26,6 +26,7 @@ type Notification = {
   seller_username: string | null;
   seller_email: string | null;
   seller_name: string | null;
+  seller_comment?: string | null;
   sender_username: string | null;
   sender_email: string | null;
   sender_name: string | null;
@@ -333,6 +334,7 @@ export default function MessagesPage() {
             : reviewed.badgeClass,
         title: t(template.title),
         body: t(template.body, { seller, product }),
+        sellerComment: message.seller_comment?.trim() || "",
       };
     }
 
@@ -551,6 +553,14 @@ export default function MessagesPage() {
                         <small className="block text-sm text-muted-foreground">
                           {highlightProduct(presentation.body, product)}
                         </small>
+                        {"sellerComment" in presentation && presentation.sellerComment ? (
+                          <p className="mt-2 rounded-lg border border-border bg-[#f8fafc] px-3 py-2 text-sm text-primary">
+                            <span className="block text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+                              {t("messages.sellerComment")}
+                            </span>
+                            {presentation.sellerComment}
+                          </p>
+                        ) : null}
                         {manager ? (
                           <span className="block text-xs font-semibold text-muted-foreground">
                             <span className="font-extrabold text-primary">{t("messages.managerLabel")}</span>{" "}

@@ -20,9 +20,8 @@ export default function ImpressumPage() {
       <header className="site-header">
         <div className="container header-inner">
           <Link className="logo" href="/">
-            <span className="logo-chip">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="Benim Depom" className="logo-img" src="/landing/logo.png" />
+            <span className="logo-wordmark">
+              Benim<span>Depom</span>
             </span>
           </Link>
           <div className="header-right">
