@@ -22,7 +22,14 @@ type Profile = {
   role: string;
 };
 
-const timezones = ["UTC", "Asia/Qyzylorda", "Asia/Almaty", "Europe/Istanbul", "Europe/Berlin", "Europe/London"];
+const timezones = [
+  { value: "UTC", label: "UTC" },
+  { value: "Asia/Qyzylorda", label: "Qyzylorda (Kazakhstan)" },
+  { value: "Asia/Almaty", label: "Almaty (Kazakhstan)" },
+  { value: "Europe/Istanbul", label: "Istanbul (Turkey)" },
+  { value: "Europe/Berlin", label: "Berlin (Germany)" },
+  { value: "Europe/London", label: "London (UK)" },
+];
 
 function apiError(data: unknown, fallback: string) {
   if (!data || typeof data !== "object") return fallback;
@@ -71,10 +78,11 @@ export default function SettingsPage() {
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setPasswordError("");
     setPasswordSuccess("");
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const token = localStorage.getItem("benim_access_token");
     if (!token) return void window.location.replace("/manager/login");
 
@@ -102,7 +110,7 @@ export default function SettingsPage() {
         return;
       }
 
-      event.currentTarget.reset();
+      formElement.reset();
       setPasswordSuccess(t("settings.passwordChanged"));
       localStorage.removeItem("benim_access_token");
       localStorage.removeItem("benim_refresh_token");
@@ -159,8 +167,8 @@ export default function SettingsPage() {
               <Label htmlFor="settings-timezone">{t("settings.timezone")}</Label>
               <FilterSelect id="settings-timezone" value={timezone} onChange={(event) => changeTimezone(event.target.value)}>
                 {timezones.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                  <option key={item.value} value={item.value}>
+                    {item.label}
                   </option>
                 ))}
               </FilterSelect>

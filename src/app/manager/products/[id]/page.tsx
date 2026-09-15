@@ -93,6 +93,7 @@ type Product = {
   catalog_revision?: number;
   pending_changes?: Record<string, unknown> | null;
   pending_changes_submitted_at?: string | null;
+  seller_change_review?: Record<string, unknown> | null;
 };
 
 type ModerationDecision = {
@@ -374,10 +375,27 @@ function formatChangeValue(value: unknown) {
   return String(value);
 }
 
+const SELLER_REVIEW_META_KEYS = new Set([
+  "seller_comment",
+  "review_kind",
+  "baseline",
+  "manager_comment",
+  "reviewed_at",
+]);
+
 function currentFieldValue(product: Product, field: string) {
   if (field === "variants") return formatChangeValue(product.variants);
   const record = product as unknown as Record<string, unknown>;
   return formatChangeValue(record[field]);
+}
+
+function reviewOldValue(product: Product, review: Record<string, unknown>, field: string) {
+  const baseline = review.baseline;
+  if (baseline && typeof baseline === "object" && !Array.isArray(baseline)) {
+    const map = baseline as Record<string, unknown>;
+    if (field in map) return formatChangeValue(map[field]);
+  }
+  return currentFieldValue(product, field);
 }
 
 function toForm(product: Product): FormState {
@@ -429,7 +447,29 @@ export default function ProductWorkspacePage() {
 
   const canModerate = product?.status === "submitted";
   const canChangeApprovedStatus = product?.status === "approved";
-  const pendingEntries = Object.entries(product?.pending_changes ?? {}).filter(([, value]) => value !== undefined);
+  const pendingChanges = product?.pending_changes ?? {};
+  const sellerPendingComment =
+    typeof pendingChanges.seller_comment === "string" ? pendingChanges.seller_comment.trim() : "";
+  const pendingEntries = Object.entries(pendingChanges).filter(
+    ([field, value]) => field !== "seller_comment" && value !== undefined,
+  );
+  const sellerChangeReview = product?.seller_change_review ?? {};
+  const sellerReviewComment =
+    typeof sellerChangeReview.seller_comment === "string"
+      ? sellerChangeReview.seller_comment.trim()
+      : "";
+  const managerReviewComment =
+    typeof sellerChangeReview.manager_comment === "string"
+      ? sellerChangeReview.manager_comment.trim()
+      : "";
+  const sellerReviewKind =
+    typeof sellerChangeReview.review_kind === "string" ? sellerChangeReview.review_kind : "";
+  const reviewEntries = Object.entries(sellerChangeReview).filter(
+    ([field, value]) => !SELLER_REVIEW_META_KEYS.has(field) && value !== undefined,
+  );
+  const showSellerReview =
+    pendingEntries.length === 0 &&
+    (reviewEntries.length > 0 || Boolean(sellerReviewComment) || Boolean(managerReviewComment));
   const latestRejection = history.find((item) => item.decision === "rejected");
   const sellerWithdrew = product?.status === "withdrawn";
   const totalQuantity = useMemo(
@@ -1229,6 +1269,14 @@ export default function ProductWorkspacePage() {
             <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.pendingChanges")}</p>
             <h2 className="text-lg font-extrabold text-primary">{t("product.pendingTitle")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{t("product.pendingHint")}</p>
+            {sellerPendingComment ? (
+              <div className="mt-3 rounded-xl border border-border bg-[#fff8f0] px-3 py-2.5">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent)]">
+                  {t("product.sellerComment")}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-primary">{sellerPendingComment}</p>
+              </div>
+            ) : null}
             <dl className="mt-4 grid gap-3">
               {pendingEntries.map(([field, value]) => (
                 <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
@@ -1254,6 +1302,59 @@ export default function ProductWorkspacePage() {
                 {t("product.rejectChanges")}
               </Button>
             </div>
+          </Panel>
+        ) : null}
+
+        {showSellerReview && product ? (
+          <Panel className="mb-4 border-[rgba(195,60,51,0.18)] bg-gradient-to-b from-[#fffaf8] to-[#fff6f4]" padded>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ui-danger)]">
+              {sellerReviewKind === "resubmission"
+                ? t("product.resubmissionChanges")
+                : t("product.rejectedSellerChanges")}
+            </p>
+            <h2 className="text-lg font-extrabold text-primary">
+              {sellerReviewKind === "resubmission"
+                ? t("product.resubmissionTitle")
+                : t("product.rejectedSellerTitle")}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {sellerReviewKind === "resubmission"
+                ? t("product.resubmissionHint")
+                : t("product.rejectedSellerHint")}
+            </p>
+            {sellerReviewComment ? (
+              <div className="mt-3 rounded-xl border border-border bg-[#fff8f0] px-3 py-2.5">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent)]">
+                  {t("product.sellerComment")}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-primary">{sellerReviewComment}</p>
+              </div>
+            ) : null}
+            {managerReviewComment ? (
+              <div className="mt-3 rounded-xl border border-[rgba(195,60,51,0.2)] bg-white px-3 py-2.5">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--ui-danger)]">
+                  {t("product.managerRejectComment")}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-primary">{managerReviewComment}</p>
+              </div>
+            ) : null}
+            {reviewEntries.length > 0 ? (
+              <dl className="mt-4 grid gap-3">
+                {reviewEntries.map(([field, value]) => (
+                  <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
+                    <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">{field}</dt>
+                    <dd className="mt-1 grid gap-1 text-sm">
+                      <small className="text-muted-foreground" title={t("product.pendingOld")}>
+                        {reviewOldValue(product, sellerChangeReview, field)}
+                      </small>
+                      <strong className="font-bold text-primary" title={t("product.pendingNew")}>
+                        {formatChangeValue(value)}
+                      </strong>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
           </Panel>
         ) : null}
 
