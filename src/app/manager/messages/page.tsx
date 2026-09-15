@@ -2,7 +2,7 @@
 
 import { FormEvent, Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, Inbox, Mail, PackageSearch, Search, Send } from "lucide-react";
+import { ClipboardCheck, Handshake, Inbox, Mail, PackageSearch, Search, Send } from "lucide-react";
 
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { formatDate } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-type Category = "all" | "review" | "availability" | "outgoing";
+type Category = "all" | "review" | "availability" | "price" | "outgoing";
 
 type Notification = {
   id: number;
@@ -27,9 +27,16 @@ type Notification = {
   seller_email: string | null;
   seller_name: string | null;
   seller_comment?: string | null;
+  price_accepted?: boolean | null;
+  price_negotiation_status?: "pending" | "accepted" | "rejected" | "superseded" | null;
+  responded_at?: string | null;
+  sender_id: number | null;
   sender_username: string | null;
   sender_email: string | null;
   sender_name: string | null;
+  manager_username?: string | null;
+  manager_email?: string | null;
+  manager_name?: string | null;
   is_read: boolean;
   created_at: string;
 };
@@ -45,9 +52,11 @@ type NotificationSummary = {
   all: number;
   review: number;
   availability: number;
+  price: number;
   outgoing: number;
   unread_review: number;
   unread_availability: number;
+  unread_price: number;
   unread_outgoing: number;
 };
 
@@ -56,9 +65,11 @@ const emptySummary: NotificationSummary = {
   all: 0,
   review: 0,
   availability: 0,
+  price: 0,
   outgoing: 0,
   unread_review: 0,
   unread_availability: 0,
+  unread_price: 0,
   unread_outgoing: 0,
 };
 
@@ -76,6 +87,8 @@ const TYPE_KEYS = new Set([
   "image_processing_failed",
   "message_received",
   "manager_message",
+  "price_negotiation_offer",
+  "price_negotiation_response",
 ]);
 
 const REVIEW_TYPES = new Set(["product_submitted_for_review", "product_change_requested"]);
@@ -84,6 +97,7 @@ const AVAILABILITY_TYPES = new Set([
   "product_availability_reminder",
   "product_deactivation_requested",
 ]);
+const PRICE_TYPES = new Set(["price_negotiation_response"]);
 
 function isUnavailableConfirmation(message: Notification) {
   return /not available/i.test(message.title) || /is not available/i.test(message.body);
@@ -98,12 +112,66 @@ function sellerLine(message: Notification) {
   return personLine(message.seller_name, message.seller_username, message.seller_email);
 }
 
+function senderIsSeller(message: Notification) {
+  const senderUsername = message.sender_username?.trim().toLowerCase() || "";
+  const sellerUsername = message.seller_username?.trim().toLowerCase() || "";
+  if (senderUsername && sellerUsername && senderUsername === sellerUsername) return true;
+  const senderEmail = message.sender_email?.trim().toLowerCase() || "";
+  const sellerEmail = message.seller_email?.trim().toLowerCase() || "";
+  return Boolean(senderEmail && sellerEmail && senderEmail === sellerEmail);
+}
+
 function managerLine(message: Notification) {
+  const fromManagerFields = personLine(
+    message.manager_name ?? null,
+    message.manager_username ?? null,
+    message.manager_email ?? null,
+  );
+  if (fromManagerFields) return fromManagerFields;
+  if (senderIsSeller(message)) return "";
   return personLine(message.sender_name, message.sender_username, message.sender_email);
 }
 
 function productLabel(message: Notification) {
   return message.product_title?.trim() || (message.product_id ? `#${message.product_id}` : "");
+}
+
+function sellerCommentFromMessage(message: Notification) {
+  const fromField = message.seller_comment?.trim() || "";
+  if (fromField) return fromField;
+  const marker = "__SELLER_COMMENT__";
+  const body = message.body || "";
+  if (!body.includes(marker)) return "";
+  return body.split(marker).slice(1).join(marker).trim();
+}
+
+function visibleNotificationBody(message: Notification) {
+  const body = message.body || "";
+  const marker = "__SELLER_COMMENT__";
+  if (!body.includes(marker)) return body.trim();
+  return body.split(marker)[0].replace(/\n+$/g, "").trim();
+}
+
+function priceNegotiationAccepted(message: Notification): boolean | null {
+  if (typeof message.price_accepted === "boolean") return message.price_accepted;
+  const text = `${message.title} ${message.body}`.toLowerCase();
+  if (
+    text.includes("принят") ||
+    text.includes("accepted") ||
+    text.includes("akzeptiert") ||
+    text.includes("kabul")
+  ) {
+    return true;
+  }
+  if (
+    text.includes("отклон") ||
+    text.includes("declined") ||
+    text.includes("abgelehnt") ||
+    text.includes("redded")
+  ) {
+    return false;
+  }
+  return null;
 }
 
 function highlightProduct(text: string, product: string): ReactNode {
@@ -155,6 +223,12 @@ export default function MessagesPage() {
           label: t("messages.tabAvailability"),
           count: unreadOnly ? summary.unread_availability : summary.availability,
           icon: PackageSearch,
+        },
+        {
+          id: "price" as const,
+          label: t("messages.tabPrice"),
+          count: unreadOnly ? summary.unread_price : summary.price,
+          icon: Handshake,
         },
         {
           id: "outgoing" as const,
@@ -232,6 +306,9 @@ export default function MessagesPage() {
           unread_availability: AVAILABILITY_TYPES.has(message.notification_type)
             ? Math.max(0, current.unread_availability - 1)
             : current.unread_availability,
+          unread_price: PRICE_TYPES.has(message.notification_type)
+            ? Math.max(0, current.unread_price - 1)
+            : current.unread_price,
         }));
       }
     }
@@ -360,6 +437,49 @@ export default function MessagesPage() {
         badgeClass: badgeTone(message.notification_type),
         title: t(template.title),
         body: t(template.body, { seller, product }),
+        sellerComment: sellerCommentFromMessage(message),
+      };
+    }
+
+    if (message.notification_type === "price_negotiation_offer") {
+      const status = message.price_negotiation_status;
+      const accepted = priceNegotiationAccepted(message);
+      const superseded = status === "superseded";
+      return {
+        badge: superseded ? t("status.superseded") : typeLabel(message.notification_type),
+        badgeClass: superseded
+          ? "bg-secondary text-muted-foreground"
+          : accepted === true
+            ? "bg-[var(--ui-success-bg)] text-[var(--ui-success)]"
+            : accepted === false
+              ? "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]"
+              : badgeTone(message.notification_type),
+        title: message.title || typeLabel(message.notification_type),
+        titleClass: superseded ? "text-muted-foreground" : "",
+        body: visibleNotificationBody(message) || t("messages.noDetails"),
+        sellerComment: sellerCommentFromMessage(message),
+      };
+    }
+
+    if (message.notification_type === "price_negotiation_response") {
+      const accepted = priceNegotiationAccepted(message);
+      return {
+        badge: typeLabel(message.notification_type),
+        badgeClass:
+          accepted === true
+            ? "bg-[var(--ui-success-bg)] text-[var(--ui-success)]"
+            : accepted === false
+              ? "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]"
+              : badgeTone(message.notification_type),
+        title: message.title || typeLabel(message.notification_type),
+        titleClass:
+          accepted === true
+            ? "text-[var(--ui-success)]"
+            : accepted === false
+              ? "text-[var(--ui-danger)]"
+              : "",
+        body: visibleNotificationBody(message) || t("messages.noDetails"),
+        sellerComment: sellerCommentFromMessage(message),
       };
     }
 
@@ -367,7 +487,8 @@ export default function MessagesPage() {
       badge: typeLabel(message.notification_type),
       badgeClass: badgeTone(message.notification_type),
       title: message.title || typeLabel(message.notification_type),
-      body: message.body || t("messages.noDetails"),
+      body: visibleNotificationBody(message) || t("messages.noDetails"),
+      sellerComment: sellerCommentFromMessage(message),
     };
   }
 
@@ -382,6 +503,12 @@ export default function MessagesPage() {
     if (type === "product_rejected" || type === "image_processing_failed" || type === "product_deactivated") {
       return "bg-[var(--ui-danger-bg)] text-[var(--ui-danger)]";
     }
+    if (type === "price_negotiation_offer") {
+      return "bg-[var(--ui-orange-soft)] text-[#c56a12]";
+    }
+    if (type === "price_negotiation_response") {
+      return "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]";
+    }
     return "bg-secondary text-muted-foreground";
   }
 
@@ -392,7 +519,9 @@ export default function MessagesPage() {
         ? summary.unread_review
         : category === "availability"
           ? summary.unread_availability
-          : summary.unread_total;
+          : category === "price"
+            ? summary.unread_price
+            : summary.unread_total;
 
   return (
     <PageContainer>
@@ -506,7 +635,11 @@ export default function MessagesPage() {
                     key={message.id}
                     className={cn(
                       "flex items-start gap-4 px-5 py-4 transition-colors",
-                      message.is_read ? "bg-card" : "bg-[rgba(247,148,29,0.04)]",
+                      message.price_negotiation_status === "superseded"
+                        ? "bg-card text-muted-foreground"
+                        : message.is_read
+                          ? "bg-card"
+                          : "bg-[rgba(247,148,29,0.04)]",
                     )}
                   >
                     <button
@@ -549,17 +682,26 @@ export default function MessagesPage() {
                             </span>
                           ) : null}
                         </span>
-                        <strong className="block text-sm font-extrabold text-primary">{presentation.title}</strong>
+                        <strong
+                          className={cn(
+                            "block text-sm font-extrabold",
+                            "titleClass" in presentation && presentation.titleClass
+                              ? presentation.titleClass
+                              : "text-primary",
+                          )}
+                        >
+                          {presentation.title}
+                        </strong>
                         <small className="block text-sm text-muted-foreground">
                           {highlightProduct(presentation.body, product)}
                         </small>
                         {"sellerComment" in presentation && presentation.sellerComment ? (
-                          <p className="mt-2 rounded-lg border border-border bg-[#f8fafc] px-3 py-2 text-sm text-primary">
-                            <span className="block text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+                          <div className="mt-2 rounded-xl border border-[rgba(247,148,29,0.28)] bg-[#fff8f0] px-3 py-2.5">
+                            <span className="block text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent)]">
                               {t("messages.sellerComment")}
                             </span>
-                            {presentation.sellerComment}
-                          </p>
+                            <p className="mt-1 text-sm font-semibold text-primary">{presentation.sellerComment}</p>
+                          </div>
                         ) : null}
                         {manager ? (
                           <span className="block text-xs font-semibold text-muted-foreground">
