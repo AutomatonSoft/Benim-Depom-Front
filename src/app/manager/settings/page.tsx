@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FilterSelect } from "@/components/ui/filter-select";
-import { authorizedFetch, logoutSession } from "@/lib/api";
+import { apiErrorMessage, authorizedFetch, logoutSession } from "@/lib/api";
 import { TIMEZONE_STORAGE_KEY } from "@/lib/date";
 import { localeLabels, useI18n, type Locale } from "@/i18n";
 
@@ -150,7 +150,7 @@ export default function SettingsPage() {
 
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        setWhatsappError(apiError(data, t("settings.whatsappFailed")));
+        setWhatsappError(apiErrorMessage(data, t("settings.whatsappFailed")));
         return;
       }
 
