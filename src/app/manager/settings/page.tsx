@@ -51,6 +51,10 @@ export default function SettingsPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [whatsappPhone, setWhatsappPhone] = useState("");
+  const [whatsappError, setWhatsappError] = useState("");
+  const [whatsappSuccess, setWhatsappSuccess] = useState("");
+  const [whatsappSaving, setWhatsappSaving] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("benim_access_token");
@@ -63,6 +67,11 @@ export default function SettingsPage() {
         if (response.status === 401) return void window.location.replace("/manager/login");
         if (!response.ok) throw new Error();
         setProfile((await response.json()) as Profile);
+        const contactResponse = await authorizedFetch("/api/v1/contact/whatsapp/");
+        if (contactResponse.ok) {
+          const contact = (await contactResponse.json()) as { phone?: string };
+          setWhatsappPhone(contact.phone || "");
+        }
       } catch {
         setError(t("settings.loadError"));
       }
@@ -119,6 +128,38 @@ export default function SettingsPage() {
       setPasswordError(t("common.apiUnreachable"));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function saveWhatsappContact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWhatsappError("");
+    setWhatsappSuccess("");
+    setWhatsappSaving(true);
+    try {
+      const response = await authorizedFetch("/api/v1/contact/whatsapp/", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: whatsappPhone }),
+      });
+
+      if (response.status === 401) {
+        window.location.replace("/manager/login");
+        return;
+      }
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setWhatsappError(apiError(data, t("settings.whatsappFailed")));
+        return;
+      }
+
+      setWhatsappPhone(typeof data?.phone === "string" ? data.phone : whatsappPhone);
+      setWhatsappSuccess(t("settings.whatsappSaved"));
+    } catch {
+      setWhatsappError(t("common.apiUnreachable"));
+    } finally {
+      setWhatsappSaving(false);
     }
   }
 
@@ -185,6 +226,33 @@ export default function SettingsPage() {
               <p className="mt-2 text-xs font-semibold text-[var(--ui-success)]">{t("settings.languageSaved", { language: localeLabels[locale] })}</p>
             </div>
           </div>
+        </SectionCard>
+
+        <SectionCard>
+          <SectionCardHeader eyebrow={t("settings.whatsappContact")} title={t("settings.whatsappPhone")} />
+          <form className="grid max-w-md gap-3 p-5" onSubmit={saveWhatsappContact}>
+            <p className="text-sm text-muted-foreground">{t("settings.whatsappContactCopy")}</p>
+            <div>
+              <Label htmlFor="whatsapp_phone">{t("settings.whatsappPhone")}</Label>
+              <Input
+                id="whatsapp_phone"
+                name="whatsapp_phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+49 176 12345678"
+                value={whatsappPhone}
+                onChange={(event) => setWhatsappPhone(event.target.value)}
+              />
+              <p className="mt-2 text-xs text-muted-foreground">{t("settings.whatsappPhoneHint")}</p>
+            </div>
+            {whatsappError ? <Feedback>{whatsappError}</Feedback> : null}
+            {whatsappSuccess ? <Feedback tone="success">{whatsappSuccess}</Feedback> : null}
+            <div className="flex justify-end">
+              <Button type="submit" variant="accent" disabled={whatsappSaving}>
+                {whatsappSaving ? t("settings.whatsappSaving") : t("common.save")}
+              </Button>
+            </div>
+          </form>
         </SectionCard>
 
         <SectionCard>
