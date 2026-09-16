@@ -22,6 +22,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { listingTargetKey, listingTargets } from "@/lib/listings";
@@ -89,11 +97,34 @@ type Product = {
   availability_reminder_sent_at?: string | null;
   availability_confirmed_at?: string | null;
   is_available?: boolean;
-  seller?: { id: number; username: string; first_name: string; email: string; phone?: string };
+  seller?: {
+    id: number;
+    username: string;
+    first_name: string;
+    email: string;
+    phone?: string;
+    preferred_language?: "ru" | "en" | "de" | "tr" | string;
+  };
   catalog_revision?: number;
   pending_changes?: Record<string, unknown> | null;
   pending_changes_submitted_at?: string | null;
   seller_change_review?: Record<string, unknown> | null;
+  active_price_negotiation?: PriceNegotiation | null;
+  latest_price_negotiation?: PriceNegotiation | null;
+};
+
+type PriceNegotiation = {
+  id: number;
+  manager_username?: string;
+  proposed_unit_price: string;
+  current_unit_price: string;
+  currency: string;
+  message: string;
+  status: "pending" | "accepted" | "rejected" | "superseded";
+  seller_comment: string;
+  responded_at?: string | null;
+  created_at: string;
+  updated_at?: string;
 };
 
 type ModerationDecision = {
@@ -384,9 +415,24 @@ const SELLER_REVIEW_META_KEYS = new Set([
 ]);
 
 function currentFieldValue(product: Product, field: string) {
-  if (field === "variants") return formatChangeValue(product.variants);
+  if (field === "variants") {
+    return formatChangeValue(
+      (product.variants ?? []).map((variant) => ({
+        color: variant.color,
+        materials: variant.materials ?? [],
+        width_cm: variant.width_cm,
+        height_cm: variant.height_cm,
+        length_cm: variant.length_cm,
+        quantity: variant.quantity,
+      })),
+    );
+  }
   const record = product as unknown as Record<string, unknown>;
   return formatChangeValue(record[field]);
+}
+
+function pendingValueChanged(product: Product, field: string, value: unknown) {
+  return formatChangeValue(value) !== currentFieldValue(product, field);
 }
 
 function reviewOldValue(product: Product, review: Record<string, unknown>, field: string) {
@@ -412,6 +458,52 @@ function toForm(product: Product): FormState {
   };
 }
 
+type SellerLanguage = "ru" | "en" | "de" | "tr";
+
+function sellerInterfaceLanguage(product: Product | null): SellerLanguage {
+  const value = product?.seller?.preferred_language?.trim().toLowerCase();
+  if (value === "en" || value === "de" || value === "tr" || value === "ru") return value;
+  return "ru";
+}
+
+function parseUnitPrice(value: string) {
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : NaN;
+}
+
+function defaultPriceNegotiationMessage(params: {
+  language: SellerLanguage;
+  title: string;
+  price: string;
+  currency: string;
+}) {
+  const priceLabel = `${params.price} ${params.currency}`.trim();
+  const title = params.title.trim() || "product";
+  if (params.language === "tr") {
+    return (
+      `Merhaba! Satışları hızlandırmak için "${title}" ürününün fiyatını ${priceLabel} ` +
+      "olarak belirlemenizi öneririz."
+    );
+  }
+  if (params.language === "de") {
+    return (
+      `Guten Tag! Wir empfehlen, den Preis für „${title}“ auf ${priceLabel} zu setzen, ` +
+      "damit sich das Produkt auf den Marktplätzen schneller verkauft."
+    );
+  }
+  if (params.language === "en") {
+    return (
+      `Hello! We recommend setting the price to ${priceLabel} for "${title}" ` +
+      "to help it sell faster on the marketplaces."
+    );
+  }
+  return (
+    `Здравствуйте! Рекомендуем установить цену ${priceLabel} для товара «${title}», ` +
+    "чтобы ускорить продажи на маркетплейсах."
+  );
+}
+
 export default function ProductWorkspacePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -427,6 +519,9 @@ export default function ProductWorkspacePage() {
   const [error, setError] = useState("");
   const [rejectComment, setRejectComment] = useState("");
   const [pendingRejectComment, setPendingRejectComment] = useState("");
+  const [negotiatePrice, setNegotiatePrice] = useState("");
+  const [negotiateMessage, setNegotiateMessage] = useState("");
+  const [negotiateOpen, setNegotiateOpen] = useState(false);
   const [selectedImageKey, setSelectedImageKey] = useState<string | null>(null);
   const [draftForm, setDraftForm] = useState<DraftForm | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
@@ -439,6 +534,12 @@ export default function ProductWorkspacePage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyCount, setHistoryCount] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [priceHistoryOpen, setPriceHistoryOpen] = useState(false);
+  const [priceHistory, setPriceHistory] = useState<PriceNegotiation[]>([]);
+  const [priceHistoryError, setPriceHistoryError] = useState("");
+  const [priceHistoryPage, setPriceHistoryPage] = useState(1);
+  const [priceHistoryCount, setPriceHistoryCount] = useState(0);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
   const [dragImageId, setDragImageId] = useState<number | null>(null);
   const [dropTargetId, setDropTargetId] = useState<number | null>(null);
   const [pendingDeleteImageId, setPendingDeleteImageId] = useState<number | null>(null);
@@ -447,11 +548,24 @@ export default function ProductWorkspacePage() {
 
   const canModerate = product?.status === "submitted";
   const canChangeApprovedStatus = product?.status === "approved";
+  const canNegotiatePrice = product?.status === "submitted" || product?.status === "approved";
+  const activeNegotiation =
+    product?.active_price_negotiation?.status === "pending" ? product.active_price_negotiation : null;
+  const latestNegotiation = product?.latest_price_negotiation ?? null;
+  const respondedNegotiation =
+    latestNegotiation &&
+    (latestNegotiation.status === "accepted" || latestNegotiation.status === "rejected")
+      ? latestNegotiation
+      : null;
   const pendingChanges = product?.pending_changes ?? {};
   const sellerPendingComment =
     typeof pendingChanges.seller_comment === "string" ? pendingChanges.seller_comment.trim() : "";
   const pendingEntries = Object.entries(pendingChanges).filter(
-    ([field, value]) => field !== "seller_comment" && value !== undefined,
+    ([field, value]) =>
+      field !== "seller_comment" &&
+      value !== undefined &&
+      product != null &&
+      pendingValueChanged(product, field, value),
   );
   const sellerChangeReview = product?.seller_change_review ?? {};
   const sellerReviewComment =
@@ -647,6 +761,27 @@ export default function ProductWorkspacePage() {
       setHistoryCount(0);
     } finally {
       setHistoryLoading(false);
+    }
+  }
+
+  async function loadPriceHistory(page = 1) {
+    if (!Number.isInteger(productId) || productId < 1) return;
+    setPriceHistoryError("");
+    setPriceHistoryLoading(true);
+    try {
+      const response = await authorizedFetch(`/api/v1/products/${productId}/price-negotiations/?page=${page}`);
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      const results = Array.isArray(data) ? data : data.results ?? [];
+      setPriceHistory(results);
+      setPriceHistoryCount(Array.isArray(data) ? results.length : Number(data.count ?? results.length));
+      setPriceHistoryPage(page);
+    } catch {
+      setPriceHistoryError(t("product.priceHistoryError"));
+      setPriceHistory([]);
+      setPriceHistoryCount(0);
+    } finally {
+      setPriceHistoryLoading(false);
     }
   }
 
@@ -917,6 +1052,78 @@ export default function ProductWorkspacePage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("product.availabilityFailed"));
     } finally { setSaving(false); }
+  }
+
+  async function sendPriceNegotiation() {
+    if (!product) return;
+    const amount = parseUnitPrice(negotiatePrice);
+    const price = Number.isFinite(amount) ? amount.toFixed(2) : "";
+    const message = negotiateMessage.trim() || defaultPriceNegotiationMessage({
+      language: sellerInterfaceLanguage(product),
+      title: product.title,
+      price: price || product.unit_price,
+      currency: product.currency,
+    });
+    if (!price || amount < 0.01) {
+      setError(t("product.negotiatePriceRequired"));
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setFeedback("");
+    try {
+      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/price-negotiation/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposed_unit_price: price,
+          message,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.negotiateFailed")));
+      setProduct(data as Product);
+      setForm(toForm(data as Product));
+      setNegotiateOpen(false);
+      setFeedback(t("product.negotiateSent"));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("product.negotiateFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openNegotiateDialog() {
+    if (!product) return;
+    const pending = product.active_price_negotiation?.status === "pending"
+      ? product.active_price_negotiation
+      : null;
+    const price = pending?.proposed_unit_price || product.unit_price;
+    setNegotiatePrice(String(price));
+    setNegotiateMessage(
+      pending?.message?.trim() ||
+        defaultPriceNegotiationMessage({
+          language: sellerInterfaceLanguage(product),
+          title: product.title,
+          price: String(price),
+          currency: product.currency,
+        }),
+    );
+    setNegotiateOpen(true);
+  }
+
+  function applyDefaultNegotiateMessage() {
+    if (!product) return;
+    setNegotiateMessage(
+      defaultPriceNegotiationMessage({
+        language: sellerInterfaceLanguage(product),
+        title: product.title,
+        price: Number.isFinite(parseUnitPrice(negotiatePrice))
+          ? parseUnitPrice(negotiatePrice).toFixed(2)
+          : product.unit_price,
+        currency: product.currency,
+      }),
+    );
   }
 
   async function uploadImage(event: ChangeEvent<HTMLInputElement>) {
@@ -1210,16 +1417,28 @@ export default function ProductWorkspacePage() {
 
         <Panel className="mb-4" padded>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="grid gap-1">
-              <Button
-                type="button"
-                variant="accent"
-                disabled={saving || product.status !== "approved"}
-                title={product.status !== "approved" ? t("product.askAvailabilityHint") : undefined}
-                onClick={() => void requestAvailability()}
-              >
-                {t("product.askAvailability")}
-              </Button>
+            <div className="grid gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="accent"
+                  disabled={saving || product.status !== "approved"}
+                  title={product.status !== "approved" ? t("product.askAvailabilityHint") : undefined}
+                  onClick={() => void requestAvailability()}
+                >
+                  {t("product.askAvailability")}
+                </Button>
+                {canNegotiatePrice ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={saving}
+                    onClick={openNegotiateDialog}
+                  >
+                    {t("product.negotiateSend")}
+                  </Button>
+                ) : null}
+              </div>
               {product.availability_reminder_sent_at ? (
                 <small className="text-xs font-semibold text-muted-foreground">
                   {t("product.lastRequest", { date: formatDate(product.availability_reminder_sent_at, true) })}
@@ -1234,17 +1453,51 @@ export default function ProductWorkspacePage() {
                   , {formatDate(product.availability_confirmed_at, true)}
                 </small>
               ) : null}
+              {activeNegotiation ? (
+                <small className="text-xs font-semibold text-[var(--brand-accent)]">
+                  {t("product.negotiatePending")}: {formatMoney(activeNegotiation.current_unit_price, activeNegotiation.currency as Product["currency"])}
+                  {" → "}
+                  {formatMoney(activeNegotiation.proposed_unit_price, activeNegotiation.currency as Product["currency"])}
+                </small>
+              ) : null}
+              {!activeNegotiation && respondedNegotiation ? (
+                <small className="text-xs font-semibold text-muted-foreground">
+                  {respondedNegotiation.status === "accepted"
+                    ? t("product.negotiateAccepted")
+                    : t("product.negotiateRejected")}
+                  {": "}
+                  {formatMoney(
+                    respondedNegotiation.proposed_unit_price,
+                    respondedNegotiation.currency as Product["currency"],
+                  )}
+                  {respondedNegotiation.seller_comment?.trim()
+                    ? ` — ${respondedNegotiation.seller_comment.trim()}`
+                    : ""}
+                </small>
+              ) : null}
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setHistoryOpen(true);
-                void loadHistory(1);
-              }}
-            >
-              {t("product.history")}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setPriceHistoryOpen(true);
+                  void loadPriceHistory(1);
+                }}
+              >
+                {t("product.priceHistory")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setHistoryOpen(true);
+                  void loadHistory(1);
+                }}
+              >
+                {t("product.history")}
+              </Button>
+            </div>
           </div>
         </Panel>
 
@@ -1904,6 +2157,143 @@ export default function ProductWorkspacePage() {
           </div>
         </div>
       ) : null}
+
+      {priceHistoryOpen ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[rgba(20,47,85,0.45)] p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="price-history-title"
+          onClick={() => setPriceHistoryOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-[0_18px_48px_rgba(20,47,85,0.16)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-border pb-3">
+              <h2 id="price-history-title" className="text-lg font-extrabold text-primary">{t("product.priceHistory")}</h2>
+              <Button type="button" variant="secondary" size="sm" onClick={() => setPriceHistoryOpen(false)}>{t("common.close")}</Button>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("product.priceHistoryIntro")}</p>
+            {priceHistoryError ? <Feedback className="mt-3">{priceHistoryError}</Feedback> : null}
+            {!priceHistoryError && priceHistoryCount === 0 && !priceHistoryLoading ? (
+              <EmptyState className="py-8" title={t("product.priceHistoryEmpty")} />
+            ) : null}
+            {!priceHistoryError && priceHistoryCount > 0 ? (
+              <div className="mt-3 flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground" aria-label={t("product.priceHistoryPages")}>
+                <Button type="button" size="sm" variant="secondary" disabled={priceHistoryLoading || priceHistoryPage <= 1} onClick={() => void loadPriceHistory(priceHistoryPage - 1)}>
+                  {t("common.previous")}
+                </Button>
+                <span>{t("common.page", { page: priceHistoryPage })}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={priceHistoryLoading || priceHistoryPage >= Math.ceil(priceHistoryCount / HISTORY_PAGE_SIZE)}
+                  onClick={() => void loadPriceHistory(priceHistoryPage + 1)}
+                >
+                  {t("common.next")}
+                </Button>
+              </div>
+            ) : null}
+            {!priceHistoryError && priceHistory.length > 0 ? (
+              <ol className="mt-4 grid gap-3">
+                {priceHistory.map((item) => (
+                  <li key={item.id} className="rounded-xl border border-border bg-[#f8fafc] p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={item.status}>
+                        {t(`status.${item.status}` as MessageKey)}
+                      </StatusBadge>
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {formatDate(item.created_at, true)}
+                        {item.manager_username ? ` · ${item.manager_username}` : ""}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-primary">
+                      {formatMoney(item.current_unit_price, item.currency as Product["currency"])}
+                      {" → "}
+                      {formatMoney(item.proposed_unit_price, item.currency as Product["currency"])}
+                    </p>
+                    {item.responded_at ? (
+                      <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                        {t("product.priceHistoryResponded", { date: formatDate(item.responded_at, true) })}
+                      </p>
+                    ) : null}
+                    {item.message?.trim() ? (
+                      <p className="mt-2 text-sm text-primary">{item.message.trim()}</p>
+                    ) : (
+                      <p className="mt-2 text-sm text-muted-foreground">{t("product.noComment")}</p>
+                    )}
+                    {item.seller_comment?.trim() ? (
+                      <div className="mt-2 rounded-lg border border-[rgba(247,148,29,0.28)] bg-[#fff8f0] px-3 py-2">
+                        <span className="block text-[11px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent)]">
+                          {t("product.sellerComment")}
+                        </span>
+                        <p className="mt-1 text-sm font-semibold text-primary">{item.seller_comment.trim()}</p>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <Dialog open={negotiateOpen} onOpenChange={setNegotiateOpen}>
+        <DialogContent className="sm:max-w-lg" showCloseButton>
+          <DialogHeader className="min-w-0">
+            <DialogTitle className="pr-8 font-extrabold text-primary">{t("product.negotiateTitle")}</DialogTitle>
+            <DialogDescription className="text-pretty">{t("product.negotiateHint")}</DialogDescription>
+          </DialogHeader>
+          {product ? (
+            <div className="grid gap-3">
+              <div>
+                <Label htmlFor="negotiate-price">{t("product.negotiatePrice")}</Label>
+                <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <Input
+                    id="negotiate-price"
+                    className="min-w-0"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={negotiatePrice}
+                    onChange={(event) => setNegotiatePrice(event.target.value.replace(",", "."))}
+                    placeholder={product.unit_price}
+                  />
+                  <span className="shrink-0 text-sm font-extrabold text-primary">{product.currency}</span>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="negotiate-message">{t("product.negotiateMessage")}</Label>
+                <Textarea
+                  id="negotiate-message"
+                  name="price-negotiation-offer"
+                  rows={4}
+                  className="mt-1 resize-none"
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  data-gramm="false"
+                  data-gramm_editor="false"
+                  data-enable-grammarly="false"
+                  value={negotiateMessage}
+                  onChange={(event) => setNegotiateMessage(event.target.value)}
+                  placeholder={t("product.negotiateMessagePlaceholder")}
+                />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2 sm:flex-wrap sm:justify-between">
+            <Button type="button" variant="secondary" disabled={saving} onClick={applyDefaultNegotiateMessage}>
+              {t("product.negotiateFillDefault")}
+            </Button>
+            <Button type="button" disabled={saving} onClick={() => void sendPriceNegotiation()}>
+              {saving ? t("product.saving") : t("product.negotiateSend")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={pendingDeleteImageId != null}
