@@ -394,7 +394,7 @@ function FormulaEditorDialog({
   );
 }
 
-function formatVariantSummary(value: unknown) {
+function formatVariantSummary(value: unknown): string {
   if (!Array.isArray(value)) return formatChangeValue(value);
   return value.map((item) => {
     if (!item || typeof item !== "object") return formatChangeValue(item);
@@ -411,7 +411,7 @@ function formatVariantSummary(value: unknown) {
   }).join("; ") || "—";
 }
 
-function formatChangeValue(value: unknown) {
+function formatChangeValue(value: unknown): string {
   if (value == null || value === "") return "—";
   if (Array.isArray(value) && value.some((item) => item && typeof item === "object" && "quantity" in item)) {
     return formatVariantSummary(value);
