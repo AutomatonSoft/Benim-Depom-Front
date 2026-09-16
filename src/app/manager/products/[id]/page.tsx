@@ -394,8 +394,28 @@ function FormulaEditorDialog({
   );
 }
 
+function formatVariantSummary(value: unknown) {
+  if (!Array.isArray(value)) return formatChangeValue(value);
+  return value.map((item) => {
+    if (!item || typeof item !== "object") return formatChangeValue(item);
+    const variant = item as Record<string, unknown>;
+    const materials = Array.isArray(variant.materials)
+      ? variant.materials.filter(Boolean).join(", ")
+      : "";
+    const parts = [
+      variant.color ? String(variant.color) : "",
+      variant.quantity != null && variant.quantity !== "" ? `qty ${variant.quantity}` : "",
+      materials,
+    ].filter(Boolean);
+    return parts.join(" · ") || formatChangeValue(item);
+  }).join("; ") || "—";
+}
+
 function formatChangeValue(value: unknown) {
   if (value == null || value === "") return "—";
+  if (Array.isArray(value) && value.some((item) => item && typeof item === "object" && "quantity" in item)) {
+    return formatVariantSummary(value);
+  }
   if (typeof value === "object") {
     try {
       return JSON.stringify(value);
