@@ -2,18 +2,18 @@
 
 import { FormEvent, Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardCheck, Handshake, Inbox, Mail, PackageSearch, Search, Send } from "lucide-react";
+import { ClipboardCheck, Handshake, Inbox, Mail, PackageSearch, Search, Send, ShoppingBag } from "lucide-react";
 
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { authorizedFetch } from "@/lib/api";
+import { authorizedFetch, apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-type Category = "all" | "review" | "availability" | "price" | "outgoing";
+type Category = "all" | "review" | "availability" | "price" | "afterbuy" | "outgoing";
 
 type Notification = {
   id: number;
@@ -39,6 +39,11 @@ type Notification = {
   manager_name?: string | null;
   is_read: boolean;
   created_at: string;
+  afterbuy_marketplace?: string | null;
+  afterbuy_account?: string | null;
+  afterbuy_qty_sold?: number | null;
+  afterbuy_stock_synced?: boolean;
+  afterbuy_seller_notified?: boolean;
 };
 
 type NotificationList = {
@@ -57,6 +62,8 @@ type NotificationSummary = {
   unread_review: number;
   unread_availability: number;
   unread_price: number;
+  afterbuy: number;
+  unread_afterbuy: number;
   unread_outgoing: number;
 };
 
@@ -70,6 +77,8 @@ const emptySummary: NotificationSummary = {
   unread_review: 0,
   unread_availability: 0,
   unread_price: 0,
+  afterbuy: 0,
+  unread_afterbuy: 0,
   unread_outgoing: 0,
 };
 
@@ -89,6 +98,7 @@ const TYPE_KEYS = new Set([
   "manager_message",
   "price_negotiation_offer",
   "price_negotiation_response",
+  "product_sold",
 ]);
 
 const REVIEW_TYPES = new Set(["product_submitted_for_review", "product_change_requested"]);
@@ -98,6 +108,43 @@ const AVAILABILITY_TYPES = new Set([
   "product_deactivation_requested",
 ]);
 const PRICE_TYPES = new Set(["price_negotiation_response"]);
+const AFTERBUY_TYPES = new Set(["product_sold"]);
+const LOCAL_AFTERBUY_MOCK_ID = -170917;
+const SHOW_LOCAL_AFTERBUY_MOCK = process.env.NODE_ENV === "development";
+
+function isLocalAfterbuyMock(message: Notification) {
+  return message.id === LOCAL_AFTERBUY_MOCK_ID;
+}
+
+function localAfterbuyMock(
+  t: (key: MessageKey, values?: Record<string, string | number>) => string,
+  flags: { read: boolean; stockSynced: boolean; sellerNotified: boolean },
+): Notification {
+  const product = t("messages.afterbuyMockProduct");
+  return {
+    id: LOCAL_AFTERBUY_MOCK_ID,
+    title: t("messages.afterbuyMockTitle"),
+    body: t("messages.afterbuyMockBody", { name: product, qty: 2, soldAt: "17.09.2026 14:20" }),
+    notification_type: "product_sold",
+    product_id: 9001,
+    product_title: product,
+    product_status: "approved",
+    seller_username: "demo_seller",
+    seller_email: "seller@example.com",
+    seller_name: "Demo Seller",
+    sender_id: null,
+    sender_username: "demo_seller",
+    sender_email: "seller@example.com",
+    sender_name: "Demo Seller",
+    is_read: flags.read,
+    created_at: new Date().toISOString(),
+    afterbuy_marketplace: "otto",
+    afterbuy_account: "jv",
+    afterbuy_qty_sold: 2,
+    afterbuy_stock_synced: flags.stockSynced,
+    afterbuy_seller_notified: flags.sellerNotified,
+  };
+}
 
 function isUnavailableConfirmation(message: Notification) {
   return /not available/i.test(message.title) || /is not available/i.test(message.body);
@@ -174,6 +221,12 @@ function priceNegotiationAccepted(message: Notification): boolean | null {
   return null;
 }
 
+function afterbuyChannelLabel(message: Notification) {
+  const marketplace = (message.afterbuy_marketplace || "").trim().toUpperCase();
+  const account = (message.afterbuy_account || "").trim().toUpperCase();
+  return [marketplace, account].filter(Boolean).join(" · ");
+}
+
 function highlightProduct(text: string, product: string): ReactNode {
   const needle = product.trim();
   if (!needle || !text.includes(needle)) return text;
@@ -202,6 +255,43 @@ export default function MessagesPage() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionBusyId, setActionBusyId] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const [mockFlags, setMockFlags] = useState({
+    read: false,
+    stockSynced: false,
+    sellerNotified: false,
+  });
+
+  const showLocalAfterbuyMock = useMemo(() => {
+    if (!SHOW_LOCAL_AFTERBUY_MOCK || page !== 1 || category === "outgoing") return false;
+    if (category !== "all" && category !== "afterbuy") return false;
+    if (unreadOnly && mockFlags.read) return false;
+    if (!appliedSearch) return true;
+    const needle = appliedSearch.toLowerCase();
+    return (
+      t("messages.afterbuyMockProduct").toLowerCase().includes(needle) ||
+      t("messages.afterbuyMockTitle").toLowerCase().includes(needle) ||
+      "afterbuy".includes(needle) ||
+      "otto".includes(needle)
+    );
+  }, [appliedSearch, category, mockFlags.read, page, t, unreadOnly]);
+
+  const displayMessages = useMemo(() => {
+    if (!showLocalAfterbuyMock) return messages;
+    return [localAfterbuyMock(t, mockFlags), ...messages];
+  }, [messages, mockFlags, showLocalAfterbuyMock, t]);
+
+  const displaySummary = useMemo(() => {
+    if (!SHOW_LOCAL_AFTERBUY_MOCK) return summary;
+    return {
+      ...summary,
+      all: summary.all + 1,
+      afterbuy: summary.afterbuy + 1,
+      unread_total: mockFlags.read ? summary.unread_total : summary.unread_total + 1,
+      unread_afterbuy: mockFlags.read ? summary.unread_afterbuy : summary.unread_afterbuy + 1,
+    };
+  }, [mockFlags.read, summary]);
 
   const tabs = useMemo(
     () =>
@@ -209,35 +299,41 @@ export default function MessagesPage() {
         {
           id: "all" as const,
           label: t("messages.tabAll"),
-          count: unreadOnly ? summary.unread_total : summary.all,
+          count: unreadOnly ? displaySummary.unread_total : displaySummary.all,
           icon: Inbox,
         },
         {
           id: "review" as const,
           label: t("messages.tabReview"),
-          count: unreadOnly ? summary.unread_review : summary.review,
+          count: unreadOnly ? displaySummary.unread_review : displaySummary.review,
           icon: ClipboardCheck,
         },
         {
           id: "availability" as const,
           label: t("messages.tabAvailability"),
-          count: unreadOnly ? summary.unread_availability : summary.availability,
+          count: unreadOnly ? displaySummary.unread_availability : displaySummary.availability,
           icon: PackageSearch,
         },
         {
           id: "price" as const,
           label: t("messages.tabPrice"),
-          count: unreadOnly ? summary.unread_price : summary.price,
+          count: unreadOnly ? displaySummary.unread_price : displaySummary.price,
           icon: Handshake,
+        },
+        {
+          id: "afterbuy" as const,
+          label: t("messages.tabAfterbuy"),
+          count: unreadOnly ? displaySummary.unread_afterbuy : displaySummary.afterbuy,
+          icon: ShoppingBag,
         },
         {
           id: "outgoing" as const,
           label: t("messages.tabOutgoing"),
-          count: unreadOnly ? summary.unread_outgoing : summary.outgoing,
+          count: unreadOnly ? displaySummary.unread_outgoing : displaySummary.outgoing,
           icon: Send,
         },
       ] as const,
-    [summary, t, unreadOnly],
+    [displaySummary, t, unreadOnly],
   );
 
   useEffect(() => {
@@ -293,6 +389,12 @@ export default function MessagesPage() {
     const token = localStorage.getItem("benim_access_token");
     if (!token) return;
     const isOutgoing = category === "outgoing";
+    if (isLocalAfterbuyMock(message)) {
+      if (!message.is_read) {
+        setMockFlags((current) => ({ ...current, read: true }));
+      }
+      return;
+    }
     if (!isOutgoing && !message.is_read) {
       const response = await authorizedFetch(`/api/v1/notifications/${message.id}/read/`, { method: "POST" });
       if (response.ok) {
@@ -309,6 +411,9 @@ export default function MessagesPage() {
           unread_price: PRICE_TYPES.has(message.notification_type)
             ? Math.max(0, current.unread_price - 1)
             : current.unread_price,
+          unread_afterbuy: AFTERBUY_TYPES.has(message.notification_type)
+            ? Math.max(0, current.unread_afterbuy - 1)
+            : current.unread_afterbuy,
         }));
       }
     }
@@ -321,12 +426,76 @@ export default function MessagesPage() {
     const response = await authorizedFetch("/api/v1/notifications/read-all/", { method: "POST" });
     if (!response.ok) return;
     setMessages((items) => items.map((item) => ({ ...item, is_read: true })));
+    setMockFlags((current) => ({ ...current, read: true }));
     setSummary((current) => ({
       ...current,
       unread_total: 0,
       unread_review: 0,
       unread_availability: 0,
+      unread_price: 0,
+      unread_afterbuy: 0,
     }));
+  }
+
+  async function syncAfterbuyStock(message: Notification) {
+    setActionBusyId(message.id);
+    setError("");
+    setFeedback("");
+    if (isLocalAfterbuyMock(message)) {
+      setMockFlags((current) => ({ ...current, stockSynced: true }));
+      setFeedback(t("messages.afterbuySyncSent"));
+      setActionBusyId(null);
+      return;
+    }
+    try {
+      const response = await authorizedFetch(`/api/v1/notifications/${message.id}/afterbuy-sync-stock/`, {
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        notification?: Notification;
+        detail?: string;
+      };
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("messages.afterbuySyncFailed")));
+      setMessages((items) =>
+        items.map((item) =>
+          item.id === message.id
+            ? { ...item, ...(data.notification ?? {}), afterbuy_stock_synced: true }
+            : item,
+        ),
+      );
+      setFeedback(t("messages.afterbuySyncSent"));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("messages.afterbuySyncFailed"));
+    } finally {
+      setActionBusyId(null);
+    }
+  }
+
+  async function notifyAfterbuySeller(message: Notification) {
+    setActionBusyId(message.id);
+    setError("");
+    setFeedback("");
+    if (isLocalAfterbuyMock(message)) {
+      setMockFlags((current) => ({ ...current, sellerNotified: true }));
+      setFeedback(t("messages.afterbuyNotifySent"));
+      setActionBusyId(null);
+      return;
+    }
+    try {
+      const response = await authorizedFetch(`/api/v1/notifications/${message.id}/afterbuy-notify-seller/`, {
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("messages.afterbuyNotifyFailed")));
+      setMessages((items) =>
+        items.map((item) => (item.id === message.id ? { ...item, afterbuy_seller_notified: true } : item)),
+      );
+      setFeedback(t("messages.afterbuyNotifySent"));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("messages.afterbuyNotifyFailed"));
+    } finally {
+      setActionBusyId(null);
+    }
   }
 
   function typeLabel(type: string) {
@@ -509,19 +678,24 @@ export default function MessagesPage() {
     if (type === "price_negotiation_response") {
       return "bg-[var(--ui-warn-bg)] text-[var(--ui-warn)]";
     }
+    if (type === "product_sold") {
+      return "bg-[var(--ui-orange-soft)] text-[#c56a12]";
+    }
     return "bg-secondary text-muted-foreground";
   }
 
   const unreadHint =
     category === "outgoing"
-      ? summary.unread_outgoing
+      ? displaySummary.unread_outgoing
       : category === "review"
-        ? summary.unread_review
+        ? displaySummary.unread_review
         : category === "availability"
-          ? summary.unread_availability
+          ? displaySummary.unread_availability
           : category === "price"
-            ? summary.unread_price
-            : summary.unread_total;
+            ? displaySummary.unread_price
+            : category === "afterbuy"
+              ? displaySummary.unread_afterbuy
+            : displaySummary.unread_total;
 
   return (
     <PageContainer>
@@ -531,7 +705,7 @@ export default function MessagesPage() {
         description={t("messages.subtitle")}
         primaryAction={
           category === "outgoing" ? null : (
-            <Button variant="secondary" disabled={!summary.unread_total} onClick={() => void readAll()}>
+            <Button variant="secondary" disabled={!displaySummary.unread_total} onClick={() => void readAll()}>
               {t("messages.markAll")}
             </Button>
           )
@@ -603,14 +777,15 @@ export default function MessagesPage() {
 
         {loading ? <p className="px-5 py-6 text-sm font-semibold text-muted-foreground">{t("messages.loading")}</p> : null}
         {error ? <Feedback className="px-5 py-4">{error}</Feedback> : null}
-        {!loading && !error && messages.length === 0 ? (
+        {feedback ? <Feedback className="px-5 py-4 text-[var(--ui-success)]">{feedback}</Feedback> : null}
+        {!loading && !error && displayMessages.length === 0 ? (
           <EmptyState
             icon={Mail}
             title={unreadOnly ? t("messages.emptyUnread") : appliedSearch ? t("messages.emptySearch") : t("messages.empty")}
           />
         ) : null}
 
-        {!loading && !error && messages.length > 0 ? (
+        {!loading && !error && displayMessages.length > 0 ? (
           <>
             <PaginationBar
               page={page}
@@ -624,12 +799,113 @@ export default function MessagesPage() {
               pageLabel={t("common.page", { page })}
             />
             <div className="divide-y divide-border">
-              {messages.map((message) => {
+              {displayMessages.map((message) => {
                 const seller = sellerLine(message);
                 const manager = managerLine(message);
                 const product = productLabel(message);
                 const presentation = messagePresentation(message);
                 const outgoingUnread = category === "outgoing" && !message.is_read;
+                if (message.notification_type === "product_sold") {
+                  const channel = afterbuyChannelLabel(message);
+                  return (
+                    <article
+                      key={message.id}
+                      className={cn(
+                        "px-5 py-4 transition-colors",
+                        message.is_read ? "bg-card" : "bg-[rgba(247,148,29,0.05)]",
+                      )}
+                    >
+                      <div className="rounded-2xl border border-[rgba(247,148,29,0.22)] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(20,47,85,0.04)]">
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={cn(
+                              "mt-1.5 size-2.5 shrink-0 rounded-full",
+                              message.is_read ? "bg-border" : "bg-[var(--brand-accent)]",
+                            )}
+                            aria-hidden
+                          />
+                          <div className="min-w-0 flex-1">
+                            <button
+                              type="button"
+                              className="w-full cursor-pointer text-left"
+                              onClick={() => void openMessage(message)}
+                            >
+                              <span className="flex items-start justify-between gap-3">
+                                <span className="flex min-w-0 flex-wrap items-center gap-2">
+                                  <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-extrabold", presentation.badgeClass)}>
+                                    {presentation.badge}
+                                  </span>
+                                  {!message.is_read ? (
+                                    <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-[var(--brand-accent)]">
+                                      {t("messages.newBadge")}
+                                    </span>
+                                  ) : null}
+                                  {channel ? (
+                                    <span className="rounded-md bg-[#f4f7fb] px-2 py-0.5 text-[11px] font-extrabold text-[#142f55]">
+                                      {channel}
+                                    </span>
+                                  ) : null}
+                                  {message.afterbuy_qty_sold != null ? (
+                                    <span className="rounded-md bg-[#fff4e8] px-2 py-0.5 text-[11px] font-extrabold text-[#c56a12]">
+                                      {t("messages.afterbuyQtyChip", { qty: message.afterbuy_qty_sold })}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <time
+                                  className="shrink-0 pt-0.5 text-[11px] font-semibold leading-4 text-muted-foreground"
+                                  dateTime={message.created_at}
+                                >
+                                  {formatDate(message.created_at, true)}
+                                </time>
+                              </span>
+                              <strong className="mt-2 block text-[15px] font-extrabold text-primary">
+                                {presentation.title}
+                              </strong>
+                              {message.product_id ? (
+                                <em className="mt-1 block text-sm font-bold not-italic text-[#142f55]">
+                                  #{message.product_id}
+                                  {message.product_title ? ` · ${message.product_title}` : ""}
+                                </em>
+                              ) : null}
+                              {seller ? (
+                                <span className="mt-1 block text-xs font-semibold text-muted-foreground">
+                                  <span className="font-extrabold text-primary">{t("messages.sellerLabel")}</span>{" "}
+                                  {seller}
+                                </span>
+                              ) : null}
+                            </button>
+                            <div className="mt-4 flex gap-2 border-t border-[rgba(247,148,29,0.16)] pt-3">
+                              <Button
+                                type="button"
+                                variant="accent"
+                                size="sm"
+                                className="h-9 min-w-0 flex-1 px-2"
+                                disabled={actionBusyId === message.id || Boolean(message.afterbuy_stock_synced)}
+                                onClick={() => void syncAfterbuyStock(message)}
+                              >
+                                {message.afterbuy_stock_synced
+                                  ? t("messages.afterbuySyncDone")
+                                  : t("messages.afterbuySync")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                className="h-9 min-w-0 flex-1 px-2"
+                                disabled={actionBusyId === message.id || Boolean(message.afterbuy_seller_notified)}
+                                onClick={() => void notifyAfterbuySeller(message)}
+                              >
+                                {message.afterbuy_seller_notified
+                                  ? t("messages.afterbuyNotifyDone")
+                                  : t("messages.afterbuyNotify")}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                }
                 return (
                   <article
                     key={message.id}
@@ -692,7 +968,12 @@ export default function MessagesPage() {
                         >
                           {presentation.title}
                         </strong>
-                        <small className="block text-sm text-muted-foreground">
+                        <small
+                          className={cn(
+                            "block text-sm text-muted-foreground",
+                            message.notification_type === "product_sold" && "whitespace-pre-line",
+                          )}
+                        >
                           {highlightProduct(presentation.body, product)}
                         </small>
                         {"sellerComment" in presentation && presentation.sellerComment ? (

@@ -1074,18 +1074,6 @@ export default function ProductWorkspacePage() {
     } finally { setSaving(false); }
   }
 
-  async function sendTestSoldNotification() {
-    setSaving(true); setError(""); setFeedback("");
-    try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/test-sold-notification/`, { method: "POST" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.testSoldFailed")));
-      setFeedback(t("product.testSoldSent"));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("product.testSoldFailed"));
-    } finally { setSaving(false); }
-  }
-
   async function sendPriceNegotiation() {
     if (!product) return;
     const amount = parseUnitPrice(negotiatePrice);
@@ -1459,15 +1447,6 @@ export default function ProductWorkspacePage() {
                   onClick={() => void requestAvailability()}
                 >
                   {t("product.askAvailability")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={saving}
-                  title={t("product.sendTestSoldHint")}
-                  onClick={() => void sendTestSoldNotification()}
-                >
-                  {t("product.sendTestSold")}
                 </Button>
                 {canNegotiatePrice ? (
                   <Button
