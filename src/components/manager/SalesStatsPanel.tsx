@@ -119,17 +119,34 @@ export function SalesStatsPanel() {
   );
 
   useEffect(() => {
-    void load({ from, to, ean, sellerEmail });
-  }, [ean, from, load, sellerEmail, to]);
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await load({
+        from: initial.from,
+        to: initial.to,
+        ean: "",
+        sellerEmail: "",
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initial.from, initial.to, load]);
 
   function searchEan(event: FormEvent) {
     event.preventDefault();
-    setEan(eanInput.trim());
+    const nextEan = eanInput.trim();
+    setEan(nextEan);
+    void load({ from, to, ean: nextEan, sellerEmail });
   }
 
   function searchSeller(event: FormEvent) {
     event.preventDefault();
-    setSellerEmail(emailInput.trim());
+    const nextEmail = emailInput.trim();
+    setSellerEmail(nextEmail);
+    void load({ from, to, ean, sellerEmail: nextEmail });
   }
 
   function resetLookups() {
@@ -137,6 +154,7 @@ export function SalesStatsPanel() {
     setEmailInput("");
     setEan("");
     setSellerEmail("");
+    void load({ from, to, ean: "", sellerEmail: "" });
   }
 
   const scopeKey: MessageKey =
@@ -155,6 +173,7 @@ export function SalesStatsPanel() {
           onChange={(range) => {
             setFrom(range.from);
             setTo(range.to);
+            void load({ from: range.from, to: range.to, ean, sellerEmail });
           }}
         />
 
