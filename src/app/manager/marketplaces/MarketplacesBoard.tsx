@@ -103,6 +103,18 @@ const operationKeys = ["publish", "update", "activate", "deactivate", "delete", 
 const listingBusyStatuses = new Set(["pending", "publishing", "deactivating", "deleting"]);
 const IN_FLIGHT_POLL_MS = 4000;
 
+function isUpdateInFlight(publication: Publication, jobs: Job[]) {
+  if (publication.status !== "publishing") return false;
+  return jobs.some((job) => {
+    if (job.operation !== "update" || job.product_id !== publication.product_id) return false;
+    if (publication.last_job_id && job.id === publication.last_job_id) return true;
+    return (job.requested_targets || []).some(
+      (target) =>
+        target.marketplace === publication.marketplace && target.account === publication.account,
+    );
+  });
+}
+
 function jsonHint(value: unknown) {
   if (!value || (typeof value === "object" && Object.keys(value as object).length === 0)) return "";
   if (typeof value === "string") return value;
@@ -338,7 +350,8 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                 : t("marketplaces.actionTakeDown")}
           </Button>
         )}
-        {publication.status === "deactivated" && publication.marketplace === "otto" && (
+        {publication.status === "deactivated" &&
+          (publication.marketplace === "otto" || publication.marketplace === "kaufland") && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runListingAction(publication, "activate")}>
             {isBusy("activate") ? t("marketplaces.queueing") : t("marketplaces.actionActivate")}
           </Button>
@@ -507,6 +520,9 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
             </div>
             {publications.map((publication) => {
               const hint = jsonHint(publication.last_error);
+              const statusLabel = isUpdateInFlight(publication, [...inProgressJobs, ...jobs])
+                ? t("pub.updating")
+                : t(`pub.${publication.status}` as MessageKey);
               return (
                 <article key={publication.id}>
                   <div>
@@ -523,7 +539,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                   <span>{marketplaceName[publication.marketplace]}</span>
                   <code>{publication.ean || "—"}</code>
                   <span title={hint || undefined}>
-                    <StatusBadge status={publication.status}>{t(`pub.${publication.status}` as MessageKey)}</StatusBadge>
+                    <StatusBadge status={publication.status}>{statusLabel}</StatusBadge>
                   </span>
                   <time dateTime={publication.updated_at}>{formatDate(publication.updated_at, true)}</time>
                   {listingActions(publication)}
