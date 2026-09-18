@@ -173,6 +173,28 @@ export function SectionCardHeader({
 /** @deprecated */
 export const PanelHeader = SectionCardHeader;
 
+export function OverviewSectionBanner({
+  title,
+  description,
+  className,
+}: {
+  title: string;
+  description?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#1b3f70] via-[#1a3a66] to-[#14325a] px-6 py-6 text-white shadow-[0_12px_28px_rgba(20,47,85,0.16)]",
+        className,
+      )}
+    >
+      <h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h2>
+      {description ? <p className="mt-1.5 max-w-3xl text-sm font-semibold text-white/75">{description}</p> : null}
+    </div>
+  );
+}
+
 export function SectionToolbar({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("flex flex-wrap items-center gap-3 border-b border-border bg-[#f8fafc] px-4 py-3", className)}>{children}</div>;
 }
@@ -197,8 +219,8 @@ export function MetricCard({
   return (
     <article
       className={cn(
-        "relative grid gap-1 rounded-2xl border p-5 shadow-[0_1px_2px_rgba(20,47,85,0.04)]",
-        tone === "default" && "border-border bg-card",
+        "relative overflow-hidden grid gap-1 rounded-2xl border p-5 shadow-[0_8px_24px_rgba(20,47,85,0.06)]",
+        tone === "default" && "border-[#d9e3ef] bg-gradient-to-br from-white to-[#f4f7fb]",
         tone === "navy" && "border-transparent bg-gradient-to-br from-[#1b3f70] to-[#14325a] text-white",
         tone === "accent" && "border-transparent bg-gradient-to-br from-[#f9a338] to-[#ef8a12] text-white",
         tone === "success" && "border-[rgba(31,138,91,0.25)] bg-[var(--ui-success-bg)]",
