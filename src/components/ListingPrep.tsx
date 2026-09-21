@@ -72,6 +72,7 @@ type Bundle = {
   channels: Record<string, ChannelRecord>;
   sellerMaterials: string;
   sellerColor: string;
+  isSet: boolean;
 };
 
 const bundleCache = new Map<string, Promise<Bundle>>();
@@ -159,12 +160,22 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
 
   let sellerMaterials = "";
   let sellerColor = "";
+  let isSet = false;
   if (productResponse.ok) {
     const product = (await readJson(productResponse)) as {
       variants?: Array<{ materials?: string[]; color?: string }>;
+      set_parts?: Array<{ description?: string; width_cm?: string; height_cm?: string; length_cm?: string }>;
     } | null;
     sellerMaterials = (product?.variants?.[0]?.materials || []).filter(Boolean).join(", ");
     sellerColor = (product?.variants?.[0]?.color || "").trim();
+    isSet = (product?.set_parts || []).some((part) =>
+      Boolean(
+        String(part.description ?? "").trim()
+        || String(part.width_cm ?? "").trim()
+        || String(part.height_cm ?? "").trim()
+        || String(part.length_cm ?? "").trim(),
+      ),
+    );
   }
 
   const channels: Record<string, ChannelRecord> = {};
@@ -184,7 +195,7 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
     }),
   );
 
-  return { publications, profiles, channels, sellerMaterials, sellerColor };
+  return { publications, profiles, channels, sellerMaterials, sellerColor, isSet };
 }
 
 function getBundle(productId: number, epoch: string, failMessage: string) {
@@ -487,7 +498,10 @@ function ListingPrepFields({
         </div>
         <div>
           <Label>{t("product.draftDescription")}</Label>
-          <Textarea rows={7} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
+          <Textarea rows={view.isSet ? 12 : 7} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
+          {view.isSet ? (
+            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.setDescriptionHint")}</p>
+          ) : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -519,7 +533,7 @@ function ListingPrepFields({
             onChange={(event) => updateDraft({ bullets: event.target.value })}
           />
           {channel.marketplace === "otto" ? (
-            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.bulletsHint")}</p>
+            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{view.isSet ? t("listing.bulletsHintSet") : t("listing.bulletsHint")}</p>
           ) : null}
         </div>
         {channel.marketplace === "otto" ? (

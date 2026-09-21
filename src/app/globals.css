@@ -94,7 +94,7 @@
   }
 
   html,
-  body {
+body {
     @apply min-h-full bg-background text-foreground antialiased;
     margin: 0;
     font-family: var(--font-sans);
