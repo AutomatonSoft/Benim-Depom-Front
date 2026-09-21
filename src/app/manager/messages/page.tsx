@@ -390,7 +390,7 @@ export default function MessagesPage() {
     if (!token) return;
     const isOutgoing = category === "outgoing";
     if (isLocalAfterbuyMock(message)) {
-      if (!message.is_read) {
+    if (!message.is_read) {
         setMockFlags((current) => ({ ...current, read: true }));
       }
       return;

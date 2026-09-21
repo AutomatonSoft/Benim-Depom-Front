@@ -282,6 +282,8 @@ const STATUS_VARIANT: Record<string, VariantProps<typeof badgeVariants>["variant
   queued: "warning",
   processing: "warning",
   publishing: "warning",
+  deactivating: "warning",
+  deleting: "warning",
   running: "warning",
   "in-flight": "warning",
   accepted: "success",

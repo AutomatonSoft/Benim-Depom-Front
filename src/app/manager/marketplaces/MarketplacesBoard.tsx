@@ -325,7 +325,18 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
         });
         if (data) setNotice(queuedNotice(data as Job));
       }
-      if (data) setReloadKey((value) => value + 1);
+      if (data) {
+        const nextStatus =
+          action === "activate"
+            ? "publishing"
+            : action === "delete" || publication.marketplace !== "otto"
+              ? "deleting"
+              : "deactivating";
+        setPublications((rows) =>
+          rows.map((row) => (row.id === publication.id ? { ...row, status: nextStatus } : row)),
+        );
+        setReloadKey((value) => value + 1);
+      }
     } catch {
       setError(t("common.apiUnreachable"));
     } finally {
@@ -350,8 +361,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                 : t("marketplaces.actionTakeDown")}
           </Button>
         )}
-        {publication.status === "deactivated" &&
-          (publication.marketplace === "otto" || publication.marketplace === "kaufland") && (
+        {publication.status === "deactivated" && publication.marketplace === "otto" && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runListingAction(publication, "activate")}>
             {isBusy("activate") ? t("marketplaces.queueing") : t("marketplaces.actionActivate")}
           </Button>
