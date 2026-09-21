@@ -47,6 +47,15 @@ type Variant = {
   quantity: number;
 };
 
+type SetPart = {
+  id?: number;
+  position?: number;
+  description: string;
+  width_cm: string;
+  height_cm: string;
+  length_cm: string;
+};
+
 type ProductImage = {
   id: number;
   image: string;
@@ -54,6 +63,11 @@ type ProductImage = {
   is_primary: boolean;
   processing_status: string;
   processing_error: string;
+  processing_result?: {
+    provider?: string;
+    status?: string;
+    payload?: { product_id?: string };
+  } | null;
   generated_images: Array<{ id: number; image: string; mode: string }>;
 };
 
@@ -91,6 +105,7 @@ type Product = {
   otto_category_name: string | null;
   otto_category_group_name: string | null;
   variants: Variant[];
+  set_parts?: SetPart[];
   images: ProductImage[];
   created_at: string;
   updated_at: string;
@@ -142,6 +157,7 @@ type FormState = {
   currency: Product["currency"];
   listing_price_eur: string;
   variants: Variant[];
+  set_parts: SetPart[];
 };
 
 type GenerationContent = { title?: string; description?: string; bullet_points?: string[]; materials?: string[]; color?: string };
@@ -394,6 +410,31 @@ function FormulaEditorDialog({
   );
 }
 
+function meaningfulSetParts(parts: SetPart[] | undefined | null): SetPart[] {
+  return (parts ?? []).filter((part) => {
+    const description = String(part.description ?? "").trim();
+    const width = String(part.width_cm ?? "").trim();
+    const height = String(part.height_cm ?? "").trim();
+    const length = String(part.length_cm ?? "").trim();
+    return Boolean(description || width || height || length);
+  });
+}
+
+function formatSetPartSummary(value: unknown): string {
+  if (!Array.isArray(value)) return formatChangeValue(value);
+  return value.map((item) => {
+    if (!item || typeof item !== "object") return formatChangeValue(item);
+    const part = item as Record<string, unknown>;
+    const size = [part.width_cm, part.height_cm, part.length_cm]
+      .map((entry) => (entry == null || entry === "" ? "" : String(entry)))
+      .filter(Boolean)
+      .join("×");
+    return [part.description ? String(part.description) : "", size ? `${size} cm` : ""]
+      .filter(Boolean)
+      .join(" · ") || formatChangeValue(item);
+  }).join("; ") || "—";
+}
+
 function formatVariantSummary(value: unknown): string {
   if (!Array.isArray(value)) return formatChangeValue(value);
   return value.map((item) => {
@@ -415,6 +456,12 @@ function formatChangeValue(value: unknown): string {
   if (value == null || value === "") return "—";
   if (Array.isArray(value) && value.some((item) => item && typeof item === "object" && "quantity" in item)) {
     return formatVariantSummary(value);
+  }
+  if (
+    Array.isArray(value)
+    && value.some((item) => item && typeof item === "object" && "description" in item && "width_cm" in item)
+  ) {
+    return formatSetPartSummary(value);
   }
   if (typeof value === "object") {
     try {
@@ -447,6 +494,16 @@ function currentFieldValue(product: Product, field: string) {
       })),
     );
   }
+  if (field === "set_parts") {
+    return formatChangeValue(
+      meaningfulSetParts(product.set_parts).map((part) => ({
+        description: part.description,
+        width_cm: part.width_cm,
+        height_cm: part.height_cm,
+        length_cm: part.length_cm,
+      })),
+    );
+  }
   const record = product as unknown as Record<string, unknown>;
   return formatChangeValue(record[field]);
 }
@@ -475,6 +532,7 @@ function toForm(product: Product): FormState {
       ...variant,
       materials: [...(variant.materials ?? [])],
     })),
+    set_parts: meaningfulSetParts(product.set_parts),
   };
 }
 
@@ -609,6 +667,11 @@ export default function ProductWorkspacePage() {
   const totalQuantity = useMemo(
     () => form?.variants.reduce((total, variant) => total + Number(variant.quantity || 0), 0) ?? 0,
     [form],
+  );
+  const hasSetParts = Boolean(form?.set_parts.length);
+  const coverImage = useMemo(
+    () => sortProductImages(product?.images ?? []).find((image) => image.is_primary) ?? sortProductImages(product?.images ?? [])[0],
+    [product],
   );
   const imageGenerationInProgress = useMemo(
     () => product?.images.some((image) => isImageGenerationInProgress(image)) ?? false,
@@ -865,6 +928,13 @@ export default function ProductWorkspacePage() {
     });
   }
 
+  function updateSetPart(index: number, field: keyof SetPart, value: string) {
+    setForm((current) => current && {
+      ...current,
+      set_parts: current.set_parts.map((part, itemIndex) => itemIndex === index ? { ...part, [field]: value } : part),
+    });
+  }
+
   function removeVariant(index: number) {
     setForm((current) => {
       if (!current || current.variants.length < 2) return current;
@@ -884,6 +954,14 @@ export default function ProductWorkspacePage() {
         currency: form.currency,
         variants: form.variants.map(({ color, materials, width_cm, height_cm, length_cm, quantity }) => ({ color, materials, width_cm, height_cm, length_cm, quantity: Number(quantity) })),
       };
+      if (form.set_parts.length > 0 || meaningfulSetParts(product?.set_parts).length > 0) {
+        payload.set_parts = form.set_parts.map(({ description, width_cm, height_cm, length_cm }) => ({
+          description,
+          width_cm,
+          height_cm,
+          length_cm,
+        }));
+      }
       if (form.listing_price_eur && form.listing_price_eur !== (product?.listing_price_eur ?? "")) {
         payload.listing_price_eur_override = form.listing_price_eur;
       }
@@ -1202,7 +1280,11 @@ export default function ProductWorkspacePage() {
   async function persistImageOrder(nextImages: ProductImage[]) {
     if (!product) return;
     const previous = product.images;
-    const ordered = nextImages.map((image, position) => ({ ...image, position }));
+    const ordered = nextImages.map((image, position) => ({
+      ...image,
+      position,
+      is_primary: position === 0,
+    }));
     if (ordered.map((image) => image.id).join() === sortProductImages(previous).map((image) => image.id).join()) return;
     setProduct((current) => current ? { ...current, images: ordered } : current);
     setSaving(true); setError(""); setFeedback("");
@@ -1553,7 +1635,9 @@ export default function ProductWorkspacePage() {
             <dl className="mt-4 grid gap-3">
               {pendingEntries.map(([field, value]) => (
                 <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
-                  <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">{field}</dt>
+                  <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+                    {field === "set_parts" ? t("product.setParts") : field === "variants" ? t("product.variantsField") : field}
+                  </dt>
                   <dd className="mt-1 grid gap-1 text-sm">
                     <small className="text-muted-foreground" title={t("product.pendingOld")}>{currentFieldValue(product, field)}</small>
                     <strong className="font-bold text-primary" title={t("product.pendingNew")}>{formatChangeValue(value)}</strong>
@@ -1615,7 +1699,9 @@ export default function ProductWorkspacePage() {
               <dl className="mt-4 grid gap-3">
                 {reviewEntries.map(([field, value]) => (
                   <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
-                    <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">{field}</dt>
+                    <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+                    {field === "set_parts" ? t("product.setParts") : field === "variants" ? t("product.variantsField") : field}
+                  </dt>
                     <dd className="mt-1 grid gap-1 text-sm">
                       <small className="text-muted-foreground" title={t("product.pendingOld")}>
                         {reviewOldValue(product, sellerChangeReview, field)}
@@ -1784,6 +1870,57 @@ export default function ProductWorkspacePage() {
 
             <div className="grid gap-3 content-start">
               {product.images.length === 0 ? <p className="text-sm text-muted-foreground">{t("product.noSourceImages")}</p> : null}
+              {hasSetParts && coverImage ? (
+                <div className="grid gap-3 rounded-2xl border border-[rgba(247,148,29,0.45)] bg-gradient-to-b from-[#fffaf3] to-card p-4">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.setPhotosEyebrow")}</p>
+                    <h3 className="text-base font-extrabold text-primary">{t("product.setPhotosTitle")}</h3>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{t("product.setPhotosHint")}</p>
+                  </div>
+                  {coverImage.generated_images.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {coverImage.generated_images.map((generated) => (
+                        <button
+                          key={generated.id}
+                          type="button"
+                          className="relative size-16 overflow-hidden rounded-xl border border-border"
+                          title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`}
+                          onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={generated.image} alt={generated.mode} className="size-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {isImageGenerationInProgress(coverImage) ? (
+                    <BackgroundProgress label={t("product.setPhotosTitle")} status={coverImage.processing_status} />
+                  ) : null}
+                  {coverImage.processing_error ? (
+                    <small className="text-xs font-semibold text-[var(--ui-danger)]">{coverImage.processing_error}</small>
+                  ) : null}
+                  {coverImage.processing_result?.provider === "gemini_set" ? (
+                    <small className="text-xs font-semibold text-muted-foreground">{t("product.setPhotosGemini")}</small>
+                  ) : coverImage.processing_result?.payload?.product_id ? (
+                    <small className="text-xs font-semibold text-[var(--ui-danger)]">{t("product.setPhotosWrongService")}</small>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="accent"
+                    className="w-fit"
+                    disabled={saving || product.status !== "approved" || isImageGenerationInProgress(coverImage)}
+                    onClick={() => void generateImage(coverImage.id)}
+                  >
+                    {isImageGenerationInProgress(coverImage)
+                      ? t("product.generating")
+                      : product.status !== "approved"
+                        ? t("product.generateAfterApprove")
+                        : coverImage.generated_images.length
+                          ? t("product.generateSetPhotosAgain")
+                          : t("product.generateSetPhotos")}
+                  </Button>
+                </div>
+              ) : null}
               {product.images.length > 1 ? <p className="text-xs font-semibold text-muted-foreground">{t("product.reorderHint")}</p> : null}
               {sortProductImages(product.images).map((image, index) => {
                 const canReorder = product.images.length > 1;
@@ -1833,8 +1970,8 @@ export default function ProductWorkspacePage() {
                       <small className="text-xs text-muted-foreground">
                         {image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}
                       </small>
-                      {image.processing_error ? <small className="text-xs font-semibold text-[var(--ui-danger)]">{image.processing_error}</small> : null}
-                      {image.generated_images.length > 0 ? (
+                      {image.processing_error && !hasSetParts ? <small className="text-xs font-semibold text-[var(--ui-danger)]">{image.processing_error}</small> : null}
+                      {!hasSetParts && image.generated_images.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {image.generated_images.map((generated) => (
                             <div key={generated.id} className="relative">
@@ -1869,7 +2006,9 @@ export default function ProductWorkspacePage() {
                             {t("product.coverBadge")}
                           </span>
                         ) : null}
-                        {image.is_primary ? (
+                        {hasSetParts ? (
+                          <small className="text-xs text-muted-foreground">{t("product.setSourceHint")}</small>
+                        ) : image.is_primary ? (
                           <Button
                             size="sm"
                             variant="secondary"
@@ -2000,6 +2139,37 @@ export default function ProductWorkspacePage() {
                   ) : null}
                 </div>
               ))}
+              {hasSetParts ? (
+                <div className="grid gap-3">
+                  <h3 className="text-base font-extrabold text-primary">{t("product.setParts")}</h3>
+                  <p className="text-xs font-semibold text-muted-foreground">{t("product.setPartsHint")}</p>
+                  {form.set_parts.map((part, index) => (
+                    <div className="grid gap-3 rounded-2xl border border-border p-4 sm:grid-cols-2 lg:grid-cols-3" key={part.id || index}>
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <Label>{t("product.setPartN", { n: String(index + 1) })}</Label>
+                        <Textarea
+                          required
+                          rows={3}
+                          value={part.description}
+                          onChange={(event) => updateSetPart(index, "description", event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label>{t("product.length")}</Label>
+                        <Input required type="number" min="0" value={part.length_cm} onChange={(event) => updateSetPart(index, "length_cm", event.target.value)} />
+                      </div>
+                      <div>
+                        <Label>{t("product.width")}</Label>
+                        <Input required type="number" min="0" value={part.width_cm} onChange={(event) => updateSetPart(index, "width_cm", event.target.value)} />
+                      </div>
+                      <div>
+                        <Label>{t("product.height")}</Label>
+                        <Input required type="number" min="0" value={part.height_cm} onChange={(event) => updateSetPart(index, "height_cm", event.target.value)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <Button disabled={saving} type="submit">{saving ? t("product.saving") : t("product.saveChanges")}</Button>
             </form>
           </Panel>
@@ -2007,15 +2177,21 @@ export default function ProductWorkspacePage() {
           <aside className="grid gap-4 content-start">
             <Panel padded>
               <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.ai")}</p>
-              <h2 className="text-lg font-extrabold text-primary">{t("product.aiTitle")}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t("product.aiHint")}</p>
+              <h2 className="text-lg font-extrabold text-primary">{hasSetParts ? t("product.aiTitleSet") : t("product.aiTitle")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{hasSetParts ? t("product.aiHintSet") : t("product.aiHint")}</p>
               <Button
                 className="mt-4 w-full"
                 variant="accent"
                 disabled={generating || descriptionGenerationInProgress}
                 onClick={() => void generateDescription()}
               >
-                {generating ? t("product.starting") : descriptionGenerationInProgress ? t("product.generating") : t("product.generateDescription")}
+                {generating
+                  ? t("product.starting")
+                  : descriptionGenerationInProgress
+                    ? t("product.generating")
+                    : hasSetParts
+                      ? t("product.generateSetDescription")
+                      : t("product.generateDescription")}
               </Button>
               {generation ? (
                 <div className="mt-3 grid gap-2 rounded-xl border border-border bg-[#f8fafc] p-3">
@@ -2039,14 +2215,14 @@ export default function ProductWorkspacePage() {
               ) : null}
               {generationContent && draftForm ? (
                 <form className="mt-4 grid gap-3" onSubmit={saveDraft}>
-                  <span className="text-sm font-extrabold text-primary">{t("product.draftHeading")}</span>
+                  <span className="text-sm font-extrabold text-primary">{hasSetParts ? t("product.draftHeadingSet") : t("product.draftHeading")}</span>
                   <div>
                     <Label>{t("product.draftTitle")}</Label>
                     <Input required maxLength={65} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
                   </div>
                   <div>
                     <Label>{t("product.draftDescription")}</Label>
-                    <Textarea required rows={9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} />
+                    <Textarea required rows={hasSetParts ? 12 : 9} value={draftForm.description} onChange={(event) => updateDraft("description", event.target.value)} />
                   </div>
                   <div>
                     <Label>{t("product.draftBullets")}</Label>
@@ -2076,14 +2252,14 @@ export default function ProductWorkspacePage() {
                       ? t("listing.materialsHintWithSeller", { materials: (form?.variants[0]?.materials || []).join(", ") })
                       : t("listing.materialsHint")}
                   </small>
-                  <small className="text-xs text-muted-foreground">{t("product.draftHint")}</small>
+                  <small className="text-xs text-muted-foreground">{hasSetParts ? t("product.draftHintSet") : t("product.draftHint")}</small>
                   <Button type="submit" disabled={draftSaving || !draftDirty}>
                     {draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}
                   </Button>
                   <Button type="button" variant="accent" disabled={applying || draftDirty || draftSaving} onClick={() => void applyDraft()}>
                     {applying ? t("listing.applying") : t("listing.apply")}
                   </Button>
-                  <small className="text-xs text-muted-foreground">{t("listing.applyHint")}</small>
+                  <small className="text-xs text-muted-foreground">{hasSetParts ? t("listing.applyHintSet") : t("listing.applyHint")}</small>
                 </form>
               ) : null}
             </Panel>
