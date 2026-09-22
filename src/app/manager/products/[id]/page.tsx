@@ -41,6 +41,7 @@ type Variant = {
   id: number;
   color: string;
   materials: string[];
+  material_composition?: string;
   width_cm: string;
   height_cm: string;
   length_cm: string;
@@ -160,7 +161,23 @@ type FormState = {
   set_parts: SetPart[];
 };
 
-type GenerationContent = { title?: string; description?: string; bullet_points?: string[]; materials?: string[]; color?: string };
+type GenerationContent = {
+  title?: string;
+  description?: string;
+  bullet_points?: string[];
+  materials?: string[];
+  color?: string;
+  material_composition?: string;
+};
+type DraftForm = {
+  title: string;
+  description: string;
+  bullets: string;
+  material1: string;
+  material2: string;
+  color: string;
+  materialComposition: string;
+};
 
 type Generation = {
   id: string;
@@ -194,8 +211,6 @@ function moveImageInList(images: ProductImage[], fromId: number, toId: number) {
   next.splice(to, 0, item);
   return next.map((image, position) => ({ ...image, position }));
 }
-
-type DraftForm = { title: string; description: string; bullets: string; material1: string; material2: string; color: string };
 
 const HISTORY_PAGE_SIZE = 5;
 
@@ -447,6 +462,9 @@ function formatVariantSummary(value: unknown): string {
       variant.color ? String(variant.color) : "",
       variant.quantity != null && variant.quantity !== "" ? `qty ${variant.quantity}` : "",
       materials,
+      typeof variant.material_composition === "string" && variant.material_composition.trim()
+        ? variant.material_composition.trim()
+        : "",
     ].filter(Boolean);
     return parts.join(" · ") || formatChangeValue(item);
   }).join("; ") || "—";
@@ -531,6 +549,7 @@ function toForm(product: Product): FormState {
     variants: (product.variants ?? []).map((variant) => ({
       ...variant,
       materials: [...(variant.materials ?? [])],
+      material_composition: (variant.material_composition ?? "").trim(),
     })),
     set_parts: meaningfulSetParts(product.set_parts),
   };
@@ -669,6 +688,10 @@ export default function ProductWorkspacePage() {
     [form],
   );
   const hasSetParts = Boolean(form?.set_parts.length);
+  const hasMaterialComposition = Boolean(
+    form?.variants.some((variant) => (variant.material_composition || "").trim()) ||
+      (product?.variants ?? []).some((variant) => (variant.material_composition || "").trim()),
+  );
   const coverImage = useMemo(
     () => sortProductImages(product?.images ?? []).find((image) => image.is_primary) ?? sortProductImages(product?.images ?? [])[0],
     [product],
@@ -731,6 +754,7 @@ export default function ProductWorkspacePage() {
         material1,
         material2,
         color: generationContent.color ?? "",
+        materialComposition: generationContent.material_composition ?? "",
       });
     }
   }
@@ -751,13 +775,14 @@ export default function ProductWorkspacePage() {
         bullet_points: draftForm.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
         materials: materialsPayload(draftForm.material1, draftForm.material2),
         color: draftForm.color.trim(),
+        material_composition: draftForm.materialComposition.trim(),
       };
       const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${generation.id}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const fieldErrors = [data.title, data.description, data.bullet_points, data.materials, data.color].flat().filter(Boolean).join(" ");
+        const fieldErrors = [data.title, data.description, data.bullet_points, data.materials, data.color, data.material_composition].flat().filter(Boolean).join(" ");
         throw new Error(data.detail || fieldErrors || "Draft could not be saved.");
       }
       setGeneration(data as Generation);
@@ -952,7 +977,15 @@ export default function ProductWorkspacePage() {
         product_type: form.product_type,
         unit_price: form.unit_price,
         currency: form.currency,
-        variants: form.variants.map(({ color, materials, width_cm, height_cm, length_cm, quantity }) => ({ color, materials, width_cm, height_cm, length_cm, quantity: Number(quantity) })),
+        variants: form.variants.map(({ color, materials, material_composition, width_cm, height_cm, length_cm, quantity }) => ({
+          color,
+          materials,
+          material_composition: (material_composition || "").trim(),
+          width_cm,
+          height_cm,
+          length_cm,
+          quantity: Number(quantity),
+        })),
       };
       if (form.set_parts.length > 0 || meaningfulSetParts(product?.set_parts).length > 0) {
         payload.set_parts = form.set_parts.map(({ description, width_cm, height_cm, length_cm }) => ({
@@ -2114,6 +2147,16 @@ export default function ProductWorkspacePage() {
                       onChange={(event) => updateVariant(index, "materials", event.target.value.split(",").map((item) => item.trim()).filter(Boolean))}
                     />
                   </div>
+                  {hasMaterialComposition ? (
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <Label>{t("product.materialComposition")}</Label>
+                      <Input
+                        value={variant.material_composition || ""}
+                        onChange={(event) => updateVariant(index, "material_composition", event.target.value)}
+                      />
+                      <p className="mt-1 text-xs font-semibold text-muted-foreground">{t("product.materialCompositionHint")}</p>
+                    </div>
+                  ) : null}
                   <div>
                     <Label>{t("product.length")}</Label>
                     <Input required type="number" min="0" value={variant.length_cm} onChange={(event) => updateVariant(index, "length_cm", event.target.value)} />
@@ -2252,6 +2295,17 @@ export default function ProductWorkspacePage() {
                       ? t("listing.materialsHintWithSeller", { materials: (form?.variants[0]?.materials || []).join(", ") })
                       : t("listing.materialsHint")}
                   </small>
+                  {(form?.variants[0]?.material_composition || "").trim() || draftForm.materialComposition.trim() ? (
+                    <div>
+                      <Label>{t("listing.materialComposition")}</Label>
+                      <Input value={draftForm.materialComposition} onChange={(event) => updateDraft("materialComposition", event.target.value)} />
+                      <small className="mt-1.5 block text-xs text-muted-foreground">
+                        {(form?.variants[0]?.material_composition || "").trim()
+                          ? t("listing.materialCompositionHintWithSeller", { composition: form?.variants[0]?.material_composition || "" })
+                          : t("listing.materialCompositionHint")}
+                      </small>
+                    </div>
+                  ) : null}
                   <small className="text-xs text-muted-foreground">{hasSetParts ? t("product.draftHintSet") : t("product.draftHint")}</small>
                   <Button type="submit" disabled={draftSaving || !draftDirty}>
                     {draftSaving ? t("product.saving") : draftDirty ? t("product.saveDraft") : t("product.draftSaved")}
