@@ -526,7 +526,108 @@ function currentFieldValue(product: Product, field: string) {
   return formatChangeValue(record[field]);
 }
 
+function parsePendingImages(value: unknown, product: Product) {
+  const current = sortProductImages(product.images ?? []);
+  if (Array.isArray(value) && value.every((item) => typeof item === "number")) {
+    const ids = new Set(value as number[]);
+    return {
+      added: current.filter((image) => ids.has(image.id)),
+      removed: [] as Array<{ id: number; url: string }>,
+      kept: [] as typeof current,
+    };
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const addedIds = new Set(
+      Array.isArray(record.added_ids) ? record.added_ids.map((item) => Number(item)) : [],
+    );
+    const removed = Array.isArray(record.removed)
+      ? record.removed.flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const row = item as { id?: unknown; url?: unknown };
+          if (typeof row.url !== "string" || !row.url) return [];
+          return [{ id: Number(row.id) || 0, url: row.url }];
+        })
+      : [];
+    return {
+      added: current.filter((image) => addedIds.has(image.id)),
+      removed,
+      kept: current.filter((image) => !addedIds.has(image.id)),
+    };
+  }
+  return {
+    added: current,
+    removed: [] as Array<{ id: number; url: string }>,
+    kept: current,
+  };
+}
+
+function PendingImageDiff({
+  product,
+  value,
+  t,
+}: {
+  product: Product;
+  value: unknown;
+  t: (key: MessageKey) => string;
+}) {
+  const { added, removed, kept } = parsePendingImages(value, product);
+  const groups = [
+    { key: "removed" as const, photos: removed, empty: removed.length === 0 },
+    { key: "added" as const, photos: added.map((image) => ({ id: image.id, url: image.image })), empty: added.length === 0 },
+    { key: "kept" as const, photos: kept.map((image) => ({ id: image.id, url: image.image })), empty: kept.length === 0 },
+  ];
+  return (
+    <div className="grid gap-3">
+      {groups.map((group) => (
+        <div key={group.key}>
+          <p
+            className={cn(
+              "text-[11px] font-extrabold uppercase tracking-[0.04em]",
+              group.key === "removed" ? "text-[var(--ui-danger)]" : group.key === "added" ? "text-[var(--brand-accent)]" : "text-muted-foreground",
+            )}
+          >
+            {t(
+              group.key === "removed"
+                ? "product.pendingImagesRemoved"
+                : group.key === "added"
+                  ? "product.pendingImagesAdded"
+                  : "product.pendingImagesKept",
+            )}
+          </p>
+          {group.empty ? (
+            <p className="mt-1 text-sm text-muted-foreground">{t("product.pendingImagesNone")}</p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {group.photos.map((photo) => (
+                <a
+                  key={`${group.key}-${photo.id}-${photo.url}`}
+                  href={photo.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(
+                    "block size-20 overflow-hidden rounded-xl border bg-white",
+                    group.key === "removed" ? "border-[rgba(195,60,51,0.45)]" : "border-border",
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt=""
+                    className={cn("size-full object-cover", group.key === "removed" && "opacity-70")}
+                  />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function pendingValueChanged(product: Product, field: string, value: unknown) {
+  if (field === "images") return true;
   return formatChangeValue(value) !== currentFieldValue(product, field);
 }
 
@@ -1669,11 +1770,23 @@ export default function ProductWorkspacePage() {
               {pendingEntries.map(([field, value]) => (
                 <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
                   <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
-                    {field === "set_parts" ? t("product.setParts") : field === "variants" ? t("product.variantsField") : field}
+                    {field === "set_parts"
+                      ? t("product.setParts")
+                      : field === "variants"
+                        ? t("product.variantsField")
+                        : field === "images"
+                          ? t("product.images")
+                          : field}
                   </dt>
                   <dd className="mt-1 grid gap-1 text-sm">
-                    <small className="text-muted-foreground" title={t("product.pendingOld")}>{currentFieldValue(product, field)}</small>
-                    <strong className="font-bold text-primary" title={t("product.pendingNew")}>{formatChangeValue(value)}</strong>
+                    {field === "images" ? (
+                      <PendingImageDiff product={product} value={value} t={t} />
+                    ) : (
+                      <>
+                        <small className="text-muted-foreground" title={t("product.pendingOld")}>{currentFieldValue(product, field)}</small>
+                        <strong className="font-bold text-primary" title={t("product.pendingNew")}>{formatChangeValue(value)}</strong>
+                      </>
+                    )}
                   </dd>
                 </div>
               ))}
@@ -1733,15 +1846,27 @@ export default function ProductWorkspacePage() {
                 {reviewEntries.map(([field, value]) => (
                   <div key={field} className="rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5">
                     <dt className="text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
-                    {field === "set_parts" ? t("product.setParts") : field === "variants" ? t("product.variantsField") : field}
+                    {field === "set_parts"
+                      ? t("product.setParts")
+                      : field === "variants"
+                        ? t("product.variantsField")
+                        : field === "images"
+                          ? t("product.images")
+                          : field}
                   </dt>
                     <dd className="mt-1 grid gap-1 text-sm">
+                      {field === "images" ? (
+                        <PendingImageDiff product={product} value={value} t={t} />
+                      ) : (
+                        <>
                       <small className="text-muted-foreground" title={t("product.pendingOld")}>
                         {reviewOldValue(product, sellerChangeReview, field)}
                       </small>
                       <strong className="font-bold text-primary" title={t("product.pendingNew")}>
                         {formatChangeValue(value)}
                       </strong>
+                        </>
+                      )}
                     </dd>
                   </div>
                 ))}
