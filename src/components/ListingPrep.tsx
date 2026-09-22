@@ -37,6 +37,7 @@ type ConfigResponse = {
     bullet_points?: string[];
     materials?: string[];
     color?: string;
+    material_composition?: string;
     vat?: string;
     shipping_profile_id?: string;
     category_id?: string;
@@ -58,6 +59,7 @@ type ChannelDraft = {
   material1: string;
   material2: string;
   color: string;
+  materialComposition: string;
   vat: string;
   shippingProfileId: string;
   hoodCategoryId: string;
@@ -72,6 +74,7 @@ type Bundle = {
   channels: Record<string, ChannelRecord>;
   sellerMaterials: string;
   sellerColor: string;
+  sellerComposition: string;
   isSet: boolean;
 };
 
@@ -84,6 +87,7 @@ function emptyDraft(): ChannelDraft {
     material1: "",
     material2: "",
     color: "",
+    materialComposition: "",
     vat: "",
     shippingProfileId: "",
     hoodCategoryId: "",
@@ -100,6 +104,7 @@ function draftFromConfig(config: ConfigResponse["configuration"]): ChannelDraft 
     material1: materialPair(source.materials)[0],
     material2: materialPair(source.materials)[1],
     color: String(source.color || "").trim(),
+    materialComposition: String(source.material_composition || "").trim(),
     vat: String(source.vat || "").trim(),
     shippingProfileId: String(source.shipping_profile_id || "").trim(),
     hoodCategoryId: String(source.category_id || "").trim(),
@@ -115,6 +120,7 @@ function draftsEqual(left: ChannelDraft, right: ChannelDraft) {
     left.material1 === right.material1 &&
     left.material2 === right.material2 &&
     left.color === right.color &&
+    left.materialComposition === right.materialComposition &&
     left.vat === right.vat &&
     left.shippingProfileId === right.shippingProfileId &&
     left.hoodCategoryId === right.hoodCategoryId &&
@@ -160,14 +166,16 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
 
   let sellerMaterials = "";
   let sellerColor = "";
+  let sellerComposition = "";
   let isSet = false;
   if (productResponse.ok) {
     const product = (await readJson(productResponse)) as {
-      variants?: Array<{ materials?: string[]; color?: string }>;
+      variants?: Array<{ materials?: string[]; color?: string; material_composition?: string }>;
       set_parts?: Array<{ description?: string; width_cm?: string; height_cm?: string; length_cm?: string }>;
     } | null;
     sellerMaterials = (product?.variants?.[0]?.materials || []).filter(Boolean).join(", ");
     sellerColor = (product?.variants?.[0]?.color || "").trim();
+    sellerComposition = (product?.variants?.[0]?.material_composition || "").trim();
     isSet = (product?.set_parts || []).some((part) =>
       Boolean(
         String(part.description ?? "").trim()
@@ -195,7 +203,7 @@ async function loadBundle(productId: number, failMessage: string): Promise<Bundl
     }),
   );
 
-  return { publications, profiles, channels, sellerMaterials, sellerColor, isSet };
+  return { publications, profiles, channels, sellerMaterials, sellerColor, sellerComposition, isSet };
 }
 
 function getBundle(productId: number, epoch: string, failMessage: string) {
@@ -215,6 +223,7 @@ function toDraft(item: ChannelRecord | ChannelDraft): ChannelDraft {
     material1: item.material1,
     material2: item.material2,
     color: item.color,
+    materialComposition: item.materialComposition,
     vat: item.vat,
     shippingProfileId: item.shippingProfileId,
     hoodCategoryId: item.hoodCategoryId,
@@ -405,6 +414,7 @@ function ListingPrepFields({
                 description: draft.description.trim(),
                 materials,
                 color,
+                material_composition: draft.materialComposition.trim(),
               };
       const response = await authorizedFetch(listingConfigPath(productId, channel), {
         method: "PATCH",
@@ -524,6 +534,20 @@ function ListingPrepFields({
             ? t("listing.materialsHintWithSeller", { materials: view.sellerMaterials })
             : t("listing.materialsHint")}
         </p>
+        {channel.marketplace === "kaufland" && (view.sellerComposition || draft.materialComposition) ? (
+          <div>
+            <Label>{t("listing.materialComposition")}</Label>
+            <Input
+              value={draft.materialComposition}
+              onChange={(event) => updateDraft({ materialComposition: event.target.value })}
+            />
+            <p className="mt-1.5 text-xs font-semibold text-muted-foreground">
+              {view.sellerComposition
+                ? t("listing.materialCompositionHintWithSeller", { composition: view.sellerComposition })
+                : t("listing.materialCompositionHint")}
+            </p>
+          </div>
+        ) : null}
         <div className={cn(channel.marketplace !== "otto" && "opacity-55")}>
           <Label>{t("product.draftBullets")}</Label>
           <Textarea
