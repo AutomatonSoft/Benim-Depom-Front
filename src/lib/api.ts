@@ -1,9 +1,8 @@
 const ACCESS_TOKEN_KEY = "benim_access_token";
-const REFRESH_TOKEN_KEY = "benim_refresh_token";
+const LEGACY_REFRESH_TOKEN_KEY = "benim_refresh_token";
 
 type RefreshResponse = {
   access: string;
-  refresh?: string;
 };
 
 let refreshPromise: Promise<string | null> | null = null;
@@ -25,18 +24,22 @@ function writeToken(key: string, value: string) {
 export function clearTokens() {
   if (!canUseStorage()) return;
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearLegacyRefreshToken();
+}
+
+export function clearLegacyRefreshToken() {
+  if (!canUseStorage()) return;
+  window.localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
 }
 
 export async function logoutSession() {
-  const refresh = readToken(REFRESH_TOKEN_KEY);
   const access = readToken(ACCESS_TOKEN_KEY);
-  if (refresh && access) {
+  if (access) {
     try {
       await authorizedFetch("/api/v1/auth/logout/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh }),
+        body: "{}",
       });
     } catch {
       // Tokens are still cleared locally so the panel cannot stay signed in.
@@ -56,13 +59,11 @@ async function refreshAccessToken() {
 }
 
 async function refreshAccessTokenRequest() {
-  const refresh = readToken(REFRESH_TOKEN_KEY);
-  if (!refresh) return null;
-
   const response = await fetch("/api/v1/auth/refresh/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh }),
+    credentials: "same-origin",
+    body: "{}",
   });
   if (!response.ok) {
     clearTokens();
@@ -71,7 +72,6 @@ async function refreshAccessTokenRequest() {
 
   const tokens = (await response.json()) as RefreshResponse;
   writeToken(ACCESS_TOKEN_KEY, tokens.access);
-  if (tokens.refresh) writeToken(REFRESH_TOKEN_KEY, tokens.refresh);
   return tokens.access;
 }
 
@@ -97,7 +97,11 @@ export async function authorizedFetch(input: RequestInfo | URL, init: RequestIni
   const request = (access: string) => {
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${access}`);
-    return fetch(input, { ...init, headers });
+    return fetch(input, {
+      ...init,
+      credentials: init.credentials ?? "same-origin",
+      headers,
+    });
   };
 
   const access = readToken(ACCESS_TOKEN_KEY);
