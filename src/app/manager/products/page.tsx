@@ -43,6 +43,7 @@ type ProductListResponse = {
 
 const statusKeys = ["draft", "submitted", "approved", "rejected", "withdrawn", "deactivated"] as const;
 const statusFilterOptions = statusKeys.filter((value) => value !== "draft");
+const PAGE_SIZE = 10;
 
 export default function ProductsPage() {
   const { t } = useI18n();
@@ -64,7 +65,7 @@ export default function ProductsPage() {
       return;
     }
 
-    const params = new URLSearchParams({ page: String(page) });
+    const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
     if (status) params.set("status", status);
     if (appliedSearch) params.set("search", appliedSearch);
 
