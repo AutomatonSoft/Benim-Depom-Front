@@ -50,6 +50,8 @@ function isPendingEmail(seller: Seller) {
   return seller.is_email_verified === false;
 }
 
+const PAGE_SIZE = 10;
+
 export default function SellersPage() {
   const { t } = useI18n();
   const [tab, setTab] = useState<DirectoryTab>("sellers");
@@ -78,7 +80,7 @@ export default function SellersPage() {
       return;
     }
 
-    const params = new URLSearchParams({ page: String(page) });
+    const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
     if (!isManagers && activity === "active") params.set("is_active", "true");
     if (!isManagers && activity === "pending") params.set("is_email_verified", "false");
     if (appliedSearch) params.set("search", appliedSearch);

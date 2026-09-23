@@ -101,6 +101,7 @@ const jobStatusKeys = [
 ] as const;
 const operationKeys = ["publish", "update", "activate", "deactivate", "delete", "search"] as const;
 const listingBusyStatuses = new Set(["pending", "publishing", "deactivating", "deleting"]);
+const PAGE_SIZE = 10;
 const IN_FLIGHT_POLL_MS = 4000;
 
 function isUpdateInFlight(publication: Publication, jobs: Job[]) {
@@ -197,8 +198,14 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
 
       if (!silentReload.current) setLoading(true);
       setError("");
-      const publicationParams = new URLSearchParams({ page: String(publicationPage) });
-      const jobParams = new URLSearchParams({ page: String(jobPage) });
+      const publicationParams = new URLSearchParams({
+        page: String(publicationPage),
+        page_size: String(PAGE_SIZE),
+      });
+      const jobParams = new URLSearchParams({
+        page: String(jobPage),
+        page_size: String(PAGE_SIZE),
+      });
       if (marketplace) publicationParams.set("marketplace", marketplace);
       if (account) publicationParams.set("account", account);
       if (status) publicationParams.set("status", status);
@@ -219,9 +226,9 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
         ] = await Promise.all([
           authorizedFetch(`/api/v1/orchestrator/publications/?${publicationParams}`),
           authorizedFetch(`/api/v1/orchestrator/jobs/?${jobParams}`),
-          authorizedFetch("/api/v1/orchestrator/jobs/?in_progress=true&page=1"),
-          authorizedFetch("/api/v1/orchestrator/publications/?status=active&page=1"),
-          authorizedFetch("/api/v1/orchestrator/publications/?status=failed&page=1"),
+          authorizedFetch("/api/v1/orchestrator/jobs/?in_progress=true&page=1&page_size=100"),
+          authorizedFetch("/api/v1/orchestrator/publications/?status=active&page=1&page_size=1"),
+          authorizedFetch("/api/v1/orchestrator/publications/?status=failed&page=1&page_size=1"),
         ]);
         const responses = [publicationResponse, jobsResponse, inProgressResponse, activeResponse, failedResponse];
         if (responses.some((response) => redirectIfUnauthorized(response.status))) return;

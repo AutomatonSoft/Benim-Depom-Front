@@ -241,6 +241,8 @@ function highlightProduct(text: string, product: string): ReactNode {
   ));
 }
 
+const PAGE_SIZE = 10;
+
 export default function MessagesPage() {
   const router = useRouter();
   const { t } = useI18n();
@@ -343,7 +345,7 @@ export default function MessagesPage() {
     async function load() {
       setLoading(true);
       setError("");
-      const params = new URLSearchParams({ page: String(page) });
+      const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
       if (category !== "all") params.set("category", category);
       if (unreadOnly) params.set("is_read", "false");
       if (appliedSearch) params.set("search", appliedSearch);
