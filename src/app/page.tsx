@@ -92,7 +92,7 @@ export default function LandingPage() {
             </div>
             <div className="hero-visual">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="" aria-hidden="true" className="hero-showroom" src="/landing/showroom-hero.png" />
+              <img alt="" aria-hidden="true" className="hero-showroom" fetchPriority="high" src="/landing/showroom-hero.jpg" />
               <div className="pipeline-card">
                 <div className="pipeline-top">
                   <div className="dot-row"><span className="dot" /><span className="dot" /><span className="dot" /></div>
@@ -651,6 +651,7 @@ export default function LandingPage() {
               <h5>{t.footer.legalTitle}</h5>
               <ul>
                 <li><Link href="/impressum">{t.impr.title}</Link></li>
+                <li><Link href="/delete-account">{t.footer.deleteAccountLink}</Link></li>
                 {t.legalDocs.map((doc) => (
                   <li key={doc.n}>
                     <Link href={doc.href ?? "/impressum"}>{doc.n}</Link>

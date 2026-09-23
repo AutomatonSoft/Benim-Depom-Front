@@ -158,6 +158,7 @@ export type LandingDict = {
     legalTitle: string;
     copyright: string;
     appLink: string;
+    deleteAccountLink: string;
   };
   waFloat: string;
   privacyAria: string;
@@ -475,6 +476,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       legalTitle: "Rechtliches",
       copyright: "© 2026 Benim Depom. Alle Rechte vorbehalten.",
       appLink: "App herunterladen",
+      deleteAccountLink: "Konto löschen",
     },
     waFloat: "Über WhatsApp kontaktieren",
     privacyAria: "Datenschutzerklärung",
@@ -772,6 +774,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       legalTitle: "Legal",
       copyright: "© 2026 Benim Depom. All rights reserved.",
       appLink: "Download the app",
+      deleteAccountLink: "Delete account",
     },
     waFloat: "Contact us on WhatsApp",
     privacyAria: "Privacy Policy",
@@ -1068,6 +1071,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       legalTitle: "Yasal",
       copyright: "© 2026 Benim Depom. Tüm hakları saklıdır.",
       appLink: "Uygulamayı indir",
+      deleteAccountLink: "Hesabı sil",
     },
     waFloat: "WhatsApp'tan Bilgi Al",
     privacyAria: "Gizlilik Politikası",
