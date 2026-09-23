@@ -205,7 +205,7 @@
 .bd-landing .pf-viewfinder {
   flex: 1; border: 2px dashed rgba(255, 255, 255, 0.55); border-radius: 18px;
   display: flex; align-items: center; justify-content: center; position: relative;
-  background: linear-gradient(rgba(10, 18, 32, 0.14), rgba(10, 18, 32, 0.32)), url("/landing/showroom-hero.png") center / cover;
+  background: linear-gradient(rgba(10, 18, 32, 0.14), rgba(10, 18, 32, 0.32)), url("/landing/showroom-hero.jpg") center / cover;
 }
 .bd-landing .pf-viewfinder svg { width: 64px; height: 64px; color: rgba(255, 255, 255, 0.5); }
 .bd-landing .pf-corner { position: absolute; width: 16px; height: 16px; border-color: var(--orange); border-style: solid; }

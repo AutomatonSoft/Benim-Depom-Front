@@ -10,7 +10,6 @@ import { useI18n } from "@/i18n";
 
 type LoginResponse = {
   access: string;
-  refresh: string;
 };
 
 type Profile = {
@@ -32,7 +31,11 @@ export default function LoginPage() {
     try {
       const loginResponse = await fetch("/api/v1/auth/login/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Refresh-Token-Cookie": "manager",
+        },
+        credentials: "same-origin",
         body: JSON.stringify({ email, password }),
       });
 
@@ -58,7 +61,7 @@ export default function LoginPage() {
       }
 
       window.localStorage.setItem("benim_access_token", tokens.access);
-      window.localStorage.setItem("benim_refresh_token", tokens.refresh);
+      window.localStorage.removeItem("benim_refresh_token");
       window.location.replace("/manager");
     } catch {
       setError(t("common.apiUnreachable"));
