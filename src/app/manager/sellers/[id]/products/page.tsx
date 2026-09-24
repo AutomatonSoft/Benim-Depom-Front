@@ -37,6 +37,7 @@ type Product = {
 
 type ProductListResponse = {
   count: number;
+  archived_count?: number;
   next: string | null;
   previous: string | null;
   results: Product[];
@@ -56,6 +57,7 @@ export default function SellerProductsPage() {
   const sellerIdValid = Number.isInteger(sellerId) && sellerId > 0;
   const [products, setProducts] = useState<Product[]>([]);
   const [count, setCount] = useState(0);
+  const [archivedCount, setArchivedCount] = useState(0);
   const [page, setPage] = useState(1);
   const [availability, setAvailability] = useState("");
   const [search, setSearch] = useState("");
@@ -106,6 +108,7 @@ export default function SellerProductsPage() {
         if (cancelled) return;
         setProducts(data.results);
         setCount(data.count);
+        setArchivedCount(data.archived_count ?? 0);
         setHasNext(Boolean(data.next));
         setHasPrevious(Boolean(data.previous));
         const name = data.results.map(sellerLabel).find(Boolean);
@@ -162,7 +165,16 @@ export default function SellerProductsPage() {
       <PageHeader
         eyebrow={t("common.panel")}
         title={t("sellerProducts.title")}
-        description={subtitle}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{subtitle}</span>
+            {archivedCount > 0 ? (
+              <span className="inline-flex items-center rounded-full border border-border bg-secondary/60 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                {t("sellerProducts.archivedCount", { count: archivedCount })}
+              </span>
+            ) : null}
+          </span>
+        }
         actions={
           <Button asChild variant="secondary">
             <Link href="/manager/sellers">{t("sellerProducts.back")}</Link>
