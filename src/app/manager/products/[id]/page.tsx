@@ -60,6 +60,8 @@ type SetPart = {
 type ProductImage = {
   id: number;
   image: string;
+  preview?: string | null;
+  thumbnail?: string | null;
   position?: number;
   is_primary: boolean;
   processing_status: string;
@@ -69,7 +71,7 @@ type ProductImage = {
     status?: string;
     payload?: { product_id?: string };
   } | null;
-  generated_images: Array<{ id: number; image: string; mode: string }>;
+  generated_images: Array<{ id: number; image: string; preview?: string | null; thumbnail?: string | null; mode: string }>;
 };
 
 type PricingFormula = {
@@ -190,6 +192,8 @@ type Generation = {
 type GalleryItem = {
   key: string;
   url: string;
+  previewUrl: string;
+  thumbnailUrl: string;
   label: string;
   generated: boolean;
   sourceImageId?: number;
@@ -532,7 +536,7 @@ function parsePendingImages(value: unknown, product: Product) {
     const ids = new Set(value as number[]);
     return {
       added: current.filter((image) => ids.has(image.id)),
-      removed: [] as Array<{ id: number; url: string }>,
+      removed: [] as Array<{ id: number; url: string; thumbnailUrl?: string }>,
       kept: [] as typeof current,
     };
   }
@@ -544,9 +548,13 @@ function parsePendingImages(value: unknown, product: Product) {
     const removed = Array.isArray(record.removed)
       ? record.removed.flatMap((item) => {
           if (!item || typeof item !== "object") return [];
-          const row = item as { id?: unknown; url?: unknown };
+          const row = item as { id?: unknown; url?: unknown; thumbnail_url?: unknown };
           if (typeof row.url !== "string" || !row.url) return [];
-          return [{ id: Number(row.id) || 0, url: row.url }];
+          return [{
+            id: Number(row.id) || 0,
+            url: row.url,
+            thumbnailUrl: typeof row.thumbnail_url === "string" ? row.thumbnail_url : undefined,
+          }];
         })
       : [];
     return {
@@ -557,7 +565,7 @@ function parsePendingImages(value: unknown, product: Product) {
   }
   return {
     added: current,
-    removed: [] as Array<{ id: number; url: string }>,
+    removed: [] as Array<{ id: number; url: string; thumbnailUrl?: string }>,
     kept: current,
   };
 }
@@ -574,8 +582,8 @@ function PendingImageDiff({
   const { added, removed, kept } = parsePendingImages(value, product);
   const groups = [
     { key: "removed" as const, photos: removed, empty: removed.length === 0 },
-    { key: "added" as const, photos: added.map((image) => ({ id: image.id, url: image.image })), empty: added.length === 0 },
-    { key: "kept" as const, photos: kept.map((image) => ({ id: image.id, url: image.image })), empty: kept.length === 0 },
+    { key: "added" as const, photos: added.map((image) => ({ id: image.id, url: image.image, thumbnailUrl: image.thumbnail || image.image })), empty: added.length === 0 },
+    { key: "kept" as const, photos: kept.map((image) => ({ id: image.id, url: image.image, thumbnailUrl: image.thumbnail || image.image })), empty: kept.length === 0 },
   ];
   return (
     <div className="grid gap-3">
@@ -612,7 +620,9 @@ function PendingImageDiff({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={photo.url}
+                    src={photo.thumbnailUrl || photo.url}
+                    loading="lazy"
+                    decoding="async"
                     alt=""
                     className={cn("size-full object-cover", group.key === "removed" && "opacity-70")}
                   />
@@ -812,6 +822,8 @@ export default function ProductWorkspacePage() {
       items.push({
         key: `source-${image.id}`,
         url: image.image,
+        previewUrl: image.preview || image.image,
+        thumbnailUrl: image.thumbnail || image.image,
         label: image.is_primary ? t("product.primaryImage") : t("product.sourceImage"),
         generated: false,
         sourceImageId: image.id,
@@ -821,6 +833,8 @@ export default function ProductWorkspacePage() {
         items.push({
           key: `generated-${generated.id}`,
           url: generated.image,
+          previewUrl: generated.preview || generated.image,
+          thumbnailUrl: generated.thumbnail || generated.image,
           label: `${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`,
           generated: true,
           sourceImageId: image.id,
@@ -1939,7 +1953,7 @@ export default function ProductWorkspacePage() {
                 {selectedGalleryItem ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={selectedGalleryItem.url} alt={selectedGalleryItem.label} className="max-h-[420px] w-full object-contain" />
+                    <img src={selectedGalleryItem.previewUrl} alt={selectedGalleryItem.label} fetchPriority="high" decoding="async" className="max-h-[420px] w-full object-contain" />
                     {selectedGalleryItem.generated ? (
                       <span className="absolute left-3 top-3 rounded-lg bg-[var(--brand-accent)] px-2 py-1 text-[11px] font-extrabold text-white">
                         {t("product.aiGenerated")}
@@ -1993,7 +2007,7 @@ export default function ProductWorkspacePage() {
                       )}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.url} alt={item.label} className="size-full object-cover" />
+                      <img src={item.thumbnailUrl} alt={item.label} loading="lazy" decoding="async" className="size-full object-cover" />
                       {item.isPrimary ? <span className="absolute right-1 top-1 size-2 rounded-full bg-[var(--brand-accent)]" aria-hidden="true" /> : null}
                       {item.generated ? (
                         <>
@@ -2046,7 +2060,7 @@ export default function ProductWorkspacePage() {
                           onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={generated.image} alt={generated.mode} className="size-full object-cover" />
+                          <img src={generated.thumbnail || generated.image} alt={generated.mode} loading="lazy" decoding="async" className="size-full object-cover" />
                         </button>
                       ))}
                     </div>
@@ -2120,7 +2134,7 @@ export default function ProductWorkspacePage() {
                       onClick={() => setSelectedImageKey(`source-${image.id}`)}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image.image} alt="" className="size-full object-cover" />
+                      <img src={image.thumbnail || image.image} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                       <span className="absolute bottom-1 left-1 rounded bg-primary/80 px-1.5 text-[10px] font-bold text-white">{index + 1}</span>
                     </button>
                     <div className="min-w-0 flex-1 grid gap-1">
@@ -2140,7 +2154,7 @@ export default function ProductWorkspacePage() {
                                 onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
                               >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={generated.image} alt={generated.mode} className="size-full object-cover" />
+                                <img src={generated.thumbnail || generated.image} alt={generated.mode} loading="lazy" decoding="async" className="size-full object-cover" />
                               </button>
                               <button
                                 type="button"
