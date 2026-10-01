@@ -14,6 +14,7 @@ import { useI18n, type MessageKey } from "@/i18n";
 
 type ProductImage = {
   image: string;
+  thumbnail?: string | null;
   is_primary: boolean;
 };
 
@@ -250,7 +251,7 @@ export default function SellerProductsPage() {
                     <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-muted-foreground">
                       {primaryImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={primaryImage.image} alt="" className="size-full object-cover" />
+                        <img src={primaryImage.thumbnail || primaryImage.image} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                       ) : (
                         <span aria-hidden>▣</span>
                       )}

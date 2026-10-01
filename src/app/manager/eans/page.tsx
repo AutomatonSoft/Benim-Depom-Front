@@ -22,7 +22,14 @@ import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { useI18n } from "@/i18n";
 
-type Ean = { id: number; code: string; account: "jv" | "xl"; product_id: number | null; imported_at: string };
+type Ean = {
+  id: number;
+  code: string;
+  account: "jv" | "xl";
+  state: "available" | "reserved" | "consumed";
+  product_id: number | null;
+  imported_at: string;
+};
 type EanList = { next: string | null; previous: string | null; results: Ean[] };
 type Summary = { accounts: { account: string; available_count: number; is_low: boolean }[] };
 type ImportResult = { created_count: number; already_exists_count: number; invalid_count: number };
@@ -201,6 +208,13 @@ export default function EansPage() {
               </div>
               {items.map((item) => {
                 const isAssigned = Boolean(item.product_id);
+                const stateLabel = isAssigned
+                  ? t("eans.assigned")
+                  : item.state === "available"
+                    ? t("eans.availableCell")
+                    : item.state === "reserved"
+                      ? t("eans.reserved")
+                      : t("eans.consumed");
                 return (
                   <article
                     key={item.id}
@@ -209,8 +223,16 @@ export default function EansPage() {
                     <strong className="font-extrabold text-primary">{item.code}</strong>
                     <span className="font-bold text-muted-foreground">{item.account.toUpperCase()}</span>
                     <div className="flex flex-col gap-1">
-                      <StatusBadge status={isAssigned ? "assigned" : "available"}>
-                        {isAssigned ? t("eans.assigned") : t("eans.availableCell")}
+                      <StatusBadge
+                        status={
+                          isAssigned
+                            ? "assigned"
+                            : item.state === "available"
+                              ? "available"
+                              : "inactive"
+                        }
+                      >
+                        {stateLabel}
                       </StatusBadge>
                       {isAssigned ? <span className="text-xs font-semibold text-muted-foreground">#{item.product_id}</span> : null}
                     </div>
