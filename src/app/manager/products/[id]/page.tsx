@@ -266,10 +266,12 @@ function MarketplaceGeneratedImageSlot({
   error,
   onOpen,
   onReplace,
+  onAdd,
   onDelete,
   onRegenerate,
   disabled,
   replacing,
+  adding,
   failedLabel,
   emptyLabel,
   replaceLabel,
@@ -284,10 +286,12 @@ function MarketplaceGeneratedImageSlot({
   error?: string;
   onOpen?: () => void;
   onReplace?: (event: ChangeEvent<HTMLInputElement>) => void;
+  onAdd?: (event: ChangeEvent<HTMLInputElement>) => void;
   onDelete?: () => void;
   onRegenerate?: () => void;
   disabled?: boolean;
   replacing?: boolean;
+  adding?: boolean;
   failedLabel: string;
   emptyLabel: string;
   replaceLabel: string;
@@ -296,9 +300,11 @@ function MarketplaceGeneratedImageSlot({
   deleteLabel: string;
   emptyActionLabel?: string;
 }) {
+  const { t } = useI18n();
   const inProgress = ["pending", "processing", "result_received"].includes(status);
+  const actionClassName = "inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-2 whitespace-normal rounded-lg border border-border px-3 py-2 text-center text-xs font-bold leading-snug text-primary transition-colors hover:bg-secondary focus-within:ring-2 focus-within:ring-ring disabled:opacity-50 [&_svg]:shrink-0";
   return (
-    <article className="grid content-start gap-2 rounded-xl border border-border bg-card p-3">
+    <article className="grid min-w-0 content-start gap-2 rounded-xl border border-border bg-card p-3">
       <strong className="text-sm font-extrabold text-primary">{title}</strong>
       {image ? (
         <button type="button" className="relative aspect-square w-full overflow-hidden rounded-lg border border-border" onClick={onOpen}>
@@ -312,25 +318,33 @@ function MarketplaceGeneratedImageSlot({
           {status === "failed" ? failedLabel : emptyLabel}
         </p>
       )}
-      {image ? (
-        <div className="flex flex-wrap gap-1.5">
-          {onReplace ? <label aria-disabled={disabled} className={cn("inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs font-bold text-primary hover:bg-secondary", disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer")}>
-            {replacing ? <RefreshCw className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}{replacing ? replacePendingLabel : replaceLabel}
-            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled} onChange={onReplace} />
-          </label> : null}
-          {onRegenerate ? <button type="button" disabled={disabled} onClick={onRegenerate} className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs font-bold text-primary hover:bg-secondary disabled:opacity-50">
-            <RefreshCw className="size-3.5" />{regenerateLabel}
-          </button> : null}
-          {onDelete ? <button type="button" disabled={disabled} onClick={onDelete} className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 px-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
-            <Trash2 className="size-3.5" />{deleteLabel}
-          </button> : null}
-        </div>
-      ) : null}
-      {!image && onRegenerate ? (
-        <Button type="button" size="sm" variant="secondary" disabled={disabled} onClick={onRegenerate}>
-          {status === "failed" ? regenerateLabel : emptyActionLabel ?? regenerateLabel}
-        </Button>
-      ) : null}
+      <div className="mx-auto mt-1 grid w-full min-w-0 max-w-[220px] gap-2">
+        {image ? (
+          <>
+            {onReplace ? <label aria-disabled={disabled} className={cn(actionClassName, disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer")}>
+              {replacing ? <RefreshCw className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}{replacing ? replacePendingLabel : replaceLabel}
+              <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled} onChange={onReplace} />
+            </label> : null}
+            {onRegenerate ? <button type="button" disabled={disabled} onClick={onRegenerate} className={actionClassName}>
+              <RefreshCw className="size-3.5" />{regenerateLabel}
+            </button> : null}
+            {onDelete ? <button type="button" disabled={disabled} onClick={onDelete} className={cn(actionClassName, "border-rose-200 text-rose-700 hover:bg-rose-50")}>
+              <Trash2 className="size-3.5" />{deleteLabel}
+            </button> : null}
+          </>
+        ) : onAdd ? (
+          <label aria-disabled={disabled || adding} className={cn(actionClassName, disabled || adding ? "cursor-not-allowed opacity-50" : "cursor-pointer")}>
+            {adding ? <RefreshCw className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}{adding ? replacePendingLabel : t("product.addImage")}
+            <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled || adding} onChange={onAdd} />
+          </label>
+        ) : null}
+        {!image && onRegenerate ? (
+          <button type="button" className={cn(actionClassName, "bg-secondary")} disabled={disabled} onClick={onRegenerate}>
+            <RefreshCw className="size-3.5" />
+            {status === "failed" ? regenerateLabel : emptyActionLabel ?? regenerateLabel}
+          </button>
+        ) : null}
+      </div>
       {error ? <small className="text-xs font-semibold text-[var(--ui-danger)]">{error}</small> : null}
     </article>
   );
@@ -1516,6 +1530,37 @@ export default function ProductWorkspacePage() {
     }
   }
 
+  /** Upload a manager-provided image into the selected generated-photo slot. */
+  async function addGeneratedPhoto(
+    mode: "white" | "xl_cover" | "interior" | "human",
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    if (!file || !coverImage) return;
+    const photoKey = `add-${mode}`;
+    setReplacingPhotoKey(photoKey);
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const body = new FormData();
+      body.set("image", file);
+      body.set("mode", mode);
+      const response = await authorizedFetch(
+        `/api/v1/products/${productId}/images/${coverImage.id}/generated/`,
+        { method: "POST", body },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(apiErrorMessage(data, t("product.imageUploadFailed")));
+      setFeedback(t("product.imageUploaded"));
+      await loadProduct({ silent: true });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("product.imageUploadFailed"));
+    } finally {
+      setSaving(false);
+      setReplacingPhotoKey(null);
+      event.target.value = "";
+    }
+  }
+
   async function deleteGeneratedImage(imageId: number, generatedId: number) {
     setSaving(true); setError(""); setFeedback("");
     try {
@@ -2457,6 +2502,8 @@ export default function ProductWorkspacePage() {
                       status={coverImage.processing_status}
                       error={coverImage.processing_error}
                       onOpen={() => openGeneratedImage("white")}
+                      onAdd={(event) => void addGeneratedPhoto("white", event)}
+                      adding={replacingPhotoKey === "add-white"}
                       onReplace={(event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("white")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("white")?.id}`)}
                       replacing={replacingPhotoKey === `generated-${generatedCoverByMode.get("white")?.id}`}
                       onDelete={() => {
@@ -2477,10 +2524,12 @@ export default function ProductWorkspacePage() {
                       status={coverImage.xl_cover_status ?? "idle"}
                       error={coverImage.xl_cover_error}
                       onOpen={() => xlCoverCandidate && setSelectedImageKey(`generated-${xlCoverCandidate.id}`)}
+                      onAdd={(event) => void addGeneratedPhoto("xl_cover", event)}
+                      adding={replacingPhotoKey === "add-xl_cover"}
                       onReplace={xlCoverCandidate ? (event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${xlCoverCandidate.id}/replace/`, event, `generated-${xlCoverCandidate.id}`) : undefined}
                       replacing={replacingPhotoKey === `generated-${xlCoverCandidate?.id}`}
                       onDelete={xlCoverCandidate ? () => setPendingDeleteGenerated({ imageId: coverImage.id, generatedId: xlCoverCandidate.id }) : undefined}
-                      onRegenerate={hasExternalImageSet ? () => void generateImage(coverImage.id, "xl_cover") : undefined}
+                      onRegenerate={generatedCoverByMode.has("white") ? () => void generateImage(coverImage.id, "xl_cover") : undefined}
                       disabled={saving || imageGenerationInProgress}
                       failedLabel={t("product.generationFailed")}
                       emptyLabel={t("product.notGenerated")}
@@ -2499,6 +2548,8 @@ export default function ProductWorkspacePage() {
                         image={generatedCoverByMode.get("interior")}
                         status={coverImage.processing_status}
                         onOpen={() => openGeneratedImage("interior")}
+                        onAdd={(event) => void addGeneratedPhoto("interior", event)}
+                        adding={replacingPhotoKey === "add-interior"}
                         onReplace={generatedCoverByMode.get("interior") ? (event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("interior")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("interior")?.id}`) : undefined}
                         replacing={replacingPhotoKey === `generated-${generatedCoverByMode.get("interior")?.id}`}
                         onDelete={generatedCoverByMode.get("interior") ? () => setPendingDeleteGenerated({ imageId: coverImage.id, generatedId: generatedCoverByMode.get("interior")!.id }) : undefined}
@@ -2516,6 +2567,8 @@ export default function ProductWorkspacePage() {
                         status={coverImage.processing_status}
                         error={undefined}
                         onOpen={() => openGeneratedImage("human")}
+                        onAdd={(event) => void addGeneratedPhoto("human", event)}
+                        adding={replacingPhotoKey === "add-human"}
                         onReplace={generatedCoverByMode.get("human") ? (event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("human")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("human")?.id}`) : undefined}
                         replacing={replacingPhotoKey === `generated-${generatedCoverByMode.get("human")?.id}`}
                         onDelete={generatedCoverByMode.get("human") ? () => setPendingDeleteGenerated({ imageId: coverImage.id, generatedId: generatedCoverByMode.get("human")!.id }) : undefined}
