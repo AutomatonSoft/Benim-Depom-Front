@@ -1,14 +1,6 @@
 ﻿import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
 import LegacyRefreshCleanup from "@/components/LegacyRefreshCleanup";
 import "./globals.css";
-
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Benim Depom | Türkiye'den Avrupa'ya Mobilya Satışı",
@@ -22,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${montserrat.className}`}>
+    <html lang="en">
       <body>
         <LegacyRefreshCleanup />
         {children}
