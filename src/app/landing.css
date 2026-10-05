@@ -448,6 +448,13 @@
 .bd-landing .dl-card-body h3 { font-size: 1.3rem; }
 .bd-landing .dl-card-body > p { color: var(--ink-soft); font-size: 0.97rem; max-width: 420px; }
 .bd-landing .dl-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-faint); }
+.bd-landing .google-play-button { gap: 14px; padding: 12px 24px; background: #151515; color: #fff; border-color: #353535; box-shadow: var(--shadow-sm); }
+.bd-landing .google-play-button:hover { background: #292929; box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.bd-landing .google-play-button:focus-visible { outline: 3px solid var(--orange); outline-offset: 4px; }
+.bd-landing .google-play-button svg { width: 30px; height: 30px; flex-shrink: 0; }
+.bd-landing .google-play-button span { display: grid; gap: 2px; text-align: left; }
+.bd-landing .google-play-button small { font-size: 0.75rem; font-weight: 500; }
+.bd-landing .google-play-button strong { font-size: 1.35rem; font-weight: 600; line-height: 1.15; }
 
 /* about */
 .bd-landing .about-wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.95fr); gap: clamp(36px, 6vw, 72px); align-items: stretch; }
