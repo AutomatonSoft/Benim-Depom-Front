@@ -176,8 +176,7 @@ export const CONTACT = {
   whatsappUrl: "https://wa.me/4917643450100",
 };
 
-// APK file served as a static asset from public/downloads/.
-export const APP_DOWNLOAD_URL = "/downloads/benim-depom.apk";
+export const APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.benimdepom";
 
 export const MARKETPLACES = ["OTTO", "Kaufland", "Hood.de"];
 
@@ -408,8 +407,8 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       ],
       cardTitle: "Benim Depom App für Android",
       cardText: "Laden Sie die App auf Ihr Smartphone und legen Sie Ihr erstes Produkt in wenigen Minuten an.",
-      btn: "App herunterladen (APK)",
-      note: "Android APK · iOS folgt",
+      btn: "Jetzt herunterladen",
+      note: "Für Android bei Google Play · iOS folgt",
     },
     about: {
       eyebrow: "Über uns",
@@ -706,8 +705,8 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       ],
       cardTitle: "Benim Depom app for Android",
       cardText: "Download the app to your smartphone and create your first product in a few minutes.",
-      btn: "Download the app (APK)",
-      note: "Android APK · iOS coming later",
+      btn: "Get it on",
+      note: "For Android on Google Play · iOS coming later",
     },
     about: {
       eyebrow: "About us",
@@ -1003,8 +1002,8 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       ],
       cardTitle: "Android için Benim Depom uygulaması",
       cardText: "Uygulamayı telefonunuza indirin ve ilk ürününüzü birkaç dakikada oluşturun.",
-      btn: "Uygulamayı indir (APK)",
-      note: "Android APK · iOS yakında",
+      btn: "Şimdi indirin",
+      note: "Android için Google Play'de · iOS yakında",
     },
     about: {
       eyebrow: "Hakkımızda",
