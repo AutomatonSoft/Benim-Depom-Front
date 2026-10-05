@@ -58,6 +58,8 @@ type Job = {
   product_id: number;
   product_title?: string;
   operation: string;
+  reconciliation_action?: "check" | "confirm_manual" | "set_manual" | "";
+  requested_by_id?: number;
   status: string;
   in_progress: boolean;
   requested_channels: string[];
@@ -147,7 +149,7 @@ function detailText(value: unknown): string {
 }
 
 function jobCanShowDetails(job: Job) {
-  return job.status === "failed" || job.status === "partial";
+  return Boolean(job.reconciliation_action) || job.status === "failed" || job.status === "partial";
 }
 
 function redirectIfUnauthorized(status: number) {
@@ -183,6 +185,8 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
   const [notice, setNotice] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [detailJob, setDetailJob] = useState<Job | null>(null);
+  const [manualPublication, setManualPublication] = useState<Publication | null>(null);
+  const [manualStatus, setManualStatus] = useState("");
   const silentReload = useRef(false);
 
   const listingBusy = useMemo(
@@ -275,8 +279,42 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
   function queuedNotice(job: Job) {
     return t("marketplaces.jobQueued", {
       id: job.id.slice(0, 8),
-      operation: t(`job.op.${job.operation}` as MessageKey),
+      operation: jobOperationLabel(job),
     });
+  }
+
+  function jobOperationLabel(job: Job) {
+    if (job.reconciliation_action === "check") return t("marketplaces.checkStatus");
+    if (job.reconciliation_action === "confirm_manual") return t("marketplaces.manualConfirmation");
+    if (job.reconciliation_action === "set_manual") return t("marketplaces.changeStatus");
+    return t(`job.op.${job.operation}` as MessageKey);
+  }
+
+  async function reconcilePublication(publication: Publication, action: "check" | "set_manual") {
+    if (busyKey) return;
+    setBusyKey(`${publication.id}:${action}`);
+    setError("");
+    setNotice("");
+    try {
+      const job = await postJob(`/api/v1/orchestrator/publications/${publication.id}/reconcile/`, {
+        action,
+        ...(action === "set_manual" ? { status: manualStatus } : {}),
+      }) as Job | null;
+      if (job) {
+        setNotice(action === "check" ? t("marketplaces.checkQueued") : t("marketplaces.statusSaved"));
+        if (action === "check") {
+          setInProgressJobs((rows) => [job, ...rows]);
+          setInProgressCount((count) => count + 1);
+        }
+        setManualPublication(null);
+        setManualStatus("");
+        setReloadKey((value) => value + 1);
+      }
+    } catch {
+      setError(t("common.apiUnreachable"));
+    } finally {
+      setBusyKey("");
+    }
   }
 
   async function postJob(path: string, body: unknown) {
@@ -295,7 +333,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
 
   async function runListingAction(
     publication: Publication,
-    action: "deactivate" | "activate" | "delete" | "publish",
+    action: "deactivate" | "activate" | "delete" | "publish" | "update",
   ) {
     const pair = { marketplace: publication.marketplace, account: publication.account };
     const confirms: Record<typeof action, string> = {
@@ -308,6 +346,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
       activate: t("marketplaces.confirmActivate"),
       delete: t("marketplaces.confirmDelete", { marketplace: marketplaceName[publication.marketplace] }),
       publish: t("marketplaces.confirmPublish"),
+      update: t("marketplaces.confirmUpdate", { marketplace: marketplaceName[publication.marketplace] }),
     };
     if (!window.confirm(confirms[action])) return;
 
@@ -334,7 +373,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
       }
       if (data) {
         const nextStatus =
-          action === "activate"
+          action === "activate" || action === "publish" || action === "update"
             ? "publishing"
             : action === "delete" || publication.marketplace !== "otto"
               ? "deleting"
@@ -352,13 +391,32 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
   }
 
   function listingActions(publication: Publication) {
-    const busy = listingBusyStatuses.has(publication.status) || Boolean(busyKey);
+    const checking = inProgressJobs.some((job) => job.product_id === publication.product_id);
+    const busy = listingBusyStatuses.has(publication.status) || Boolean(busyKey) || checking;
     const isBusy = (action: string) => busyKey === `${publication.id}:${action}`;
     if (listingBusyStatuses.has(publication.status)) {
       return <span className="text-xs font-bold text-muted-foreground">{t("marketplaces.waitingMarketplace")}</span>;
     }
     return (
       <div className="listing-actions">
+        {["failed", "active", "deactivated"].includes(publication.status) && (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void reconcilePublication(publication, "check")}>
+            {isBusy("check") || checking ? t("marketplaces.checkingStatus") : t("marketplaces.checkStatus")}
+          </Button>
+        )}
+        {["failed", "active", "deactivated", "deleted"].includes(publication.status) && (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
+            setManualStatus("");
+            setManualPublication(publication);
+          }}>
+            {t("marketplaces.changeStatus")}
+          </Button>
+        )}
+        {publication.status === "active" && (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runListingAction(publication, "update")}>
+            {isBusy("update") ? t("marketplaces.queueing") : t("marketplaces.actionUpdate")}
+          </Button>
+        )}
         {publication.status === "active" && (
           <Button size="sm" variant="destructive" disabled={busy} onClick={() => void runListingAction(publication, "deactivate")}>
             {isBusy("deactivate")
@@ -430,7 +488,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                   </Link>
                   <small>#{job.product_id}</small>
                 </div>
-                <span>{t(`job.op.${job.operation}` as MessageKey)}</span>
+                <span>{jobOperationLabel(job)}</span>
                 <span>{(job.requested_targets || []).map(targetKey).join(" · ") || job.requested_channels.join(", ")}</span>
                 <StatusBadge status={job.status}>{t(`job.${job.status}` as MessageKey)}</StatusBadge>
                 <time dateTime={job.created_at}>{formatDate(job.created_at, true)}</time>
@@ -639,7 +697,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                     </Link>
                     <small>#{job.product_id}</small>
                   </div>
-                  <span>{t(`job.op.${job.operation}` as MessageKey)}</span>
+                  <span>{jobOperationLabel(job)}</span>
                   <span>
                     {(job.requested_targets || []).map(targetKey).join(" · ") || job.requested_channels.join(", ")}
                   </span>
@@ -664,6 +722,44 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
         ) : null}
       </section>
 
+      <Dialog open={Boolean(manualPublication)} onOpenChange={(open) => {
+        if (!open && !busyKey) setManualPublication(null);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("marketplaces.changeStatus")}</DialogTitle>
+            <DialogDescription>{t("marketplaces.changeStatusHelp")}</DialogDescription>
+          </DialogHeader>
+          {manualPublication && (
+            <>
+              <div className="rounded-xl border bg-muted/30 p-3 text-sm">
+                <p className="font-bold">{manualPublication.product_title}</p>
+                <p className="mt-1 text-muted-foreground">
+                  {marketplaceName[manualPublication.marketplace]} {manualPublication.account.toUpperCase()} · EAN {manualPublication.ean}
+                </p>
+              </div>
+              <label className="grid gap-2 text-sm font-semibold">
+                {t("marketplaces.newStatus")}
+                <FilterSelect value={manualStatus} onChange={(event) => setManualStatus(event.target.value)} disabled={Boolean(busyKey)}>
+                  <option value="" disabled>{t("marketplaces.selectStatus")}</option>
+                  <option value="active">{t("pub.active")}</option>
+                  <option value="deactivated">{t("pub.deactivated")}</option>
+                  <option value="failed">{t("pub.failed")}</option>
+                </FilterSelect>
+              </label>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" disabled={Boolean(busyKey)} onClick={() => setManualPublication(null)}>{t("marketplaces.cancelConfirmation")}</Button>
+                <Button variant="accent" disabled={!manualStatus || Boolean(busyKey)}
+                  onClick={() => void reconcilePublication(manualPublication, "set_manual")}>
+                  {busyKey ? t("marketplaces.queueing") : t("marketplaces.saveStatus")}
+                </Button>
+              </div>
+              {error && <Feedback>{error}</Feedback>}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(detailJob)} onOpenChange={(open) => !open && setDetailJob(null)}>
         <DialogContent className="sm:max-w-md" showCloseButton>
           {detailJob ? (
@@ -672,11 +768,14 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                 <DialogTitle className="pr-8 font-extrabold text-primary">
                   {t(`job.${detailJob.status}` as MessageKey)}
                   {" · "}
-                  {t(`job.op.${detailJob.operation}` as MessageKey)}
+                  {jobOperationLabel(detailJob)}
                 </DialogTitle>
                 <DialogDescription>
                   {detailJob.product_title || `#${detailJob.product_id}`} · #{detailJob.product_id}
                 </DialogDescription>
+                {detailJob.reconciliation_action && detailJob.requested_by_id && (
+                  <p className="text-xs text-muted-foreground">{t("marketplaces.confirmationAuthor", { id: detailJob.requested_by_id })}</p>
+                )}
               </DialogHeader>
 
               <div className="grid max-h-[60vh] gap-3 overflow-y-auto">
@@ -689,6 +788,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                       .filter(Boolean)
                       .join(" ");
                     const text =
+                      (result.ok && detailJob.reconciliation_action ? t(detailJob.reconciliation_action === "set_manual" ? "marketplaces.statusSaved" : "marketplaces.publicationConfirmed") : "") ||
                       detailText(result.details) ||
                       detailText(result.error) ||
                       (result.ok
