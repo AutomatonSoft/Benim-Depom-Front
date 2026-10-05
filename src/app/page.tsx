@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Play } from "lucide-react";
 
 import Link from "next/link";
 
@@ -498,12 +499,15 @@ export default function LandingPage() {
               </ul>
             </div>
             <div className="window-card">
-              <div className="window-bar"><span className="wdot" /><span className="wdot" /><span className="wdot" /><span className="wtitle">benim-depom.apk</span></div>
+              <div className="window-bar"><span className="wdot" /><span className="wdot" /><span className="wdot" /><span className="wtitle">Benim Depom · Google Play</span></div>
               <div className="dl-card-body">
                 <div className="dl-phone-icon"><Ic name="phone" /></div>
                 <h3>{t.download.cardTitle}</h3>
                 <p>{t.download.cardText}</p>
-                <a className="btn btn-primary" download href={APP_DOWNLOAD_URL}><Ic name="download" />{t.download.btn}</a>
+                <a className="btn google-play-button" href={APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+                  <Play aria-hidden="true" fill="currentColor" strokeWidth={0} />
+                  <span><small>{t.download.btn}</small><strong>Google Play</strong></span>
+                </a>
                 <span className="dl-note">{t.download.note}</span>
               </div>
             </div>
