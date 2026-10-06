@@ -2389,64 +2389,13 @@ export default function ProductWorkspacePage() {
 
             <div className="grid gap-3 content-start">
               {product.images.length === 0 ? <p className="text-sm text-muted-foreground">{t("product.noSourceImages")}</p> : null}
-              {hasSetParts && coverImage ? (
-                <div className="grid gap-3 rounded-2xl border border-[rgba(247,148,29,0.45)] bg-gradient-to-b from-[#fffaf3] to-card p-4">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.setPhotosEyebrow")}</p>
-                    <h3 className="text-base font-extrabold text-primary">{t("product.setPhotosTitle")}</h3>
-                    <p className="mt-1 text-xs font-semibold text-muted-foreground">{t("product.setPhotosHint")}</p>
-                  </div>
-                  {coverImage.generated_images.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {coverImage.generated_images.map((generated) => (
-                        <button
-                          key={generated.id}
-                          type="button"
-                          className="relative size-16 overflow-hidden rounded-xl border border-border"
-                          title={`${t("product.aiGenerated")} · ${t(`mode.${generated.mode}` as MessageKey)}`}
-                          onClick={() => setSelectedImageKey(`generated-${generated.id}`)}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={generated.thumbnail || generated.image} alt={generated.mode} loading="lazy" decoding="async" className="size-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  {isImageGenerationInProgress(coverImage) ? (
-                    <BackgroundProgress label={t("product.setPhotosTitle")} status={coverImage.processing_status} />
-                  ) : null}
-                  {coverImage.processing_error ? (
-                    <small className="text-xs font-semibold text-[var(--ui-danger)]">{coverImage.processing_error}</small>
-                  ) : null}
-                  {coverImage.processing_result?.provider === "gemini_set" ? (
-                    <small className="text-xs font-semibold text-muted-foreground">{t("product.setPhotosGemini")}</small>
-                  ) : coverImage.processing_result?.payload?.product_id ? (
-                    <small className="text-xs font-semibold text-[var(--ui-danger)]">{t("product.setPhotosWrongService")}</small>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    variant="accent"
-                    className="w-fit"
-                    disabled={saving || product.status !== "approved" || isImageGenerationInProgress(coverImage)}
-                    onClick={() => void generateImage(coverImage.id)}
-                  >
-                    {isImageGenerationInProgress(coverImage)
-                      ? t("product.generating")
-                      : product.status !== "approved"
-                        ? t("product.generateAfterApprove")
-                        : coverImage.generated_images.length
-                          ? t("product.generateSetPhotosAgain")
-                          : t("product.generateSetPhotos")}
-                  </Button>
-                </div>
-              ) : null}
-              {!hasSetParts && coverImage ? (
+              {coverImage ? (
                 <section className="grid gap-3 rounded-2xl border border-[rgba(247,148,29,0.45)] bg-gradient-to-b from-[#fffaf3] to-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t("product.imageGeneration")}</p>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--brand-accent)]">{t(hasSetParts ? "product.setPhotosEyebrow" : "product.imageGeneration")}</p>
                       <h3 className="text-base font-extrabold text-primary">{t("product.marketplaceImages")}</h3>
-                      <p className="mt-1 max-w-3xl text-xs font-semibold text-muted-foreground">{t("product.marketplaceImagesHint")}</p>
+                      <p className="mt-1 max-w-3xl text-xs font-semibold text-muted-foreground">{t(hasSetParts ? "product.setMarketplaceImagesHint" : "product.marketplaceImagesHint")}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
@@ -2470,9 +2419,9 @@ export default function ProductWorkspacePage() {
                           size="sm"
                           variant="secondary"
                           disabled={saving || imageGenerationInProgress}
-                          onClick={() => void generateImage(coverImage.id, "external")}
+                          onClick={() => void generateImage(coverImage.id, hasSetParts ? undefined : "external")}
                         >
-                          {t("product.regenerateMarketplacePhotos")}
+                          {t(hasSetParts ? "product.generateSetPhotosAgain" : "product.regenerateMarketplacePhotos")}
                         </Button>
                       ) : null}
                     </div>
@@ -2480,7 +2429,7 @@ export default function ProductWorkspacePage() {
                   <div className="grid gap-2 sm:grid-cols-2">
                     {coverImage.processing_status !== "idle" || hasExternalImageSet ? (
                       <BackgroundProgress
-                        label={t("product.externalPhotoBatch")}
+                        label={t(hasSetParts ? "product.setPhotosTitle" : "product.externalPhotoBatch")}
                         status={coverImage.processing_status === "idle" ? "succeeded" : coverImage.processing_status}
                         readyLabel={t("product.imagesReady")}
                         failedLabel={t("product.imageTaskFailed")}
@@ -2634,7 +2583,7 @@ export default function ProductWorkspacePage() {
                         {image.processing_status === "idle" ? t("product.notGenerated") : image.processing_status.replaceAll("_", " ")}
                       </small>
                       {image.processing_error && !hasSetParts ? <small className="text-xs font-semibold text-[var(--ui-danger)]">{image.processing_error}</small> : null}
-                      {hasSetParts && image.generated_images.length > 0 ? (
+                      {hasSetParts && !image.is_primary && image.generated_images.length > 0 ? (
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {image.generated_images.map((generated) => (
                             <div key={generated.id} className="relative">
