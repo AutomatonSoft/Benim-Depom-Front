@@ -34,6 +34,7 @@ import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { listingTargetKey, listingTargets } from "@/lib/listings";
 import { materialPair, materialsPayload } from "@/lib/materials";
+import { calculateMarginEur } from "@/lib/pricing-margin";
 import { cn } from "@/lib/utils";
 import { useI18n, type MessageKey } from "@/i18n";
 
@@ -380,12 +381,14 @@ function sellerPriceEur(product: Product) {
 const cityOrder = ["IST", "ANK", "IZM", "BUR", "KSY", "INE"] as const;
 
 function FormulaEditorDialog({
+  product,
   formula,
   saving,
   onClose,
   onSave,
   onReset,
 }: {
+  product: Product;
   formula: PricingFormula;
   saving: boolean;
   onClose: () => void;
@@ -394,12 +397,15 @@ function FormulaEditorDialog({
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState(formula);
+  const [marginResult, setMarginResult] = useState<number | null | undefined>();
 
   function setField(field: "margin" | "adv_fee" | "vat" | "eur_to_try" | "eur_to_usd", value: string) {
+    setMarginResult(undefined);
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
   function setCity(city: string, value: string) {
+    setMarginResult(undefined);
     setDraft((current) => ({
       ...current,
       city_tariffs_eur_per_cbm: { ...current.city_tariffs_eur_per_cbm, [city]: value },
@@ -407,6 +413,7 @@ function FormulaEditorDialog({
   }
 
   function setTier(index: number, field: "min_cbm" | "max_cbm" | "price_eur", value: string) {
+    setMarginResult(undefined);
     setDraft((current) => ({
       ...current,
       de_size_tiers: current.de_size_tiers.map((tier, itemIndex) => itemIndex === index ? { ...tier, [field]: value } : tier),
@@ -465,6 +472,24 @@ function FormulaEditorDialog({
                 <Label>{t("formula.vat")}</Label>
                 <Input required step="0.01" min="0" type="number" value={String(draft.vat)} onChange={(event) => setField("vat", event.target.value)} />
               </div>
+            </div>
+          </section>
+          <section className="rounded-xl border border-[var(--brand-accent)]/20 bg-[var(--brand-accent)]/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0 flex-1 basis-56">
+                <h3 className="text-sm font-extrabold text-primary">{t("formula.marginAmount")}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">{t("formula.marginHint")}</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setMarginResult(calculateMarginEur(product, draft))}>
+                {t("formula.calculateMargin")}
+              </Button>
+            </div>
+            <div aria-live="polite">
+              {typeof marginResult === "number" ? (
+                <p className="mt-3 text-2xl font-extrabold tabular-nums text-emerald-700">{formatMoney(String(marginResult), "EUR")}</p>
+              ) : marginResult === null ? (
+                <p className="mt-3 text-sm text-[var(--ui-danger)]">{t("formula.marginUnavailable")}</p>
+              ) : null}
             </div>
           </section>
           <section className="grid gap-3">
@@ -2786,6 +2811,7 @@ export default function ProductWorkspacePage() {
 
       {priceHelpOpen && product.pricing_formula ? (
         <FormulaEditorDialog
+          product={product}
           formula={product.pricing_formula}
           saving={saving}
           onClose={() => setPriceHelpOpen(false)}
