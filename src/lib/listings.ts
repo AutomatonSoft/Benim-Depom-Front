@@ -33,7 +33,7 @@ export function ottoCatalogPath(path: string, language: OttoCatalogLanguage) {
 export function defaultOttoShippingProfileId(
   profiles: Array<{ shipping_profile_id: string; shipping_profile_name: string }>,
 ) {
-  const match = profiles.find((profile) => /4\s*[-–]\s*8\s*wochen/i.test(profile.shipping_profile_name));
+  const match = profiles.find((profile) => /2\s*[-–]\s*4\s*wochen/i.test(profile.shipping_profile_name));
   return match?.shipping_profile_id ?? "";
 }
 
