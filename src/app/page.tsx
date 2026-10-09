@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Play } from "lucide-react";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { landingFontVars } from "@/components/landing/fonts";
 import { Ic } from "@/components/landing/icons";
@@ -631,7 +632,7 @@ export default function LandingPage() {
             <div className="footer-brand">
               <div className="footer-logo-text">Benim<span className="accent">Depom</span></div>
               <p>{t.footer.tagline}</p>
-              <img
+              <Image
                 alt="Benim Depom"
                 className="footer-mark"
                 height={229}

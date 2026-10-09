@@ -1,11 +1,11 @@
-// Run with: node --test tests/pricing-margin.test.cjs
-const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
-const { test } = require("node:test");
-const ts = require("typescript");
+// Run with: node --test tests/pricing-margin.test.mjs
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import ts from "typescript";
 
 const compiled = ts.transpileModule(
-  readFileSync(`${__dirname}/../src/lib/pricing-margin.ts`, "utf8"),
+  readFileSync(new URL("../src/lib/pricing-margin.ts", import.meta.url), "utf8"),
   { compilerOptions: { module: ts.ModuleKind.CommonJS } },
 ).outputText;
 const compiledModule = { exports: {} };
