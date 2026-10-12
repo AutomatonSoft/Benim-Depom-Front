@@ -12,3 +12,10 @@ export function formatDate(value: string, withTime = false) {
     timeZone: getTimezone(),
   }).format(new Date(value));
 }
+
+export function formatTime(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeStyle: "medium",
+    timeZone: getTimezone(),
+  }).format(new Date(value));
+}
