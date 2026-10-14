@@ -10,7 +10,7 @@ function FilterSelect({ className, children, ...props }: React.ComponentProps<"s
       <select
         data-slot="filter-select"
         className={cn(
-          "flex h-10 w-full appearance-none rounded-[10px] border border-input bg-card px-3 py-2 pr-9 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full cursor-pointer appearance-none rounded-[10px] border border-input bg-card px-3 py-2 pr-9 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50",
           "[background-image:none]",
         )}
         {...props}
