@@ -2322,7 +2322,7 @@ export default function ProductWorkspacePage() {
                   <small className="text-xs font-semibold text-[var(--brand-accent)]">{t("product.manualListing")}</small>
                 ) : null}
       </div>
-              <p className="text-sm font-semibold text-muted-foreground">
+              <p className="text-base font-bold text-primary">
                 {t("product.warehouse", { city: product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—" })}
               </p>
               <h3 className="text-base font-extrabold text-primary">{t("product.variants", { count: totalQuantity })}</h3>

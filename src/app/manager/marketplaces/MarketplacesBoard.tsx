@@ -88,9 +88,8 @@ const publicationStatusKeys = [
   "publishing",
   "active",
   "deactivating",
-  "deactivated",
+  "removed",
   "deleting",
-  "deleted",
   "failed",
 ] as const;
 const jobStatusKeys = [
@@ -554,7 +553,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
               <option value="">{t("marketplaces.allStatuses")}</option>
               {publicationStatusKeys.map((value) => (
                 <option key={value} value={value}>
-                  {t(`pub.${value}` as MessageKey)}
+                  {t(`pub.${value === "removed" ? "deactivated" : value}` as MessageKey)}
                 </option>
               ))}
             </FilterSelect>
