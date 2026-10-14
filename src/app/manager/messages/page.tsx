@@ -731,6 +731,7 @@ export default function MessagesPage() {
           </form>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-primary">
             <Checkbox
+              className="cursor-pointer"
               checked={unreadOnly}
               onCheckedChange={(value) => {
                 setPage(1);
@@ -756,7 +757,7 @@ export default function MessagesPage() {
                 type="button"
                 onClick={() => selectCategory(tab.id)}
                 className={cn(
-                  "inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-bold transition-colors",
+                  "inline-flex shrink-0 cursor-pointer items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-bold transition-colors",
                   active
                     ? "border-[var(--brand-accent)] text-primary"
                     : "border-transparent text-muted-foreground hover:text-primary",
