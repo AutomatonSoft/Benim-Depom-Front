@@ -192,7 +192,7 @@ export function DateRangePicker({
                 type="button"
                 onClick={() => pickDay(cell)}
                 className={cn(
-                  "grid size-9 place-items-center rounded-full text-sm font-semibold transition-colors",
+                  "grid size-9 cursor-pointer place-items-center rounded-full text-sm font-semibold transition-colors",
                   between && "bg-[#eef3f9] text-primary",
                   selected && "bg-primary text-primary-foreground",
                   !selected && !between && "text-primary hover:bg-[#eef3f9]",
@@ -224,7 +224,7 @@ export function DateRangePicker({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold text-primary shadow-[0_1px_2px_rgba(20,47,85,0.06)] hover:border-primary/25"
+            className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold text-primary shadow-[0_1px_2px_rgba(20,47,85,0.06)] hover:border-primary/25"
           >
             <Calendar className="size-4 text-[var(--brand-accent)]" />
             {label}
@@ -237,7 +237,7 @@ export function DateRangePicker({
           <div className="mb-4 flex items-center justify-between">
             <button
               type="button"
-              className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary"
+              className="grid size-8 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-secondary"
               onClick={() => setLeftMonth(addMonths(leftMonth, -1))}
               aria-label={t("overview.prevMonth")}
             >
@@ -245,7 +245,7 @@ export function DateRangePicker({
             </button>
             <button
               type="button"
-              className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary"
+              className="grid size-8 cursor-pointer place-items-center rounded-full text-muted-foreground hover:bg-secondary"
               onClick={() => setLeftMonth(addMonths(leftMonth, 1))}
               aria-label={t("overview.nextMonth")}
             >
@@ -262,7 +262,7 @@ export function DateRangePicker({
                 key={preset.id}
                 type="button"
                 onClick={() => applyPreset(preset)}
-                className="rounded-full border border-border bg-[#f7f9fc] px-3 py-2 text-xs font-bold text-primary hover:border-[var(--brand-accent)] hover:bg-[var(--ui-orange-soft)]"
+                className="cursor-pointer rounded-full border border-border bg-[#f7f9fc] px-3 py-2 text-xs font-bold text-primary hover:border-[var(--brand-accent)] hover:bg-[var(--ui-orange-soft)]"
               >
                 {preset.label}
               </button>
