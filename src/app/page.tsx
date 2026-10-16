@@ -9,7 +9,7 @@ import Image from "next/image";
 import { landingFontVars } from "@/components/landing/fonts";
 import { Ic } from "@/components/landing/icons";
 import { useLandingLang } from "@/components/landing/use-landing-lang";
-import { APP_DOWNLOAD_URL, CONTACT, LANDING_I18N, MARKETPLACES, type LandingLang } from "@/lib/landing-content";
+import { APP_DOWNLOAD_URL, IOS_APP_DOWNLOAD_URL, CONTACT, LANDING_I18N, MARKETPLACES, type LandingLang } from "@/lib/landing-content";
 
 import "./landing.css";
 
@@ -500,15 +500,23 @@ export default function LandingPage() {
               </ul>
             </div>
             <div className="window-card">
-              <div className="window-bar"><span className="wdot" /><span className="wdot" /><span className="wdot" /><span className="wtitle">Benim Depom · Google Play</span></div>
+              <div className="window-bar"><span className="wdot" /><span className="wdot" /><span className="wdot" /><span className="wtitle">Benim Depom · Google Play & App Store</span></div>
               <div className="dl-card-body">
                 <div className="dl-phone-icon"><Ic name="phone" /></div>
                 <h3>{t.download.cardTitle}</h3>
                 <p>{t.download.cardText}</p>
-                <a className="btn google-play-button" href={APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-                  <Play aria-hidden="true" fill="currentColor" strokeWidth={0} />
-                  <span><small>{t.download.btn}</small><strong>Google Play</strong></span>
-                </a>
+                <div className="dl-store-buttons">
+                  <a className="btn store-button" href={APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+                    <Play aria-hidden="true" fill="currentColor" strokeWidth={0} />
+                    <span><small>{t.download.btn}</small><strong>Google Play</strong></span>
+                  </a>
+                  <a className="btn store-button" href={IOS_APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M17.05 12.54c.03 3.23 2.83 4.3 2.86 4.31-.02.08-.45 1.54-1.48 3.05-.89 1.3-1.81 2.59-3.27 2.62-1.43.03-1.89-.85-3.53-.85-1.63 0-2.14.82-3.5.88-1.41.05-2.48-1.41-3.38-2.71-1.84-2.66-3.25-7.51-1.36-10.8A5.23 5.23 0 0 1 7.81 6.4c1.38-.03 2.68.93 3.52.93.85 0 2.44-1.15 4.11-.98.7.03 2.66.28 3.92 2.13-.1.06-2.34 1.36-2.31 4.06ZM14.37 4.55c.75-.91 1.26-2.17 1.12-3.43-1.08.04-2.39.72-3.17 1.63-.69.79-1.29 2.05-1.13 3.26 1.2.09 2.43-.61 3.18-1.46Z" />
+                    </svg>
+                    <span><small>{t.download.btn}</small><strong>App Store</strong></span>
+                  </a>
+                </div>
                 <span className="dl-note">{t.download.note}</span>
               </div>
             </div>

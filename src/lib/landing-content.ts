@@ -177,6 +177,7 @@ export const CONTACT = {
 };
 
 export const APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.benimdepom";
+export const IOS_APP_DOWNLOAD_URL = "https://apps.apple.com/app/benimdepom/id6815613593?l=ru";
 
 export const MARKETPLACES = ["OTTO", "Kaufland", "Hood.de"];
 
@@ -405,10 +406,10 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
         "Status, Freigaben und Veröffentlichungen jederzeit verfolgen",
         "Benachrichtigungen zu Prüfung und Verkauf erhalten",
       ],
-      cardTitle: "Benim Depom App für Android",
+      cardTitle: "Benim Depom für Android und iOS",
       cardText: "Laden Sie die App auf Ihr Smartphone und legen Sie Ihr erstes Produkt in wenigen Minuten an.",
       btn: "Jetzt herunterladen",
-      note: "Für Android bei Google Play · iOS folgt",
+      note: "Für Android und iPhone verfügbar",
     },
     about: {
       eyebrow: "Über uns",
@@ -703,10 +704,10 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
         "Follow status, approvals and publications at any time",
         "Receive notifications about review and sales",
       ],
-      cardTitle: "Benim Depom app for Android",
+      cardTitle: "Benim Depom for Android and iOS",
       cardText: "Download the app to your smartphone and create your first product in a few minutes.",
       btn: "Get it on",
-      note: "For Android on Google Play · iOS coming later",
+      note: "Available for Android and iPhone",
     },
     about: {
       eyebrow: "About us",
@@ -1000,10 +1001,10 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
         "Durumu, onayları ve yayınları her an takip edin",
         "İnceleme ve satışlarla ilgili bildirimler alın",
       ],
-      cardTitle: "Android için Benim Depom uygulaması",
+      cardTitle: "Android ve iOS için Benim Depom",
       cardText: "Uygulamayı telefonunuza indirin ve ilk ürününüzü birkaç dakikada oluşturun.",
       btn: "Şimdi indirin",
-      note: "Android için Google Play'de · iOS yakında",
+      note: "Android ve iPhone için kullanılabilir",
     },
     about: {
       eyebrow: "Hakkımızda",
