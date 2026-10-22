@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -76,7 +77,7 @@ export default function SellerSettingsPage() {
           <label key={key} className="seller-field">{label}
             <input type="password" required minLength={key === "current_password" ? 1 : 8} autoComplete={key === "current_password" ? "current-password" : "new-password"} value={password[key]} onChange={event => setPassword(value => ({ ...value, [key]: event.target.value }))} />
           </label>)}
-        <Button variant="accent" className="seller-button primary" disabled={busy}>{busy ? "Saving…" : "Update password"}</Button>
+        <Button variant="accent" className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Update password"}</Button>
       </form>
 
       <section className="seller-card seller-settings-row">
@@ -104,7 +105,7 @@ export default function SellerSettingsPage() {
             {error && deleteOpen && <SellerNotice>{error}</SellerNotice>}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-              <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={() => void deleteAccount()}>{busy ? "Please wait…" : "Delete account"}</Button>
+              <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={() => void deleteAccount()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Please wait…" : "Delete account"}</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { SellerNotice, SellerPage } from "@/components/SellerShell";
+import { Archive, Ban, CircleCheck, CircleX, History, LoaderCircle, Pencil } from "lucide-react";
+import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import SellerProductImage from "@/components/seller/SellerProductImage";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { Button } from "@/components/ui/button";
@@ -137,7 +138,7 @@ export default function SellerProductDetailsPage() {
   }
 
   if (!product) return <SellerPage title="Product details">
-    {error ? <><SellerNotice>{error}</SellerNotice><Link className="seller-button" href="/seller/products">{t("Back to products")}</Link></> : <p className="seller-empty" aria-live="polite">{t("Loading product…")}</p>}
+    {error ? <><SellerNotice>{error}</SellerNotice><Link className="seller-button" href="/seller/products">{t("Back to products")}</Link></> : <SellerLoadingState label={t("Loading product…")} rows={3} />}
   </SellerPage>;
 
   const variant = product.variants?.[0];
@@ -151,8 +152,8 @@ export default function SellerProductDetailsPage() {
     dynamicTitle
     dynamicDescription
     actions={<div className="seller-toolbar">
-      {canEdit && <Link className="seller-button" href={`/seller/products/${id}/edit`}>{t("Edit product")}</Link>}
-      <Link className="seller-button" href="#moderation-history">{t("Review history")}</Link>
+      {canEdit && <Link className="seller-button" href={`/seller/products/${id}/edit`}><Pencil size={18} strokeWidth={1.8} aria-hidden="true" />{t("Edit product")}</Link>}
+      <Link className="seller-button" href="#moderation-history"><History size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</Link>
     </div>}
   >
     {error && <SellerNotice>{error}</SellerNotice>}
@@ -168,9 +169,9 @@ export default function SellerProductDetailsPage() {
           {product.pending_changes_submitted_at && <span>{t("Submitted")}: {formatDate(product.pending_changes_submitted_at, locale)}</span>}
         </div>}
         <div className="seller-product-actions seller-detail-actions">
-          {product.status === "submitted" && <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("withdraw")}>{t("Withdraw submission")}</button>}
-          {product.status === "approved" && !product.deactivated_at && <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("deactivate")}>{t("Request deactivation")}</button>}
-          {["draft", "rejected", "withdrawn"].includes(product.status) && <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("archive")}>{t("Archive product")}</button>}
+          {product.status === "submitted" && <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("withdraw")}><CircleX size={18} strokeWidth={1.8} aria-hidden="true" />{t("Withdraw submission")}</button>}
+          {product.status === "approved" && !product.deactivated_at && <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("deactivate")}><Ban size={18} strokeWidth={1.8} aria-hidden="true" />{t("Request deactivation")}</button>}
+          {["draft", "rejected", "withdrawn"].includes(product.status) && <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("archive")}><Archive size={18} strokeWidth={1.8} aria-hidden="true" />{t("Archive product")}</button>}
         </div>
       </section>
 
@@ -216,8 +217,8 @@ export default function SellerProductDetailsPage() {
         <p className="seller-offer-message" data-seller-translate="skip">{product.active_price_negotiation.message}</p>
         <label className="seller-field">{t("Optional comment")}<textarea value={comment} maxLength={2000} onChange={e => setComment(e.target.value)} /></label>
         <div className="seller-toolbar">
-          <button className="seller-button primary" disabled={busy} onClick={() => setConfirmation("accept")}>{t("Accept offer")}</button>
-          <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("decline")}>{t("Decline offer")}</button>
+          <button className="seller-button primary" disabled={busy} onClick={() => setConfirmation("accept")}><CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Accept offer")}</button>
+          <button className="seller-button danger" disabled={busy} onClick={() => setConfirmation("decline")}><CircleX size={18} strokeWidth={1.8} aria-hidden="true" />{t("Decline offer")}</button>
         </div>
       </section>}
 
@@ -261,7 +262,7 @@ export default function SellerProductDetailsPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
-          <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={confirmAction}>{busy ? t("Please wait…") : t("Confirm")}</Button>
+          <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={confirmAction}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? t("Please wait…") : t("Confirm")}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

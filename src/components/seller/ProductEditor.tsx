@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Camera } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, LoaderCircle, Plus, Star, Trash2 } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
@@ -268,6 +268,46 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       {success && <SellerNotice kind="success">{success}</SellerNotice>}
       <div className="seller-product-form-layout">
         <div className="seller-product-form-main">
+          <section className="seller-card seller-photo-upload" onDragOver={event => event.preventDefault()} onDrop={event => {
+            event.preventDefault();
+            chooseFiles([...files, ...Array.from(event.dataTransfer.files)]);
+          }}>
+            <h2>{t(product ? "Add photos" : "Product photos")}</h2>
+            <p>{t(product ? "Select or drop additional photos for this product." : "Select or drop up to 20 JPEG, PNG or WebP images. The first photo will be the main image.")} {t("Maximum 40 MB each.")}</p>
+            <label className="seller-field">{t("Photos")}
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple required={!product} onChange={event => chooseFiles(Array.from(event.target.files || []))} />
+            </label>
+            <label className="seller-button seller-camera-picker"><Camera size={18} strokeWidth={1.8} aria-hidden="true" />{t("Take photo")}<input className="seller-camera-picker-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
+              const captured = Array.from(event.target.files || []);
+              if (captured.length) chooseFiles([...files, ...captured]);
+              event.currentTarget.value = "";
+            }} /></label>
+            {files.length > 0 && <div className="seller-photo-list">{files.map((file, index) => <div className="seller-photo-row" key={`${file.name}-${index}`}>
+              {/* Local previews use blob URLs created by this form. */}
+              <Image unoptimized src={previews[index]} alt={t("Selected product photo {number}", { number: index + 1 })} width={64} height={64} />
+              <span className="seller-photo-name">{!product && index === 0 ? <><Star size={16} strokeWidth={1.8} aria-hidden="true" />{t("Main photo")} · </> : null}{file.name}</span>
+              {!product && <>
+                <button type="button" className="seller-icon-button" aria-label={`${t("Move earlier")}: ${file.name}`} title={t("Move earlier")} disabled={index === 0} onClick={() => moveFile(index, -1)}><ArrowUp size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+                <button type="button" className="seller-icon-button" aria-label={`${t("Move later")}: ${file.name}`} title={t("Move later")} disabled={index === files.length - 1} onClick={() => moveFile(index, 1)}><ArrowDown size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+              </>}
+              <button type="button" className="seller-icon-button danger" aria-label={`${t("Remove")}: ${file.name}`} title={t("Remove")} onClick={() => removeFile(index)}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+            </div>)}</div>}
+          </section>
+
+          {product && product.images.length > 0 && <section className="seller-card">
+            <h2>{t("Current photos")}</h2>
+            <p className="seller-field-hint">{t("Sellers can add, remove, reorder, or choose the main photo. Replacing an existing photo is not available to seller accounts.")}</p>
+            <div className="seller-photo-grid">{product.images.map((image, index) => <div className="seller-photo-tile" key={image.id}>
+              <SellerProductImage src={image.thumbnail || image.image} alt={image.is_primary ? t("Main product photo") : t("Product photo")} />
+              {image.is_primary ? <span className="seller-badge approved"><Star size={16} strokeWidth={1.8} aria-hidden="true" />{t("Main photo")}</span> : <button type="button" className="seller-icon-button" aria-label={`${t("Make main")} ${index + 1}`} title={t("Make main")} disabled={busy} onClick={() => void makePrimary(image.id)}><Star size={18} strokeWidth={1.8} aria-hidden="true" /></button>}
+              <div className="seller-photo-actions">
+                <button type="button" className="seller-icon-button" aria-label={`${t("Move earlier")}: ${t("Product photo")} ${index + 1}`} title={t("Move earlier")} disabled={busy || index === 0} onClick={() => void moveExisting(index, -1)}><ArrowUp size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+                <button type="button" className="seller-icon-button" aria-label={`${t("Move later")}: ${t("Product photo")} ${index + 1}`} title={t("Move later")} disabled={busy || index === product.images.length - 1} onClick={() => void moveExisting(index, 1)}><ArrowDown size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+                <button type="button" className="seller-icon-button danger" aria-label={`${t("Remove")}: ${t("Product photo")} ${index + 1}`} title={t("Remove")} disabled={busy} onClick={() => void removeImage(image.id)}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+              </div>
+            </div>)}</div>
+          </section>}
+
           <section className="seller-card">
             <h2>{t("Product information")}</h2>
             <div className="seller-form-grid">
@@ -283,8 +323,11 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
               {field("color", "Color")}
               {field("materials", "Materials (up to 2)")}
               {field("material_composition", "Material composition", "text", false)}
-              <div className="seller-field-row">{field("width_cm", "Width (cm)", "number")}{field("height_cm", "Height (cm)", "number")}</div>
-              {field("length_cm", "Length (cm)", "number")}
+              <div className="seller-dimensions-row">
+                {field("width_cm", "Width (cm)", "number")}
+                {field("height_cm", "Height (cm)", "number")}
+                {field("length_cm", "Length (cm)", "number")}
+              </div>
             </div>
           </section>
 
@@ -294,14 +337,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
               <button type="button" className="seller-button" disabled={setParts.length >= 20} onClick={() => {
                 idempotencyKey.current = null;
                 setSetParts(current => [...current, { description: "", width_cm: "", height_cm: "", length_cm: "" }]);
-              }}>{t("Add set part")}</button>
+              }}><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add set part")}</button>
             </div>
             {setParts.length > 0 ? <div className="seller-stack">{setParts.map((part, index) => <fieldset className="seller-set-part" key={part.id ?? index}>
               <legend>{t("Piece")} {index + 1}</legend>
               <label className="seller-field">{t("Description")}
                 <Input required maxLength={2000} value={part.description} onChange={event => updateSetPart(index, "description", event.target.value)} />
               </label>
-              <div className="seller-field-row">
+              <div className="seller-dimensions-row">
                 {(["width_cm", "height_cm", "length_cm"] as const).map(key => <label key={key} className="seller-field">{t(key === "width_cm" ? "Width (cm)" : key === "height_cm" ? "Height (cm)" : "Length (cm)")}
                   <Input required type="number" min="0.01" step="0.01" value={part[key]} onChange={event => updateSetPart(index, key, event.target.value)} />
                 </label>)}
@@ -309,7 +352,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
               <button type="button" className="seller-button danger" onClick={() => {
                 idempotencyKey.current = null;
                 setSetParts(current => current.filter((_, position) => position !== index));
-              }}>{t("Remove set part")}</button>
+              }}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" />{t("Remove set part")}</button>
             </fieldset>)}</div> : <p className="seller-field-hint">{t("No additional set parts.")}</p>}
           </section>
 
@@ -318,42 +361,6 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             setOtto(value);
           }} />
 
-          <section className="seller-card seller-photo-upload" onDragOver={event => event.preventDefault()} onDrop={event => {
-            event.preventDefault();
-            chooseFiles([...files, ...Array.from(event.dataTransfer.files)]);
-          }}>
-            <h2>{t(product ? "Add photos" : "Product photos")}</h2>
-            <p>{t(product ? "Select or drop additional photos for this product." : "Select or drop up to 20 JPEG, PNG or WebP images. The first photo will be the main image.")} {t("Maximum 40 MB each.")}</p>
-            <label className="seller-field">{t("Photos")}
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple required={!product} onChange={event => chooseFiles(Array.from(event.target.files || []))} />
-            </label>
-            <label className="seller-button seller-camera-picker"><Camera size={16} />{t("Take photo")}<input className="seller-camera-picker-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
-              const captured = Array.from(event.target.files || []);
-              if (captured.length) chooseFiles([...files, ...captured]);
-              event.currentTarget.value = "";
-            }} /></label>
-            {files.length > 0 && <div className="seller-photo-list">{files.map((file, index) => <div className="seller-photo-row" key={`${file.name}-${index}`}>
-              {/* Local previews use blob URLs created by this form. */}
-              <Image unoptimized src={previews[index]} alt={t("Selected product photo {number}", { number: index + 1 })} width={64} height={64} />
-              <span>{!product && index === 0 ? t("Main photo") : ""} {file.name}</span>
-              {!product && <><button type="button" className="seller-button" disabled={index === 0} onClick={() => moveFile(index, -1)}>{t("Move earlier")}</button><button type="button" className="seller-button" disabled={index === files.length - 1} onClick={() => moveFile(index, 1)}>{t("Move later")}</button></>}
-              <button type="button" className="seller-button danger" onClick={() => removeFile(index)}>{t("Remove")}</button>
-            </div>)}</div>}
-          </section>
-
-          {product && product.images.length > 0 && <section className="seller-card">
-            <h2>{t("Current photos")}</h2>
-            <p className="seller-field-hint">{t("Sellers can add, remove, reorder, or choose the main photo. Replacing an existing photo is not available to seller accounts.")}</p>
-            <div className="seller-photo-grid">{product.images.map((image, index) => <div className="seller-photo-tile" key={image.id}>
-              <SellerProductImage src={image.thumbnail || image.image} alt={image.is_primary ? t("Main product photo") : t("Product photo")} />
-              {image.is_primary ? <span className="seller-badge approved">{t("Main photo")}</span> : <button type="button" className="seller-button" disabled={busy} onClick={() => void makePrimary(image.id)}>{t("Make main")}</button>}
-              <div className="seller-photo-actions">
-                <button type="button" className="seller-button" disabled={busy || index === 0} onClick={() => void moveExisting(index, -1)}>{t("Move earlier")}</button>
-                <button type="button" className="seller-button" disabled={busy || index === product.images.length - 1} onClick={() => void moveExisting(index, 1)}>{t("Move later")}</button>
-                <button type="button" className="seller-button danger" disabled={busy} onClick={() => void removeImage(image.id)}>{t("Remove")}</button>
-              </div>
-            </div>)}</div>
-          </section>}
         </div>
 
         <aside className="seller-product-form-side">
@@ -394,7 +401,10 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           </section>}
 
           <div className="seller-form-actions">
-            <button className="seller-button primary" disabled={busy}>{busy ? t(files.length ? "Uploading photos…" : "Saving…") : product ? t("Save changes") : t("Send for review")}</button>
+            <button className="seller-button primary" disabled={busy}>
+              <LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />
+              {busy ? t(files.length ? "Uploading photos…" : "Saving…") : product ? t("Save changes") : t("Send for review")}
+            </button>
           </div>
         </aside>
       </div>

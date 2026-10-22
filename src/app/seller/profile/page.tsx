@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { SellerNotice, SellerPage } from "@/components/SellerShell";
+import { LoaderCircle } from "lucide-react";
+import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import { sellerRequest, type SellerProfile } from "@/lib/seller";
 import { readSellerLocale, setSellerLocale } from "@/lib/seller-i18n";
 
@@ -49,7 +50,7 @@ export default function SellerProfilePage() {
   const initials = profile ? ([profile.first_name, profile.last_name].filter(Boolean).map(value => value[0]).join(" ") || profile.username.slice(0, 2)).toUpperCase() : "";
 
   return <SellerPage title="Profile" description="Update your contact details and language preference.">
-    {loading ? <p className="seller-empty" aria-live="polite">Loading…</p> : error && !profile ? <SellerNotice>{error}</SellerNotice> : <>
+    {loading ? <SellerLoadingState label="Loading…" rows={2} /> : error && !profile ? <SellerNotice>{error}</SellerNotice> : <>
       {profile && <section className="seller-profile-summary">
         <span className="seller-profile-avatar" aria-hidden="true">{initials}</span>
         <div className="seller-profile-identity"><strong data-seller-translate="skip">{name}</strong><span data-seller-translate="skip">{profile.email}</span></div>
@@ -65,7 +66,7 @@ export default function SellerProfilePage() {
         <label className="seller-field">Email<input type="email" required value={form.email} onChange={event => setForm(value => ({ ...value, email: event.target.value }))} /></label>
         <label className="seller-field">Phone<input type="tel" value={form.phone} onChange={event => setForm(value => ({ ...value, phone: event.target.value }))} /></label>
         <label className="seller-field">Preferred language<select value={form.preferred_language} onChange={event => setForm(value => ({ ...value, preferred_language: event.target.value }))}>{languages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <button className="seller-button primary" disabled={busy}>{busy ? "Saving…" : "Save profile"}</button>
+        <button className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Save profile"}</button>
       </form>
     </>}
   </SellerPage>;

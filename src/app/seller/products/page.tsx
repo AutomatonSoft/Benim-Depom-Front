@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Ellipsis, FileClock, Package, Plus, Search, SlidersHorizontal } from "lucide-react";
-import { SellerNotice, SellerPage } from "@/components/SellerShell";
+import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import SellerProductImage from "@/components/seller/SellerProductImage";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ function ProductActions({ product, t }: { product: SellerProduct; t: Translate }
   return <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" size="icon" className="seller-product-menu" aria-label={t("Product actions for {title}", { title: product.title })}>
-        <Ellipsis size={18} aria-hidden="true" />
+        <Ellipsis size={18} strokeWidth={1.8} aria-hidden="true" />
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
@@ -87,7 +87,7 @@ function ProductActions({ product, t }: { product: SellerProduct; t: Translate }
       {(["draft", "rejected", "withdrawn", "approved"].includes(product.status)) &&
         <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/edit`}>{t("Edit product")}</Link></DropdownMenuItem>}
       <DropdownMenuSeparator />
-      <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/history`}><FileClock size={16} />{t("Review history")}</Link></DropdownMenuItem>
+      <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/history`}><FileClock size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</Link></DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>;
 }
@@ -157,19 +157,19 @@ export default function SellerProductsPage() {
   return <SellerPage
     title="My products"
     description="Manage your catalogue and track product review status."
-    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><Plus size={17} />{t("Add product")}</Link></Button>}
+    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</Link></Button>}
   >
     <div className="seller-products-toolbar">
       <label className="seller-product-search">
         <span className="sr-only">{t("Search products")}</span>
-        <Search size={17} aria-hidden="true" />
+        <Search size={18} strokeWidth={1.8} aria-hidden="true" />
         <Input value={search} onChange={e => changeFilter(setSearch, e.target.value)} placeholder={t("Search by product name or EAN")} />
       </label>
       <div className="seller-product-filters">{filters}<SortSelect t={t} value={ordering} onChange={value => changeFilter(setOrdering, value)} /></div>
       <div className="seller-product-mobile-filters">
         <SortSelect t={t} value={ordering} onChange={value => changeFilter(setOrdering, value)} />
         <Sheet>
-          <SheetTrigger asChild><Button variant="outline" className="seller-button"><SlidersHorizontal size={16} />{t("Filters")}{(status || available) ? <span className="seller-filter-dot" aria-label={t("Active filters")} /> : null}</Button></SheetTrigger>
+          <SheetTrigger asChild><Button variant="outline" className="seller-button"><SlidersHorizontal size={18} strokeWidth={1.8} aria-hidden="true" />{t("Filters")}{(status || available) ? <span className="seller-filter-dot" aria-label={t("Active filters")} /> : null}</Button></SheetTrigger>
           <SheetContent side="bottom" className="seller-filter-sheet">
             <SheetHeader>
               <SheetTitle>{t("Filter products")}</SheetTitle>
@@ -183,7 +183,7 @@ export default function SellerProductsPage() {
     </div>
 
     {error ? <SellerNotice>{error} <button type="button" className="seller-inline-retry" onClick={() => void load()}>{t("Try again")}</button></SellerNotice> : loading ?
-      <div className="seller-table-loading" role="status" aria-live="polite">{t("Loading products…")}</div> : page?.results.length ? <>
+      <SellerLoadingState label={t("Loading products…")} rows={4} /> : page?.results.length ? <>
         <div className="seller-products-table-wrap">
           <Table className="seller-product-table" aria-label={t("My products")}>
             <TableHeader><TableRow>
@@ -225,7 +225,7 @@ export default function SellerProductsPage() {
         <Package size={28} aria-hidden="true" />
         <strong>{t(search || status || available ? "No products found." : "Your catalogue is empty.")}</strong>
         <span>{t(search || status || available ? "Try changing your search or filters." : "Add your first product to start your catalogue.")}</span>
-        {!search && !status && !available && <Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><Plus size={16} />{t("Add product")}</Link></Button>}
+        {!search && !status && !available && <Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</Link></Button>}
       </div>}
 
     {page && !error && <div className="seller-pagination">

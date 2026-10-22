@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SellerNotice, SellerPage } from "@/components/SellerShell";
+import { Banknote, ClipboardList, PackageCheck } from "lucide-react";
+import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -92,13 +93,13 @@ export default function SellerStatisticsPage() {
     {dateError && <SellerNotice>{t("Start date must be before end date.")}</SellerNotice>}
     {productError && <SellerNotice>{t("The product filter could not be loaded. Sales totals remain available for all products.")}</SellerNotice>}
     {error && <SellerNotice>{error}</SellerNotice>}
-    {loading && !dateError ? <p className="seller-empty" aria-live="polite">{t("Loading statistics…")}</p> : !dateError && stats && <>
+    {loading && !dateError ? <SellerLoadingState label={t("Loading statistics…")} rows={2} /> : !dateError && stats && <>
       <div className="seller-card-grid">
-        <div className="seller-kpi"><span>{t("Units sold")}</span><strong>{stats.quantity_sold}</strong></div>
-        <div className="seller-kpi"><span>{t("Orders")}</span><strong>{stats.orders_count}</strong></div>
-        <div className="seller-kpi"><span>{t("Revenue (EUR)")}</span><strong>{money(stats.amount_eur, "EUR")}</strong></div>
-        <div className="seller-kpi"><span>{t("Revenue (TRY)")}</span><strong>{money(stats.amount_try, "TRY")}</strong></div>
-        <div className="seller-kpi"><span>{t("Revenue (USD)")}</span><strong>{money(stats.amount_usd, "USD")}</strong></div>
+        <div className="seller-kpi"><div className="seller-kpi-label"><PackageCheck size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Units sold")}</span></div><strong>{stats.quantity_sold}</strong></div>
+        <div className="seller-kpi"><div className="seller-kpi-label"><ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Orders")}</span></div><strong>{stats.orders_count}</strong></div>
+        <div className="seller-kpi"><div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue (EUR)")}</span></div><strong>{money(stats.amount_eur, "EUR")}</strong></div>
+        <div className="seller-kpi"><div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue (TRY)")}</span></div><strong>{money(stats.amount_try, "TRY")}</strong></div>
+        <div className="seller-kpi"><div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue (USD)")}</span></div><strong>{money(stats.amount_usd, "USD")}</strong></div>
       </div>
       {stats.quantity_sold === 0 && <div className="seller-card seller-empty seller-stat-empty">{t("No sales in this period. Try another date range or product.")}</div>}
     </>}

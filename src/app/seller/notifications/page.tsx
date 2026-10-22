@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { BadgeDollarSign, Bell, CircleCheck, Search, ShoppingBag } from "lucide-react";
-import { SellerNotice, SellerPage } from "@/components/SellerShell";
+import { BadgeDollarSign, Bell, Check, CheckCheck, CircleCheck, CircleX, Search, ShoppingBag } from "lucide-react";
+import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { sellerRequest, type PageResult, type SellerNotification } from "@/lib/seller";
 
@@ -115,11 +115,11 @@ export default function SellerNotificationsPage() {
     }
   }
 
-  return <SellerPage title="Notifications" description="Review updates about your products and respond to supported requests." actions={filter !== "outgoing" ? <button className="seller-button" disabled={busy} onClick={() => void markAll()}>{t("Mark all as read")}</button> : undefined}>
+  return <SellerPage title="Notifications" description="Review updates about your products and respond to supported requests." actions={filter !== "outgoing" ? <button className="seller-button" disabled={busy} onClick={() => void markAll()}><CheckCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Mark all as read")}</button> : undefined}>
     <div className="seller-toolbar">
       <label className="search">
         <span className="sr-only">{t("Search notifications")}</span>
-        <Search size={17} aria-hidden="true" />
+        <Search size={18} strokeWidth={1.8} aria-hidden="true" />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("Search notifications")} />
       </label>
       <label className="seller-field">
@@ -129,7 +129,7 @@ export default function SellerNotificationsPage() {
     </div>
 
     {error && <SellerNotice>{error}</SellerNotice>}
-    {loading && !items.length ? <p className="seller-empty" aria-live="polite">{t("Loading notifications…")}</p> : items.length ? <div className="seller-stack">
+    {loading && !items.length ? <SellerLoadingState label={t("Loading notifications…")} rows={3} /> : items.length ? <div className="seller-stack">
       {items.map(item => {
         const type = item.notification_type.toLowerCase();
         const Icon = iconFor(type);
@@ -138,7 +138,7 @@ export default function SellerNotificationsPage() {
         return <article className={`seller-card seller-notification${item.is_read ? "" : " unread"}`} key={item.id}>
           <div className="seller-notification-heading">
             <div>
-              <div className="seller-notification-meta"><span className="seller-notification-icon"><Icon size={17} aria-hidden="true" /></span><span className="seller-badge">{t(categoryFor(type))}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString(locale)}</time></div>
+              <div className="seller-notification-meta"><span className="seller-notification-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-badge">{t(categoryFor(type))}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString(locale)}</time></div>
               <h2 data-seller-translate="skip">{item.title || type.replaceAll("_", " ")}</h2>
             </div>
             {!item.is_read && <span className="seller-badge pending">{t("Unread")}</span>}
@@ -148,8 +148,8 @@ export default function SellerNotificationsPage() {
           {isPriceOffer && item.proposed_unit_price && <p>{t("Proposed price")}: <strong data-seller-translate="skip">{item.proposed_unit_price} {item.proposed_currency}</strong></p>}
           <div className="seller-toolbar seller-notification-actions">
             {item.product_id && <Link className="seller-button" href={`/seller/products/${item.product_id}`}>{isPriceOffer ? t("Review offer") : t("View product")}</Link>}
-            {filter !== "outgoing" && canConfirmAvailability && item.product_id && <><button className="seller-button primary" disabled={busy} onClick={() => void availability(item, true)}>{t("Available")}</button><button className="seller-button" disabled={busy} onClick={() => void availability(item, false)}>{t("Unavailable")}</button></>}
-            {filter !== "outgoing" && !item.is_read && <button className="seller-button" disabled={busy} onClick={() => void markRead(item)}>{t("Mark read")}</button>}
+            {filter !== "outgoing" && canConfirmAvailability && item.product_id && <><button className="seller-button primary" disabled={busy} onClick={() => void availability(item, true)}><CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Available")}</button><button className="seller-button" disabled={busy} onClick={() => void availability(item, false)}><CircleX size={18} strokeWidth={1.8} aria-hidden="true" />{t("Unavailable")}</button></>}
+            {filter !== "outgoing" && !item.is_read && <button className="seller-button" disabled={busy} onClick={() => void markRead(item)}><Check size={18} strokeWidth={1.8} aria-hidden="true" />{t("Mark read")}</button>}
           </div>
         </article>;
       })}

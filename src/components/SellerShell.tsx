@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Bell, ChartNoAxesCombined, CircleUserRound, House, LogOut, Package, Plus, Settings } from "lucide-react";
+import { Bell, ChartNoAxesCombined, CircleAlert, CircleCheck, CircleUserRound, House, LogOut, Package, Plus, Settings } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { clearSellerToken, sellerLogout, sellerRequest, type SellerProfile } from "@/lib/seller";
 import { readSellerLocale, setSellerLocale } from "@/lib/seller-i18n";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
@@ -23,7 +24,18 @@ export function SellerPage({ title, description, children, actions, dynamicTitle
 }
 
 export function SellerNotice({ children, kind = "error" }: { children: ReactNode; kind?: "error" | "success" }) {
-  return <p role="status" className={`seller-notice seller-notice-${kind}`}><SellerLocalized>{children}</SellerLocalized></p>;
+  const Icon = kind === "success" ? CircleCheck : CircleAlert;
+  return <p role={kind === "error" ? "alert" : "status"} aria-atomic="true" className={`seller-notice seller-notice-${kind}`}><Icon size={18} strokeWidth={1.8} aria-hidden="true" /><span><SellerLocalized>{children}</SellerLocalized></span></p>;
+}
+
+export function SellerLoadingState({ label, rows = 3 }: { label: string; rows?: number }) {
+  const { t } = useSellerI18n();
+  return <div className="seller-loading-state" role="status" aria-label={t(label)}>
+    <div className="seller-loading-intro" aria-hidden="true"><Skeleton className="seller-loading-title" /><Skeleton className="seller-loading-copy" /></div>
+    <div className="seller-loading-rows" aria-hidden="true">{Array.from({ length: rows }, (_, index) =>
+      <div className="seller-loading-row" key={index}><Skeleton className="seller-loading-thumb" /><div><Skeleton className="seller-loading-line" /><Skeleton className="seller-loading-line short" /></div></div>,
+    )}</div>
+  </div>;
 }
 
 export default function SellerShell({ children }: { children: ReactNode }) {
@@ -67,7 +79,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
 
   if (isPublic) return <div className="seller-auth-wrap"><SellerAuthFrame>{children}</SellerAuthFrame></div>;
   if (!profile && sessionError) return <main className="seller-loading"><div className="seller-card"><p role="alert">{t(sessionError)}</p><button className="seller-button" onClick={()=>setRetry(value=>value+1)}>{t("Retry session check")}</button></div></main>;
-  if (!profile) return <main className="seller-loading" aria-live="polite">{t("Loading your workspace…")}</main>;
+  if (!profile) return <main className="seller-loading"><SellerLoadingState label={t("Loading your workspace…")} rows={4} /></main>;
 
   async function logout() { try { await sellerLogout(); } catch { clearSellerToken(); } router.replace("/seller/login"); }
 
@@ -78,16 +90,16 @@ export default function SellerShell({ children }: { children: ReactNode }) {
         const active = href === "/seller/products"
           ? pathname === href || /^\/seller\/products\/\d/.test(pathname)
           : pathname === href || pathname.startsWith(`${href}/`);
-        return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon size={18} />{t(label)}{href === "/seller/notifications" && unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link>;
+        return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon size={18} strokeWidth={1.8} aria-hidden="true" />{t(label)}{href === "/seller/notifications" && unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link>;
       })}</nav>
-      <button className="seller-logout" type="button" onClick={logout}><LogOut size={18} />{t("Sign out")}</button>
+      <button className="seller-logout" type="button" onClick={logout}><LogOut size={18} strokeWidth={1.8} aria-hidden="true" />{t("Sign out")}</button>
     </aside>
     <div className="seller-main-column">
-      <header className="seller-topbar"><Link href="/seller/products" className="seller-brand-mobile"><span>BENIM</span><b>DEPOM</b></Link><div className="seller-topbar-actions"><Link aria-label={`${t("Notifications")}${unread ? `, ${unread} ${t("unread")}` : ""}`} className="seller-bell" href="/seller/notifications"><Bell size={19}/>{unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link><details className="seller-profile-menu"><summary className="seller-user"><span className="seller-user-name">{[profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.username}</span><span className="seller-avatar" aria-hidden="true">{(profile.first_name || profile.username).slice(0,1).toUpperCase()}</span></summary><div className="seller-profile-menu-panel"><Link href="/seller/profile" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><CircleUserRound size={17}/>{t("Profile")}</Link><Link href="/seller/settings" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><Settings size={17}/>{t("Settings")}</Link><button type="button" onClick={logout}><LogOut size={17}/>{t("Sign out")}</button></div></details></div></header>
+      <header className="seller-topbar"><Link href="/seller/products" className="seller-brand-mobile"><span>BENIM</span><b>DEPOM</b></Link><div className="seller-topbar-actions"><Link aria-label={`${t("Notifications")}${unread ? `, ${unread} ${t("unread")}` : ""}`} className="seller-bell" href="/seller/notifications"><Bell size={18} strokeWidth={1.8} aria-hidden="true" />{unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link><details className="seller-profile-menu"><summary className="seller-user"><span className="seller-user-name">{[profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.username}</span><span className="seller-avatar" aria-hidden="true">{(profile.first_name || profile.username).slice(0,1).toUpperCase()}</span></summary><div className="seller-profile-menu-panel"><Link href="/seller/profile" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><CircleUserRound size={18} strokeWidth={1.8} aria-hidden="true" />{t("Profile")}</Link><Link href="/seller/settings" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><Settings size={18} strokeWidth={1.8} aria-hidden="true" />{t("Settings")}</Link><button type="button" onClick={logout}><LogOut size={18} strokeWidth={1.8} aria-hidden="true" />{t("Sign out")}</button></div></details></div></header>
       <SellerLocalized>{children}</SellerLocalized>
       <nav className="seller-bottom-nav" aria-label={t("Mobile navigation")}>{mobileLinks.map(([href,label,Icon]) => {
         const active = href === "/seller/products" ? pathname === href || /^\/seller\/products\/\d/.test(pathname) : pathname === href || pathname.startsWith(`${href}/`);
-        return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon size={19}/><span>{t(label)}</span></Link>;
+        return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t(label)}</span></Link>;
       })}</nav>
     </div>
   </div>;

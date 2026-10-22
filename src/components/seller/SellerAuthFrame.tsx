@@ -19,9 +19,9 @@ export default function SellerAuthFrame({ children }: { children: ReactNode }) {
         <p>{t("Follow your products, review updates and sales from one place.")}</p>
       </div>
       <ul className="seller-auth-benefits">
-        <li><PackageCheck size={19} aria-hidden="true" />{t("Track product review status")}</li>
-        <li><ChartNoAxesCombined size={19} aria-hidden="true" />{t("See your actual sales results")}</li>
-        <li><ShieldCheck size={19} aria-hidden="true" />{t("Seller-only account access")}</li>
+        <li><PackageCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Track product review status")}</li>
+        <li><ChartNoAxesCombined size={18} strokeWidth={1.8} aria-hidden="true" />{t("See your actual sales results")}</li>
+        <li><ShieldCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Seller-only account access")}</li>
       </ul>
     </aside>
     <div className="seller-auth-content">{children}</div>
