@@ -23,7 +23,7 @@ function localDate(date: Date) {
 }
 
 export default function SellerStatisticsPage() {
-  const { t } = useSellerI18n();
+  const { t, locale } = useSellerI18n();
   const today = new Date();
   const start = new Date(today);
   start.setDate(start.getDate() - 29);
@@ -74,7 +74,9 @@ export default function SellerStatisticsPage() {
 
   const money = (value: string | null, currency: string) => value === null ? "—" : `${value} ${currency}`;
 
-  return <SellerPage title="Sales statistics" description="Afterbuy sales totals for the selected business dates.">
+  const number = (value: number) => new Intl.NumberFormat(locale).format(value);
+
+  return <SellerPage title="Sales statistics" description="Sales for the selected dates.">
     <div className="seller-toolbar seller-stat-presets">
       <button type="button" className="seller-button" onClick={() => preset(7)}>{t("Last 7 days")}</button>
       <button type="button" className="seller-button" onClick={() => preset(30)}>{t("Last 30 days")}</button>
@@ -94,12 +96,17 @@ export default function SellerStatisticsPage() {
     {productError && <SellerNotice>{t("The product filter could not be loaded. Sales totals remain available for all products.")}</SellerNotice>}
     {error && <SellerNotice>{error}</SellerNotice>}
     {loading && !dateError ? <SellerLoadingState label={t("Loading statistics…")} rows={2} /> : !dateError && stats && <>
-      <div className="seller-card-grid">
-        <div className="seller-kpi"><div className="seller-kpi-label"><PackageCheck size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Units sold")}</span></div><strong>{stats.quantity_sold}</strong></div>
-        <div className="seller-kpi"><div className="seller-kpi-label"><ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Orders")}</span></div><strong>{stats.orders_count}</strong></div>
-        <div className="seller-kpi"><div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue (EUR)")}</span></div><strong>{money(stats.amount_eur, "EUR")}</strong></div>
-        <div className="seller-kpi"><div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue (TRY)")}</span></div><strong>{money(stats.amount_try, "TRY")}</strong></div>
-        <div className="seller-kpi"><div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue (USD)")}</span></div><strong>{money(stats.amount_usd, "USD")}</strong></div>
+      <div className="seller-card-grid seller-stat-grid">
+        <div className="seller-kpi"><div className="seller-kpi-label"><PackageCheck size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Units sold")}</span></div><strong>{number(stats.quantity_sold)}</strong></div>
+        <div className="seller-kpi"><div className="seller-kpi-label"><ClipboardList size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Orders")}</span></div><strong>{number(stats.orders_count)}</strong></div>
+        <div className="seller-kpi seller-kpi-revenue">
+          <div className="seller-kpi-label"><Banknote size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Revenue")}</span></div>
+          <div className="seller-stat-revenue-values">
+            {([["EUR", stats.amount_eur], ["TRY", stats.amount_try], ["USD", stats.amount_usd]] as const).map(([currency, amount]) =>
+              <div key={currency}><span>{currency}</span><strong>{money(amount, currency)}</strong></div>,
+            )}
+          </div>
+        </div>
       </div>
       {stats.quantity_sold === 0 && <div className="seller-card seller-empty seller-stat-empty">{t("No sales in this period. Try another date range or product.")}</div>}
     </>}

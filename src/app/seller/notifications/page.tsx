@@ -116,7 +116,7 @@ export default function SellerNotificationsPage() {
   }
 
   return <SellerPage title="Notifications" description="Review updates about your products and respond to supported requests." actions={filter !== "outgoing" ? <button className="seller-button" disabled={busy} onClick={() => void markAll()}><CheckCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Mark all as read")}</button> : undefined}>
-    <div className="seller-toolbar">
+    <div className="seller-toolbar seller-notifications-toolbar">
       <label className="search">
         <span className="sr-only">{t("Search notifications")}</span>
         <Search size={18} strokeWidth={1.8} aria-hidden="true" />
@@ -129,12 +129,14 @@ export default function SellerNotificationsPage() {
     </div>
 
     {error && <SellerNotice>{error}</SellerNotice>}
-    {loading && !items.length ? <SellerLoadingState label={t("Loading notifications…")} rows={3} /> : items.length ? <div className="seller-stack">
+    {loading && !items.length ? <SellerLoadingState label={t("Loading notifications…")} rows={3} /> : items.length ? <div className="seller-stack seller-notifications-list">
       {items.map(item => {
         const type = item.notification_type.toLowerCase();
         const Icon = iconFor(type);
         const canConfirmAvailability = ["product_confirmation", "product_availability_reminder"].includes(type);
         const isPriceOffer = type === "price_negotiation_offer";
+        const productName = item.product_title?.trim();
+        const productNameAlreadyShown = !!productName && [item.title, item.body].some(text => text.toLocaleLowerCase(locale).includes(productName.toLocaleLowerCase(locale)));
         return <article className={`seller-card seller-notification${item.is_read ? "" : " unread"}`} key={item.id}>
           <div className="seller-notification-heading">
             <div>
@@ -144,8 +146,9 @@ export default function SellerNotificationsPage() {
             {!item.is_read && <span className="seller-badge pending">{t("Unread")}</span>}
           </div>
           <p data-seller-translate="skip">{item.body}</p>
-          {item.product_title && <p className="seller-notification-product">{t("Product")}: <span data-seller-translate="skip">{item.product_title}</span></p>}
+          {productName && !productNameAlreadyShown && <p className="seller-notification-product">{t("Product")}: <span data-seller-translate="skip">{productName}</span></p>}
           {isPriceOffer && item.proposed_unit_price && <p>{t("Proposed price")}: <strong data-seller-translate="skip">{item.proposed_unit_price} {item.proposed_currency}</strong></p>}
+          {canConfirmAvailability && item.product_id && <p className="seller-notification-availability-help">{t("Please confirm whether this product is currently available.")}</p>}
           <div className="seller-toolbar seller-notification-actions">
             {item.product_id && <Link className="seller-button" href={`/seller/products/${item.product_id}`}>{isPriceOffer ? t("Review offer") : t("View product")}</Link>}
             {filter !== "outgoing" && canConfirmAvailability && item.product_id && <><button className="seller-button primary" disabled={busy} onClick={() => void availability(item, true)}><CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Available")}</button><button className="seller-button" disabled={busy} onClick={() => void availability(item, false)}><CircleX size={18} strokeWidth={1.8} aria-hidden="true" />{t("Unavailable")}</button></>}
@@ -153,7 +156,7 @@ export default function SellerNotificationsPage() {
           </div>
         </article>;
       })}
-    </div> : <div className="seller-card seller-empty">{t(search || filter ? "No notifications match these filters." : "You have no notifications.")}</div>}
+    </div> : <div className="seller-card seller-empty seller-notifications-list">{t(search || filter ? "No notifications match these filters." : "You have no notifications.")}</div>}
 
     {next && <div className="seller-pagination"><button className="seller-button" disabled={loading || busy} onClick={() => void load(next, true)}>{loading ? t("Loading…") : t("Load more")}</button></div>}
   </SellerPage>;

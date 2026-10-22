@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Camera, LoaderCircle, Plus, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, LoaderCircle, Plus, Star, Trash2, Upload } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
@@ -274,8 +274,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           }}>
             <h2>{t(product ? "Add photos" : "Product photos")}</h2>
             <p>{t(product ? "Select or drop additional photos for this product." : "Select or drop up to 20 JPEG, PNG or WebP images. The first photo will be the main image.")} {t("Maximum 40 MB each.")}</p>
-            <label className="seller-field">{t("Photos")}
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple required={!product} onChange={event => chooseFiles(Array.from(event.target.files || []))} />
+            <label className="seller-photo-dropzone">
+              <Upload size={24} strokeWidth={1.8} aria-hidden="true" />
+              <span>{t("Select or drop photos")}</span>
+              <small>{t("JPEG, PNG, or WebP · Maximum 40 MB each.")}</small>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("Photos")} aria-required={!product} onChange={event => {
+                chooseFiles(Array.from(event.target.files || []));
+                event.currentTarget.value = "";
+              }} />
             </label>
             <label className="seller-button seller-camera-picker"><Camera size={18} strokeWidth={1.8} aria-hidden="true" />{t("Take photo")}<input className="seller-camera-picker-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
               const captured = Array.from(event.target.files || []);
@@ -364,7 +370,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
         </div>
 
         <aside className="seller-product-form-side">
-          <section className="seller-card">
+          <section className="seller-card seller-price-stock">
             <h2>{t("Price and stock")}</h2>
             <div className="seller-form-grid">
               {field("unit_price", "Unit price", "number")}

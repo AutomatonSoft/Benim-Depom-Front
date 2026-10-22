@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneElement, createContext, isValidElement, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { Children, cloneElement, createContext, isValidElement, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { readSellerLocale, SELLER_LOCALE_KEY, translateSeller, type SellerLocale } from "@/lib/seller-i18n";
 
 const LocaleContext = createContext<SellerLocale>("en");
@@ -29,7 +29,7 @@ function localize(node: ReactNode, t: (text: string) => string): ReactNode {
     const text = node.slice(leading.length, node.length - trailing.length || undefined);
     return text ? `${leading}${t(text)}${trailing}` : node;
   }
-  if (Array.isArray(node)) return node.map((child) => localize(child, t));
+  if (Array.isArray(node)) return Children.map(node, child => localize(child, t));
   if (!isValidElement(node)) return node;
 
   const props = { ...(node.props as Record<string, unknown>) };

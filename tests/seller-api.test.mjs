@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { sellerLogin, sellerRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
 import { readSellerLocale, setSellerLocale, translateSeller } from "../src/lib/seller-i18n.ts";
+import { loadOttoCatalogPages, parseOttoAttributeValue } from "../src/lib/otto-catalog.ts";
 
 const values = new Map([["benim_access_token", "manager-access"]]);
 const events = [];
@@ -22,7 +23,34 @@ test("seller labels translate and interpolate in every supported language", () =
   assert.equal(translateSeller("Filters", "ru"), "Фильтры");
   assert.equal(translateSeller("Send for review", "de"), "Zur Prüfung einreichen");
   assert.equal(translateSeller("Show password", "tr"), "Şifreyi göster");
+  for (const locale of ["ru", "tr", "de"]) {
+    assert.notEqual(translateSeller("Optional attributes", locale), "Optional attributes");
+    assert.notEqual(translateSeller("Select or drop photos", locale), "Select or drop photos");
+  }
   assert.equal(translateSeller("Server error", "de"), "Server error");
+});
+
+test("OTTO attribute values follow the supported catalog types", () => {
+  assert.equal(parseOttoAttributeValue("STRING", "Oak"), "Oak");
+  assert.equal(parseOttoAttributeValue("INTEGER", "12"), 12);
+  assert.equal(parseOttoAttributeValue("INTEGER", "1.5"), null);
+  assert.equal(parseOttoAttributeValue("FLOAT", "1.5"), 1.5);
+  assert.equal(parseOttoAttributeValue("BOOLEAN", "true"), null);
+});
+
+test("OTTO catalog selectors follow the API's numbered pagination", async () => {
+  const urls = [];
+  const values = await loadOttoCatalogPages("/api/v1/catalog/otto/groups/en/", async url => {
+    urls.push(url);
+    return url.includes("page=1")
+      ? { results: ["first"], next: 2 }
+      : { results: ["second"], next: null };
+  });
+  assert.deepEqual(values, ["first", "second"]);
+  assert.deepEqual(urls, [
+    "/api/v1/catalog/otto/groups/en/?page=1&limit=200",
+    "/api/v1/catalog/otto/groups/en/?page=2&limit=200",
+  ]);
 });
 
 test("changing seller language updates only its preference", () => {

@@ -153,6 +153,7 @@ export default function SellerProductsPage() {
     setStatus={value => changeFilter(setStatus, value)}
     setAvailable={value => changeFilter(setAvailable, value)}
   />;
+  const quantityFormat = new Intl.NumberFormat(locale);
 
   return <SellerPage
     title="My products"
@@ -188,7 +189,7 @@ export default function SellerProductsPage() {
           <Table className="seller-product-table" aria-label={t("My products")}>
             <TableHeader><TableRow>
               <TableHead>{t("Product")}</TableHead><TableHead>{t("Status")}</TableHead>
-              <TableHead>{t("Unit price")}</TableHead><TableHead>{t("Quantity")}</TableHead>
+              <TableHead className="seller-numeric-cell">{t("Unit price")}</TableHead><TableHead className="seller-numeric-cell">{t("Quantity")}</TableHead>
               <TableHead>{t("Dimensions")}</TableHead><TableHead>{t("Updated")}</TableHead>
               <TableHead><span className="sr-only">{t("Actions")}</span></TableHead>
             </TableRow></TableHeader>
@@ -200,8 +201,8 @@ export default function SellerProductsPage() {
                   <span data-seller-translate="skip">{product.product_type}</span>
                 </div></div></TableCell>
                 <TableCell><StatusBadges product={product} t={t} /></TableCell>
-                <TableCell><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong></TableCell>
-                <TableCell><span data-seller-translate="skip">{product.total_quantity}</span> {t("units")}</TableCell>
+                <TableCell className="seller-numeric-cell"><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong></TableCell>
+                <TableCell className="seller-numeric-cell"><span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</TableCell>
                 <TableCell><span data-seller-translate="skip">{variant ? `${variant.width_cm} × ${variant.height_cm} × ${variant.length_cm} cm` : t("Dimensions not provided")}</span></TableCell>
                 <TableCell>{new Date(product.updated_at).toLocaleDateString(locale)}</TableCell>
                 <TableCell><ProductActions product={product} t={t} /></TableCell>
@@ -214,7 +215,7 @@ export default function SellerProductsPage() {
           <div className="seller-product-summary">
             <h2><Link className="seller-link" data-seller-translate="skip" href={`/seller/products/${product.id}`}>{product.title}</Link></h2>
             <p data-seller-translate="skip">{product.product_type}</p>
-            <p><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong> · <span data-seller-translate="skip">{product.total_quantity}</span> {t("units")}</p>
+            <p><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong> · <span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</p>
             <StatusBadges product={product} t={t} />
           </div>
           <div className="seller-product-actions">

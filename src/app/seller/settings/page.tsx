@@ -68,7 +68,7 @@ export default function SellerSettingsPage() {
   }
 
   return <SellerPage title="Settings" description="Security, account and support settings.">
-    <div className="seller-stack">
+    <div className="seller-stack seller-page-narrow">
       {error && !deleteOpen && <SellerNotice>{error}</SellerNotice>}
       {notice && <SellerNotice kind="success">{notice}</SellerNotice>}
       <form className="seller-card seller-form-grid" onSubmit={changePassword}>
@@ -81,7 +81,7 @@ export default function SellerSettingsPage() {
       </form>
 
       <section className="seller-card seller-settings-row">
-        <div><h2>Notifications</h2><p>In-app notifications are available in your workspace. Browser push notification registration is not available for this account.</p></div>
+        <div><h2>Notifications</h2><p>See product updates and requests in your notifications.</p></div>
         <Button asChild variant="outline" className="seller-button"><Link href="/seller/notifications">Open notifications</Link></Button>
       </section>
 

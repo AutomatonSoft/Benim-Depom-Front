@@ -50,24 +50,26 @@ export default function SellerProfilePage() {
   const initials = profile ? ([profile.first_name, profile.last_name].filter(Boolean).map(value => value[0]).join(" ") || profile.username.slice(0, 2)).toUpperCase() : "";
 
   return <SellerPage title="Profile" description="Update your contact details and language preference.">
-    {loading ? <SellerLoadingState label="Loading…" rows={2} /> : error && !profile ? <SellerNotice>{error}</SellerNotice> : <>
-      {profile && <section className="seller-profile-summary">
-        <span className="seller-profile-avatar" aria-hidden="true">{initials}</span>
-        <div className="seller-profile-identity"><strong data-seller-translate="skip">{name}</strong><span data-seller-translate="skip">{profile.email}</span></div>
-        <div className="seller-profile-count"><span>Products in your catalogue</span><strong>{profile.product_count}</strong></div>
-      </section>}
-      <form className="seller-card seller-form-grid" onSubmit={submit}>
-        {error && <SellerNotice>{error}</SellerNotice>}
-        {notice && <SellerNotice kind="success">{notice}</SellerNotice>}
-        <div className="seller-field-row">
-          <label className="seller-field">First name<input value={form.first_name} onChange={event => setForm(value => ({ ...value, first_name: event.target.value }))} /></label>
-          <label className="seller-field">Last name<input value={form.last_name} onChange={event => setForm(value => ({ ...value, last_name: event.target.value }))} /></label>
-        </div>
-        <label className="seller-field">Email<input type="email" required value={form.email} onChange={event => setForm(value => ({ ...value, email: event.target.value }))} /></label>
-        <label className="seller-field">Phone<input type="tel" value={form.phone} onChange={event => setForm(value => ({ ...value, phone: event.target.value }))} /></label>
-        <label className="seller-field">Preferred language<select value={form.preferred_language} onChange={event => setForm(value => ({ ...value, preferred_language: event.target.value }))}>{languages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <button className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Save profile"}</button>
-      </form>
-    </>}
+    <div className="seller-page-narrow seller-profile-content">
+      {loading ? <SellerLoadingState label="Loading…" rows={2} /> : error && !profile ? <SellerNotice>{error}</SellerNotice> : <>
+        {profile && <section className="seller-profile-summary">
+          <span className="seller-profile-avatar" aria-hidden="true">{initials}</span>
+          <div className="seller-profile-identity"><strong data-seller-translate="skip">{name}</strong><span data-seller-translate="skip">{profile.email}</span></div>
+          <div className="seller-profile-count"><span>Products in your catalogue</span><strong>{profile.product_count}</strong></div>
+        </section>}
+        <form className="seller-card seller-form-grid" onSubmit={submit}>
+          {error && <SellerNotice>{error}</SellerNotice>}
+          {notice && <SellerNotice kind="success">{notice}</SellerNotice>}
+          <div className="seller-field-row">
+            <label className="seller-field">First name<input value={form.first_name} onChange={event => setForm(value => ({ ...value, first_name: event.target.value }))} /></label>
+            <label className="seller-field">Last name<input value={form.last_name} onChange={event => setForm(value => ({ ...value, last_name: event.target.value }))} /></label>
+          </div>
+          <label className="seller-field">Email<input type="email" required value={form.email} onChange={event => setForm(value => ({ ...value, email: event.target.value }))} /></label>
+          <label className="seller-field">Phone<input type="tel" value={form.phone} onChange={event => setForm(value => ({ ...value, phone: event.target.value }))} /></label>
+          <label className="seller-field">Preferred language<select value={form.preferred_language} onChange={event => setForm(value => ({ ...value, preferred_language: event.target.value }))}>{languages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <button className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Save profile"}</button>
+        </form>
+      </>}
+    </div>
   </SellerPage>;
 }
