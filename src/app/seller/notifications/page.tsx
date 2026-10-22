@@ -1,0 +1,19 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback,useEffect,useState } from "react";
+import { SellerNotice,SellerPage } from "@/components/SellerShell";
+import { sellerRequest,type PageResult,type SellerNotification } from "@/lib/seller";
+
+export default function SellerNotificationsPage(){const [items,setItems]=useState<SellerNotification[]>([]);const [next,setNext]=useState<string|null>(null);const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+ const load=useCallback(async(url="/api/v1/notifications/")=>{setError("");try{const result=await sellerRequest<PageResult<SellerNotification>>(url);setItems(previous=>url.includes("page=")?[...previous,...result.results]:result.results);setNext(result.next);}catch(e){setError(e instanceof Error?e.message:"Unable to load notifications.");}},[]);
+ useEffect(()=>{void Promise.resolve().then(()=>load());},[load]);
+ async function markRead(item:SellerNotification){setBusy(true);try{await sellerRequest(`/api/v1/notifications/${item.id}/read/`,{method:"POST",body:"{}"});window.dispatchEvent(new Event("seller-notifications-updated"));await load();}catch(e){setError(e instanceof Error?e.message:"Could not mark as read.");}finally{setBusy(false);}}
+ async function markAll(){setBusy(true);try{await sellerRequest("/api/v1/notifications/read-all/",{method:"POST",body:"{}"});window.dispatchEvent(new Event("seller-notifications-updated"));await load();}catch(e){setError(e instanceof Error?e.message:"Could not mark notifications as read.");}finally{setBusy(false);}}
+ async function availability(item:SellerNotification,is_available:boolean){if(!item.product_id)return;setBusy(true);try{await sellerRequest(`/api/v1/products/${item.product_id}/availability/`,{method:"POST",body:JSON.stringify({is_available})});await markRead(item);await load();}catch(e){setError(e instanceof Error?e.message:"Could not update availability.");}finally{setBusy(false);}}
+ return <SellerPage title="Notifications" description="Review updates about your products and respond to requests." actions={<button className="seller-button" disabled={busy} onClick={()=>void markAll()}>Mark all as read</button>}>
+ {error&&<SellerNotice>{error}</SellerNotice>}<div className="seller-stack">{items.length?items.map(item=><article className="seller-card" key={item.id} style={{borderLeft:`4px solid ${item.is_read?"#e2e8ef":"#f58a1f"}`}}><div style={{display:"flex",justifyContent:"space-between",gap:12}}><div><h2 data-seller-translate="skip">{item.title||item.notification_type.replaceAll("_"," ")}</h2><p data-seller-translate="skip">{item.body}</p><small>{new Date(item.created_at).toLocaleString()}</small>{item.product_title&&<p>Product: <span data-seller-translate="skip">{item.product_title}</span></p>}</div>{!item.is_read&&<span className="seller-badge pending">Unread</span>}</div>
+   <div className="seller-toolbar" style={{marginTop:12}}>{item.product_id&&<Link className="seller-button" href={`/seller/products/${item.product_id}`}>View product</Link>}{item.product_id&&item.notification_type.toLowerCase().includes("availability")&&<><button className="seller-button primary" disabled={busy} onClick={()=>void availability(item,true)}>Available</button><button className="seller-button" disabled={busy} onClick={()=>void availability(item,false)}>Unavailable</button></>}{item.notification_type.toLowerCase().includes("price")&&item.product_id&&<Link className="seller-button primary" href={`/seller/products/${item.product_id}`}>Review offer</Link>}{!item.is_read&&<button className="seller-button" disabled={busy} onClick={()=>void markRead(item)}>Mark read</button>}</div>
+  </article>):<div className="seller-card seller-empty">You have no notifications.</div>}</div>{next&&<div className="seller-pagination"><button className="seller-button" disabled={busy} onClick={()=>void load(next)}>Load more</button></div>}
+ </SellerPage>;
+}
