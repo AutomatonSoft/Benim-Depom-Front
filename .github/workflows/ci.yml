@@ -28,8 +28,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "${{ github.base_ref }}" == "stage" && "${{ github.head_ref }}" != "local" ]]; then
-            echo "Only Pull Requests local -> stage are allowed."
+          if [[ "${{ github.base_ref }}" == "stage" && "${{ github.head_ref }}" != "local" && "${{ github.head_ref }}" != feature/* ]]; then
+            echo "Only Pull Requests feature/* or local -> stage are allowed."
             exit 1
           fi
 
