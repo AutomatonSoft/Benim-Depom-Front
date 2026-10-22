@@ -7,6 +7,7 @@ import { Bell, ChartNoAxesCombined, CircleUserRound, House, LogOut, Package, Plu
 import { clearSellerToken, sellerLogout, sellerRequest, type SellerProfile } from "@/lib/seller";
 import { readSellerLocale, setSellerLocale } from "@/lib/seller-i18n";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
+import SellerAuthFrame from "@/components/seller/SellerAuthFrame";
 
 const links = [
   ["/seller/products", "My products", Package], ["/seller/products/new", "Add product", Plus],
@@ -64,7 +65,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
     return () => { window.clearInterval(timer); window.removeEventListener("seller-notifications-updated", refresh); };
   }, [isPublic, profile]);
 
-  if (isPublic) return <div className="seller-auth-wrap">{children}</div>;
+  if (isPublic) return <div className="seller-auth-wrap"><SellerAuthFrame>{children}</SellerAuthFrame></div>;
   if (!profile && sessionError) return <main className="seller-loading"><div className="seller-card"><p role="alert">{t(sessionError)}</p><button className="seller-button" onClick={()=>setRetry(value=>value+1)}>{t("Retry session check")}</button></div></main>;
   if (!profile) return <main className="seller-loading" aria-live="polite">{t("Loading your workspace…")}</main>;
 
@@ -73,13 +74,21 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   return <div className="seller-shell">
     <aside className="seller-sidebar">
       <Link className="seller-brand" href="/seller"><span>BENIM</span><b>DEPOM</b><small>{t("SELLER WORKSPACE")}</small></Link>
-      <nav aria-label={t("Seller navigation")}>{links.map(([href, label, Icon]) => <Link key={href} href={href} className={pathname === href || (href === "/seller/products" && pathname === "/seller") ? "active" : ""}><Icon size={18} />{t(label)}{href === "/seller/notifications" && unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link>)}</nav>
+      <nav aria-label={t("Seller navigation")}>{links.map(([href, label, Icon]) => {
+        const active = href === "/seller/products"
+          ? pathname === href || /^\/seller\/products\/\d/.test(pathname)
+          : pathname === href || pathname.startsWith(`${href}/`);
+        return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon size={18} />{t(label)}{href === "/seller/notifications" && unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link>;
+      })}</nav>
       <button className="seller-logout" type="button" onClick={logout}><LogOut size={18} />{t("Sign out")}</button>
     </aside>
     <div className="seller-main-column">
-      <header className="seller-topbar"><Link href="/seller/products" className="seller-brand-mobile"><span>BENIM</span><b>DEPOM</b></Link><div className="seller-user"><Link aria-label={`${t("Notifications")}${unread ? `, ${unread} ${t("unread")}` : ""}`} className="seller-bell" href="/seller/notifications"><Bell size={19}/>{unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link><span>{[profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.username}</span><span className="seller-avatar">{(profile.first_name || profile.username).slice(0,1).toUpperCase()}</span></div></header>
+      <header className="seller-topbar"><Link href="/seller/products" className="seller-brand-mobile"><span>BENIM</span><b>DEPOM</b></Link><div className="seller-topbar-actions"><Link aria-label={`${t("Notifications")}${unread ? `, ${unread} ${t("unread")}` : ""}`} className="seller-bell" href="/seller/notifications"><Bell size={19}/>{unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</Link><details className="seller-profile-menu"><summary className="seller-user"><span className="seller-user-name">{[profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.username}</span><span className="seller-avatar" aria-hidden="true">{(profile.first_name || profile.username).slice(0,1).toUpperCase()}</span></summary><div className="seller-profile-menu-panel"><Link href="/seller/profile" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><CircleUserRound size={17}/>{t("Profile")}</Link><Link href="/seller/settings" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><Settings size={17}/>{t("Settings")}</Link><button type="button" onClick={logout}><LogOut size={17}/>{t("Sign out")}</button></div></details></div></header>
       <SellerLocalized>{children}</SellerLocalized>
-      <nav className="seller-bottom-nav" aria-label={t("Mobile navigation")}>{mobileLinks.map(([href,label,Icon]) => <Link key={href} href={href}><Icon size={19}/><span>{t(label)}</span></Link>)}</nav>
+      <nav className="seller-bottom-nav" aria-label={t("Mobile navigation")}>{mobileLinks.map(([href,label,Icon]) => {
+        const active = href === "/seller/products" ? pathname === href || /^\/seller\/products\/\d/.test(pathname) : pathname === href || pathname.startsWith(`${href}/`);
+        return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><Icon size={19}/><span>{t(label)}</span></Link>;
+      })}</nav>
     </div>
   </div>;
 }

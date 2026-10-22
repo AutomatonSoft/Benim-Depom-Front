@@ -15,14 +15,16 @@ export type SellerImage = { id: number; image: string; preview: string; thumbnai
 export type SellerVariant = { id?: number; color: string; materials: string[]; material_composition?: string; width_cm: string; height_cm: string; length_cm: string; quantity: number };
 export type SellerProduct = {
   id: number; title: string; product_type: string; unit_price: string; currency: "TRY" | "EUR" | "USD";
-  warehouse_city: string; status: string; is_available: boolean; deactivated_at: string | null; total_quantity: number; total_amount: string;
+  warehouse_city: string; status: string; is_available: boolean; deactivated_at: string | null; deactivation_requested_at?: string | null; total_quantity: number; total_amount: string;
   variants: SellerVariant[]; set_parts: Array<{ id?: number; description: string; width_cm: string; height_cm: string; length_cm: string }>;
   images: SellerImage[]; otto_category_id: number | null; otto_category_group_id: number | null; otto_attributes: Record<string, unknown>;
   created_at: string; updated_at: string; last_moderation_decision: string | null;
   active_price_negotiation: PriceNegotiation | null; latest_price_negotiation: PriceNegotiation | null;
+  otto_category_name?: string | null; otto_category_group_name?: string | null;
+  pending_changes?: Record<string, unknown> | null; pending_changes_submitted_at?: string | null;
 };
 export type PriceNegotiation = { id: number; manager_username: string; proposed_unit_price: string; current_unit_price: string; currency: string; message: string; status: string; seller_comment: string; created_at: string; responded_at: string | null };
-export type SellerNotification = { id: number; notification_type: string; product_id: number | null; product_title: string | null; is_read: boolean; created_at: string; title: string; body: string; proposed_unit_price: string | null; proposed_currency: string | null; price_negotiation_status: string | null };
+export type SellerNotification = { id: number; notification_type: string; product_id: number | null; product_title: string | null; is_read: boolean; created_at: string; title: string; body: string; proposed_unit_price: string | null; proposed_currency: string | null; price_negotiation_status: string | null; seller_comment?: string; price_accepted?: boolean | null; responded_at?: string | null; sender_name?: string | null; manager_name?: string | null };
 export type PageResult<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const TOKEN_KEY = "benim_seller_access_token";
@@ -33,6 +35,12 @@ export function sellerToken() {
 }
 export function saveSellerToken(token: string) { localStorage.setItem(TOKEN_KEY, token); }
 export function clearSellerToken() { if (typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY); }
+
+function sellerApiPath(path: string) {
+  const url = new URL(path, window.location.origin);
+  if (!url.pathname.startsWith("/api/v1/")) throw new SellerApiError(0, "Invalid seller API URL.");
+  return `${url.pathname}${url.search}`;
+}
 
 async function refreshSellerToken() {
   if (!refreshInFlight) {
@@ -52,20 +60,26 @@ async function refreshSellerToken() {
 }
 
 export async function sellerRequest<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+  const apiPath = sellerApiPath(path);
   const request = (token: string) => {
     const headers = new Headers(init.headers);
     headers.set("Authorization", `Bearer ${token}`);
     if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    return fetch(path, { ...init, headers, credentials: "same-origin" });
+    return fetch(apiPath, { ...init, headers, credentials: "same-origin" });
   };
-  let token = sellerToken();
-  if (!token) token = await refreshSellerToken();
+  let token: string | null;
+  try { token = sellerToken() ?? await refreshSellerToken(); }
+  catch { throw new SellerApiError(0, "Unable to reach the server. Check your connection and try again."); }
   if (!token) throw new SellerApiError(401, "Your session has expired. Please sign in again.");
-  let response = await request(token);
+  let response: Response;
+  try { response = await request(token); }
+  catch { throw new SellerApiError(0, "Unable to reach the server. Check your connection and try again."); }
   if (response.status === 401) {
-    token = await refreshSellerToken();
+    try { token = await refreshSellerToken(); }
+    catch { throw new SellerApiError(0, "Unable to reach the server. Check your connection and try again."); }
     if (!token) throw new SellerApiError(401, "Your session has expired. Please sign in again.");
-    response = await request(token);
+    try { response = await request(token); }
+    catch { throw new SellerApiError(0, "Unable to reach the server. Check your connection and try again."); }
   }
   if (!response.ok) {
     let body: unknown;
@@ -82,8 +96,7 @@ export async function sellerAllPages<T>(path: string): Promise<T[]> {
   const items = [...first.results];
   let next = first.next;
   while (next) {
-    const url = new URL(next, window.location.origin);
-    const page = await sellerRequest<PageResult<T>>(`${url.pathname}${url.search}`);
+    const page = await sellerRequest<PageResult<T>>(next);
     items.push(...page.results);
     next = page.next;
   }
@@ -110,11 +123,19 @@ export class SellerApiError extends Error {
   constructor(status: number, message: string, data?: unknown) { super(message); this.status = status; this.data = data; this.name = "SellerApiError"; }
 }
 
+function flattenErrors(value: unknown, path = ""): string[] {
+  if (Array.isArray(value)) return value.flatMap((item, index) => flattenErrors(item, path ? `${path}[${index}]` : ""));
+  if (value && typeof value === "object") return Object.entries(value).flatMap(([key, item]) => flattenErrors(item, path ? `${path}.${key}` : key));
+  if (typeof value !== "string" && typeof value !== "number") return [];
+  const message = String(value);
+  return [path ? `${path}: ${message}` : message];
+}
+
 export function errorMessage(data: unknown, fallback = "Request failed") {
   if (!data || typeof data !== "object") return fallback;
   const object = data as Record<string, unknown>;
   if (typeof object.detail === "string") return object.detail;
-  return Object.entries(object).map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(" ") : String(value)}`).join("; ") || fallback;
+  return Object.entries(object).flatMap(([field, value]) => flattenErrors(value, field)).join("; ") || fallback;
 }
 
 export async function sellerLogin(email: string, password: string) {

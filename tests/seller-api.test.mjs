@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sellerLogin, sellerRequest, sellerLogout, clearSellerToken } from "../src/lib/seller.ts";
+import { sellerLogin, sellerRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
 import { readSellerLocale, setSellerLocale, translateSeller } from "../src/lib/seller-i18n.ts";
 
 const values = new Map([["benim_access_token", "manager-access"]]);
@@ -10,7 +10,7 @@ globalThis.localStorage = {
   setItem: (key, value) => values.set(key, value),
   removeItem: (key) => values.delete(key),
 };
-globalThis.window = { localStorage: globalThis.localStorage };
+globalThis.window = { localStorage: globalThis.localStorage, location: { origin: "https://app.test" } };
 globalThis.window.dispatchEvent = (event) => { events.push(event.type); return true; };
 
 test("seller labels translate and interpolate in every supported language", () => {
@@ -19,6 +19,9 @@ test("seller labels translate and interpolate in every supported language", () =
   assert.equal(translateSeller("Profile saved.", "tr"), "Profil kaydedildi.");
   assert.equal(translateSeller("Profile saved.", "de"), "Profil gespeichert.");
   assert.equal(translateSeller("{count} products · Page {page}", "tr", { count: 12, page: 2 }), "12 ürün · Sayfa 2");
+  assert.equal(translateSeller("Filters", "ru"), "Фильтры");
+  assert.equal(translateSeller("Send for review", "de"), "Zur Prüfung einreichen");
+  assert.equal(translateSeller("Show password", "tr"), "Şifreyi göster");
   assert.equal(translateSeller("Server error", "de"), "Server error");
 });
 
@@ -68,6 +71,28 @@ test("invalid credentials remain an authentication error", async (t) => {
   assert.equal(values.has("benim_seller_access_token"), false);
 });
 
+test("seller API pagination never sends its bearer token to an external URL", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; clearSellerToken(); });
+  values.set("benim_seller_access_token", "seller-access");
+  const calls = [];
+  globalThis.fetch = async (input, init = {}) => {
+    calls.push([String(input), init]);
+    return Response.json({ ok: true });
+  };
+
+  await sellerRequest("https://untrusted.example/api/v1/notifications/?page=2");
+  assert.equal(calls[0][0], "/api/v1/notifications/?page=2");
+  assert.equal(calls[0][1].headers.get("Authorization"), "Bearer seller-access");
+});
+
+test("nested serializer errors remain readable", () => {
+  assert.equal(
+    errorMessage({ variants: [{ materials: ["Enter at least one material."] }] }),
+    "variants[0].materials[0]: Enter at least one material.",
+  );
+});
+
 test("parallel expired requests share one refresh request", async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; clearSellerToken(); });
@@ -86,8 +111,8 @@ test("parallel expired requests share one refresh request", async (t) => {
   };
 
   const [first, second] = await Promise.all([
-    sellerRequest("/api/first/"),
-    sellerRequest("/api/second/"),
+    sellerRequest("/api/v1/first/"),
+    sellerRequest("/api/v1/second/"),
   ]);
   assert.deepEqual(first, { ok: true });
   assert.deepEqual(second, { ok: true });
@@ -112,6 +137,6 @@ test("expired refresh clears the seller session", async (t) => {
   globalThis.fetch = async (input) => String(input).endsWith("/refresh/")
     ? Response.json({ detail: "Token is invalid or expired" }, { status: 401 })
     : new Response(null, { status: 401 });
-  await assert.rejects(sellerRequest("/api/private/"), { status: 401 });
+  await assert.rejects(sellerRequest("/api/v1/private/"), { status: 401 });
   assert.equal(values.has("benim_seller_access_token"), false);
 });
