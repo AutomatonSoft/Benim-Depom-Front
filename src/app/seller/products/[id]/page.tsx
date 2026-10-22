@@ -152,8 +152,8 @@ export default function SellerProductDetailsPage() {
     dynamicTitle
     dynamicDescription
     actions={<div className="seller-toolbar">
-      {canEdit && <Link className="seller-button" href={`/seller/products/${id}/edit`}><Pencil size={18} strokeWidth={1.8} aria-hidden="true" />{t("Edit product")}</Link>}
-      <Link className="seller-button" href="#moderation-history"><History size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</Link>
+      {canEdit && <Link className="seller-button" href={`/seller/products/${id}/edit`}><span className="seller-link-content"><Pencil size={18} strokeWidth={1.8} aria-hidden="true" />{t("Edit product")}</span></Link>}
+      <Link className="seller-button" href="#moderation-history"><span className="seller-link-content"><History size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</span></Link>
     </div>}
   >
     {error && <SellerNotice>{error}</SellerNotice>}

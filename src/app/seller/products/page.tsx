@@ -6,9 +6,9 @@ import { Ellipsis, FileClock, Package, Plus, Search, SlidersHorizontal } from "l
 import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import SellerProductImage from "@/components/seller/SellerProductImage";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
+import { SellerSelect } from "@/components/seller/SellerSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,21 +58,16 @@ function FilterFields({
   setAvailable: (value: string) => void;
 }) {
   return <>
-    <Select aria-label={t("Product status")} value={status} onChange={e => setStatus(e.target.value)}>
-      {statuses.map(value => <option value={value} key={value}>{value ? t(statusLabel[value]) : t("All statuses")}</option>)}
-    </Select>
-    <Select aria-label={t("Availability")} value={available} onChange={e => setAvailable(e.target.value)}>
-      <option value="">{t("Any availability")}</option>
-      <option value="true">{t("Available")}</option>
-      <option value="false">{t("Unavailable")}</option>
-    </Select>
+    <SellerSelect ariaLabel={t("Product status")} placeholder={t("All statuses")} value={status} onValueChange={setStatus}
+      options={statuses.map(value => ({ value, label: value ? t(statusLabel[value]) : t("All statuses") }))} />
+    <SellerSelect ariaLabel={t("Availability")} placeholder={t("Any availability")} value={available} onValueChange={setAvailable}
+      options={[["", t("Any availability")], ["true", t("Available")], ["false", t("Unavailable")]].map(([value, label]) => ({ value, label }))} />
   </>;
 }
 
 function SortSelect({ t, value, onChange }: { t: Translate; value: string; onChange: (value: string) => void }) {
-  return <Select aria-label={t("Sort products")} value={value} onChange={e => onChange(e.target.value)}>
-    {sortOptions.map(([key, label]) => <option value={key} key={key}>{t(label)}</option>)}
-  </Select>;
+  return <SellerSelect ariaLabel={t("Sort products")} placeholder={t("Sort products")} value={value} onValueChange={onChange}
+    options={sortOptions.map(([key, label]) => ({ value: key, label: t(label) }))} />;
 }
 
 function ProductActions({ product, t }: { product: SellerProduct; t: Translate }) {
@@ -87,7 +82,7 @@ function ProductActions({ product, t }: { product: SellerProduct; t: Translate }
       {(["draft", "rejected", "withdrawn", "approved"].includes(product.status)) &&
         <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/edit`}>{t("Edit product")}</Link></DropdownMenuItem>}
       <DropdownMenuSeparator />
-      <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/history`}><FileClock size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</Link></DropdownMenuItem>
+      <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/history`}><span className="seller-link-content"><FileClock size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</span></Link></DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>;
 }
@@ -158,7 +153,7 @@ export default function SellerProductsPage() {
   return <SellerPage
     title="My products"
     description="Manage your catalogue and track product review status."
-    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</Link></Button>}
+    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
   >
     <div className="seller-products-toolbar">
       <label className="seller-product-search">
@@ -226,7 +221,7 @@ export default function SellerProductsPage() {
         <Package size={28} aria-hidden="true" />
         <strong>{t(search || status || available ? "No products found." : "Your catalogue is empty.")}</strong>
         <span>{t(search || status || available ? "Try changing your search or filters." : "Add your first product to start your catalogue.")}</span>
-        {!search && !status && !available && <Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</Link></Button>}
+        {!search && !status && !available && <Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
       </div>}
 
     {page && !error && <div className="seller-pagination">

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle } from "lucide-react";
+import { ChevronRight, LoaderCircle, MessageCircle, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -85,11 +85,17 @@ export default function SellerSettingsPage() {
         <Button asChild variant="outline" className="seller-button"><Link href="/seller/notifications">Open notifications</Link></Button>
       </section>
 
-      <section className="seller-card seller-settings-row">
-        <div><h2>Support &amp; privacy</h2><p>Contact support using the public Benim Depom WhatsApp details.</p></div>
-        <div className="seller-settings-links">
-          {contact && <a className="seller-button" href={contact} target="_blank" rel="noreferrer">Contact support on WhatsApp</a>}
-          <Link className="seller-link" href="/privacy_policy">Privacy policy</Link>
+      <section className="seller-card seller-support-card">
+        <h2>Support &amp; privacy</h2>
+        <div className="seller-settings-link-list">
+          {contact ? <a className="seller-settings-link-row" href={contact} target="_blank" rel="noopener noreferrer">
+            <span className="seller-settings-link-layout"><span className="seller-settings-row-icon whatsapp"><MessageCircle size={20} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-settings-row-copy"><strong>Contact us</strong><small>Write to our support team.</small></span><ChevronRight size={19} aria-hidden="true" /></span>
+          </a> : <div className="seller-settings-link-row" aria-disabled="true">
+            <span className="seller-settings-link-layout"><span className="seller-settings-row-icon whatsapp"><MessageCircle size={20} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-settings-row-copy"><strong>Contact us</strong><small>Write to our support team.</small></span><ChevronRight size={19} aria-hidden="true" /></span>
+          </div>}
+          <Link className="seller-settings-link-row" href="/privacy_policy">
+            <span className="seller-settings-link-layout"><span className="seller-settings-row-icon"><ShieldCheck size={20} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-settings-row-copy"><strong>Privacy policy</strong><small>How we use and protect your data.</small></span><ChevronRight size={19} aria-hidden="true" /></span>
+          </Link>
         </div>
       </section>
 

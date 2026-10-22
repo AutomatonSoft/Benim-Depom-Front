@@ -8,9 +8,10 @@ import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
 import SellerProductImage from "@/components/seller/SellerProductImage";
-import { sellerRequest, type SellerProduct, type SellerVariant } from "@/lib/seller";
+import { SellerSelect } from "@/components/seller/SellerSelect";
+import { SellerApiError, sellerRequest, type SellerProduct, type SellerVariant } from "@/lib/seller";
+import { sellerProductErrorDetails } from "@/lib/seller-product-errors";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
@@ -61,9 +62,11 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(product ? () => fieldsFor(product) : empty);
   const [setParts, setSetParts] = useState<SetPart[]>(() => product?.set_parts || []);
+  const [setPartsOpen, setSetPartsOpen] = useState(() => Boolean(product?.set_parts.length));
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
   const [resubmit, setResubmit] = useState(false);
@@ -73,11 +76,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     attributes: product?.otto_attributes ?? {},
   }));
   const idempotencyKey = useRef<string | null>(null);
+  const submitInFlight = useRef(false);
+  const submitted = useRef(false);
 
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
 
   function set<K extends keyof Fields>(key: K, value: Fields[K]) {
     idempotencyKey.current = null;
+    setFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
     setFields(current => ({ ...current, [key]: value }));
   }
 
@@ -95,12 +101,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     }
     idempotencyKey.current = null;
     setError("");
+    setFieldErrors(current => { const next = { ...current }; delete next.images; return next; });
     setFiles(selected);
     setPreviews(selected.map(file => URL.createObjectURL(file)));
   }
 
   function updateSetPart(index: number, key: SetPartField, value: string) {
     idempotencyKey.current = null;
+    setFieldErrors(current => { const next = { ...current }; delete next.set_parts; return next; });
     setSetParts(current => current.map((part, position) => position === index ? { ...part, [key]: value } : part));
   }
 
@@ -118,25 +126,28 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (submitInFlight.current || submitted.current) return;
     setError("");
+    setFieldErrors({});
     setSuccess("");
     const materials = fields.materials.split(",").map(value => value.trim()).filter(Boolean);
     if (materials.length < 1 || materials.length > 2) {
-      setError(t("Enter one or two materials, separated by commas."));
+      setFieldErrors({ materials: t("Enter one or two materials, separated by commas.") });
       return;
     }
     if (setParts.some(part =>
       !part.description.trim() ||
       [part.width_cm, part.height_cm, part.length_cm].some(value => !Number.isFinite(Number(value)) || Number(value) <= 0),
     )) {
-      setError(t("Complete the description and positive dimensions for each set part."));
+      setFieldErrors({ set_parts: t("Complete the description and positive dimensions for each set part.") });
       return;
     }
     if (!product && files.length === 0) {
-      setError(t("Add at least one product photo."));
+      setFieldErrors({ images: t("Add at least one product photo.") });
       return;
     }
 
+    submitInFlight.current = true;
     setBusy(true);
     const variant: SellerVariant = {
       color: fields.color.trim(),
@@ -177,6 +188,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           updateBody = JSON.stringify(payload);
         }
         const saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`, { method: "PATCH", headers, body: updateBody });
+        submitted.current = true;
         const pending = !!saved.pending_changes && Object.keys(saved.pending_changes).length > 0;
         setSuccess(saved.status === "submitted" || pending ? t("Your changes were sent for review.") : t("Product saved."));
         window.setTimeout(() => router.push(`/seller/products/${product.id}`), 700);
@@ -192,15 +204,23 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           headers: { "Idempotency-Key": idempotencyKey.current },
           body: form,
         });
+        submitted.current = true;
         idempotencyKey.current = null;
         const status = created.status.replaceAll("_", " ");
         setSuccess(t("Product created with status: {status}", { status: t(status.charAt(0).toUpperCase() + status.slice(1)) }));
         window.setTimeout(() => router.push(`/seller/products/${created.id}`), 700);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("Could not save product."));
+      if (e instanceof SellerApiError) {
+        const details = sellerProductErrorDetails(e.data);
+        setFieldErrors(details.fields);
+        setError(details.message || (Object.keys(details.fields).length ? t("Some product details need attention. Review the highlighted fields.") : e.message));
+      } else {
+        setError(e instanceof Error ? e.message : t("Could not save product."));
+      }
     } finally {
-      setBusy(false);
+      if (!submitted.current) submitInFlight.current = false;
+      setBusy(submitted.current);
     }
   }
 
@@ -255,11 +275,13 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       <Input
       required={required}
       type={type}
+      aria-invalid={Boolean(fieldErrors[name])}
       step={type === "number" ? name === "quantity" ? "1" : "0.01" : undefined}
       min={type === "number" ? name === "quantity" ? "1" : "0.01" : undefined}
       value={fields[name]}
       onChange={event => set(name, event.target.value as Fields[typeof name])}
     />
+    {fieldErrors[name] && <small className="seller-field-error">{fieldErrors[name]}</small>}
   </label>;
 
   return <SellerLocalized>
@@ -273,6 +295,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             chooseFiles([...files, ...Array.from(event.dataTransfer.files)]);
           }}>
             <h2>{t(product ? "Add photos" : "Product photos")}</h2>
+            {fieldErrors.images && <small className="seller-field-error">{fieldErrors.images}</small>}
             <p>{t(product ? "Select or drop additional photos for this product." : "Select or drop up to 20 JPEG, PNG or WebP images. The first photo will be the main image.")} {t("Maximum 40 MB each.")}</p>
             <label className="seller-photo-dropzone">
               <Upload size={24} strokeWidth={1.8} aria-hidden="true" />
@@ -323,12 +346,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           </section>
 
           <section className="seller-card">
-            <h2>{t("Variant details")}</h2>
+            <h2>{t("Color and materials")}</h2>
+            {fieldErrors.variants && <small className="seller-field-error">{fieldErrors.variants}</small>}
             <p>{t("One color variant is supported per product. Add materials separated by commas.")}</p>
             <div className="seller-form-grid">
               {field("color", "Color")}
               {field("materials", "Materials (up to 2)")}
               {field("material_composition", "Material composition", "text", false)}
+              <h3 className="seller-subsection-title">{t("Dimensions")}</h3>
               <div className="seller-dimensions-row">
                 {field("width_cm", "Width (cm)", "number")}
                 {field("height_cm", "Height (cm)", "number")}
@@ -337,14 +362,17 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             </div>
           </section>
 
-          <section className="seller-card">
-            <div className="seller-section-heading">
-              <div><h2>{t("Set parts (optional)")}</h2><p>{t("Add up to 20 additional pieces with their own dimensions.")}</p></div>
+          <details className="seller-card seller-optional-parts" open={setPartsOpen} onToggle={event => setSetPartsOpen(event.currentTarget.open)}>
+            <summary className="seller-optional-parts-summary">
+              <span><strong>{t("Set parts (optional)")}</strong><small>{t("Add up to 20 additional pieces with their own dimensions.")}</small></span>
+              <span className="seller-badge">{setParts.length}</span>
+            </summary>
+            <div className="seller-optional-parts-content">
+              {fieldErrors.set_parts && <small className="seller-field-error">{fieldErrors.set_parts}</small>}
               <button type="button" className="seller-button" disabled={setParts.length >= 20} onClick={() => {
                 idempotencyKey.current = null;
                 setSetParts(current => [...current, { description: "", width_cm: "", height_cm: "", length_cm: "" }]);
               }}><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add set part")}</button>
-            </div>
             {setParts.length > 0 ? <div className="seller-stack">{setParts.map((part, index) => <fieldset className="seller-set-part" key={part.id ?? index}>
               <legend>{t("Piece")} {index + 1}</legend>
               <label className="seller-field">{t("Description")}
@@ -360,12 +388,15 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
                 setSetParts(current => current.filter((_, position) => position !== index));
               }}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" />{t("Remove set part")}</button>
             </fieldset>)}</div> : <p className="seller-field-hint">{t("No additional set parts.")}</p>}
-          </section>
+            </div>
+          </details>
 
           <OttoFields value={otto} onChange={value => {
             idempotencyKey.current = null;
+            setFieldErrors(current => { const next = { ...current }; delete next.otto_attributes; return next; });
             setOtto(value);
           }} />
+          {fieldErrors.otto_attributes && <small className="seller-field-error">{fieldErrors.otto_attributes}</small>}
 
         </div>
 
@@ -376,16 +407,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
               {field("unit_price", "Unit price", "number")}
               <div className="seller-field-row">
                 <label className="seller-field">{t("Currency")}
-                  <Select value={fields.currency} onChange={event => set("currency", event.target.value as Fields["currency"])}>
-                    {["TRY", "EUR", "USD"].map(currency => <option key={currency}>{currency}</option>)}
-                  </Select>
+                  <SellerSelect value={fields.currency} onValueChange={value => set("currency", value as Fields["currency"])} placeholder={t("Currency")} options={["TRY", "EUR", "USD"].map(currency => ({ value: currency, label: currency }))} />
+                  {fieldErrors.currency && <small className="seller-field-error">{fieldErrors.currency}</small>}
                 </label>
                 {field("quantity", "Quantity", "number")}
               </div>
               <label className="seller-field">{t("Warehouse city")}
-                <Select value={fields.warehouse_city} onChange={event => set("warehouse_city", event.target.value)}>
-                  {cities.map(([code, label]) => <option key={code} value={code}>{t(label)}</option>)}
-                </Select>
+                <SellerSelect value={fields.warehouse_city} onValueChange={value => set("warehouse_city", value)} placeholder={t("Warehouse city")} options={cities.map(([value, label]) => ({ value, label: t(label) }))} />
+                {fieldErrors.warehouse_city && <small className="seller-field-error">{fieldErrors.warehouse_city}</small>}
               </label>
             </div>
           </section>

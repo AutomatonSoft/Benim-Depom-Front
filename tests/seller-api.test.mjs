@@ -1,8 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sellerLogin, sellerRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
+import { sellerAvatarInitial, sellerLogin, sellerRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
 import { readSellerLocale, setSellerLocale, translateSeller } from "../src/lib/seller-i18n.ts";
 import { loadOttoCatalogPages, parseOttoAttributeValue } from "../src/lib/otto-catalog.ts";
+import { answerAvailabilityOnce, availabilityResponseState, SellerAvailabilityGuard } from "../src/lib/seller-availability.ts";
+import { getSellerDatePreset, berlinBusinessDate, parseSellerIsoDate, sellerDateToIso, shiftSellerCalendarMonth } from "../src/lib/seller-date-range.ts";
+import { firstSellerProductOptions, sellerProductSearchUrl } from "../src/lib/seller-product-search.ts";
+import { toggleSellerMultiValue } from "../src/lib/seller-select.ts";
+import { sellerProductErrorDetails } from "../src/lib/seller-product-errors.ts";
+import { LANDING_I18N, SELLER_LOGIN_PATH } from "../src/lib/landing-content.ts";
 
 const values = new Map([["benim_access_token", "manager-access"]]);
 const events = [];
@@ -167,4 +173,113 @@ test("expired refresh clears the seller session", async (t) => {
     : new Response(null, { status: 401 });
   await assert.rejects(sellerRequest("/api/v1/private/"), { status: 401 });
   assert.equal(values.has("benim_seller_access_token"), false);
+});
+
+test("seller avatars use one trimmed initial and fall back to username", () => {
+  assert.equal(sellerAvatarInitial({ first_name: "  Alikhan ", username: "bulkair" }), "A");
+  assert.equal(sellerAvatarInitial({ first_name: "   ", username: " seller " }), "S");
+  assert.equal(sellerAvatarInitial({ first_name: "", username: "" }), "");
+});
+
+test("seller multi-select toggles each selected value once", () => {
+  assert.deepEqual(toggleSellerMultiValue(["oak"], "linen"), ["oak", "linen"]);
+  assert.deepEqual(toggleSellerMultiValue(["oak", "linen"], "oak"), ["linen"]);
+});
+
+test("product validation errors map to friendly field names without exposing API paths", () => {
+  const details = sellerProductErrorDetails({
+    variants: [{ materials: ["Choose one or two materials."], width_cm: ["Enter a valid number."] }],
+    otto_attributes: { 415: ["Invalid value."] },
+    unknown_field: ["Invalid value."],
+  });
+  assert.equal(details.fields.materials, "Choose one or two materials.");
+  assert.equal(details.fields.width_cm, "Enter a valid number.");
+  assert.equal(details.fields.otto_attributes, "Invalid value.");
+  assert.equal(details.message, "Some product details need attention. Review the form and try again.");
+  assert.equal(JSON.stringify(details).includes("unknown_field"), false);
+});
+
+test("statistics product search requests one ten-item page and uses backend search", () => {
+  assert.equal(sellerProductSearchUrl(), "/api/v1/products/?page_size=10");
+  assert.equal(sellerProductSearchUrl("  sofa bed  "), "/api/v1/products/?page_size=10&search=sofa+bed");
+  assert.deepEqual(firstSellerProductOptions(Array.from({ length: 100 }, (_, index) => index)), Array.from({ length: 10 }, (_, index) => index));
+});
+
+test("seller date presets use Berlin dates and calendar-day arithmetic", () => {
+  assert.equal(berlinBusinessDate(new Date("2025-12-31T23:30:00.000Z")), "2026-01-01");
+  assert.deepEqual(getSellerDatePreset("last7Days", "2026-01-01"), { from: "2025-12-26", to: "2026-01-01" });
+  assert.deepEqual(getSellerDatePreset("thisWeek", "2026-01-01"), { from: "2025-12-29", to: "2026-01-01" });
+  assert.deepEqual(getSellerDatePreset("lastWeek", "2026-01-01"), { from: "2025-12-22", to: "2025-12-28" });
+  assert.deepEqual(getSellerDatePreset("lastMonth", "2026-01-01"), { from: "2025-12-01", to: "2025-12-31" });
+  assert.equal(sellerDateToIso(parseSellerIsoDate("2026-01-01")), "2026-01-01");
+  const month = shiftSellerCalendarMonth(new Date(2025, 11, 1), 1);
+  assert.equal(sellerDateToIso(month), "2026-01-01");
+});
+
+test("availability actions only apply to unanswered incoming reminders", () => {
+  const unanswered = { notification_type: "product_availability_reminder", product_id: 12, is_read: true, responded_at: null };
+  assert.equal(availabilityResponseState(unanswered), "pending");
+  assert.equal(availabilityResponseState({ ...unanswered, responded_at: "2026-01-01T00:00:00Z" }), "answered");
+  assert.equal(availabilityResponseState({ ...unanswered, notification_type: "product_confirmation" }), "none");
+  assert.equal(availabilityResponseState(unanswered, true), "answered");
+});
+
+test("one availability response guards same-product double clicks and duplicate reminders", async () => {
+  const guard = new SellerAvailabilityGuard();
+  let resolvePost;
+  let postCount = 0;
+  const send = () => {
+    postCount += 1;
+    return new Promise(resolve => { resolvePost = resolve; });
+  };
+  const noop = async () => {};
+  const onAnswered = () => {};
+  const onReadError = () => {};
+  const first = answerAvailabilityOnce({ guard, productId: 12, send, markRead: noop, onAnswered, onReadError });
+  const doubleClick = await answerAvailabilityOnce({ guard, productId: 12, send, markRead: noop, onAnswered, onReadError });
+  const secondReminder = await answerAvailabilityOnce({ guard, productId: 12, send, markRead: noop, onAnswered, onReadError });
+  assert.equal(doubleClick, false);
+  assert.equal(secondReminder, false);
+  assert.equal(postCount, 1);
+  resolvePost();
+  assert.equal(await first, true);
+  assert.equal(availabilityResponseState({ notification_type: "product_availability_reminder", product_id: 12, responded_at: null }, guard.answered.has(12)), "answered");
+  assert.equal(await answerAvailabilityOnce({ guard, productId: 12, send, markRead: noop, onAnswered, onReadError }), false);
+  assert.equal(postCount, 1);
+});
+
+test("mark-as-read failure does not repeat a successful availability response", async () => {
+  const guard = new SellerAvailabilityGuard();
+  let posts = 0;
+  let readErrors = 0;
+  const request = () => answerAvailabilityOnce({
+    guard,
+    productId: 21,
+    send: async () => { posts += 1; },
+    markRead: async () => { throw new Error("Read request failed"); },
+    onAnswered: () => {},
+    onReadError: () => { readErrors += 1; },
+  });
+  assert.equal(await request(), true);
+  assert.equal(await request(), false);
+  assert.equal(posts, 1);
+  assert.equal(readErrors, 1);
+});
+
+test("availability failures stay visible and ambiguous failures require a status refresh", async () => {
+  const guard = new SellerAvailabilityGuard();
+  const rejected = Object.assign(new Error("Availability was rejected"), { status: 422 });
+  await assert.rejects(guard.submit(31, async () => { throw rejected; }), /Availability was rejected/);
+  assert.equal(guard.isBlocked(31), false);
+
+  const ambiguous = Object.assign(new Error("Connection lost"), { status: 0 });
+  await assert.rejects(guard.submit(32, async () => { throw ambiguous; }), /Connection lost/);
+  assert.equal(guard.isBlocked(32), true);
+  guard.resolveUncertain(32);
+  assert.equal(guard.isBlocked(32), false);
+});
+
+test("landing exposes localized seller sign-in and keeps the destination fixed", () => {
+  assert.equal(SELLER_LOGIN_PATH, "/seller/login");
+  assert.deepEqual([LANDING_I18N.en.nav.sellerLogin, LANDING_I18N.de.nav.sellerLogin, LANDING_I18N.tr.nav.sellerLogin], ["Sign in", "Anmelden", "Giriş Yap"]);
 });

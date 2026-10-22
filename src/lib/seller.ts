@@ -11,6 +11,13 @@ export type SellerProfile = {
   product_count: number;
 };
 
+export function sellerAvatarInitial(profile: Pick<SellerProfile, "first_name" | "username">) {
+  const firstName = profile.first_name?.trim();
+  const username = profile.username?.trim();
+  const initial = Array.from(firstName || username || "")[0];
+  return initial ? initial.toUpperCase() : "";
+}
+
 export type SellerImage = { id: number; image: string; preview: string; thumbnail: string; position: number; is_primary: boolean };
 export type SellerVariant = { id?: number; color: string; materials: string[]; material_composition?: string; width_cm: string; height_cm: string; length_cm: string; quantity: number };
 export type SellerProduct = {
