@@ -43,14 +43,14 @@ export default function SellerRegisterPage() {
       {text("username", "Username", "text", "username")}
       {text("email", "Email", "email", "email")}
       <div className="seller-field-row">{text("first_name", "First name", "text", "given-name")}{text("last_name", "Last name", "text", "family-name")}</div>
-      {text("phone", "Phone", "tel", "tel")}
+      {text("phone", "Phone (optional)", "tel", "tel")}
       {text("password", "Password", "password", "new-password")}
       {text("password_confirm", "Confirm password", "password", "new-password")}
       <label className="seller-field">{t("Preferred language")}
         <SellerSelect value={form.preferred_language} onValueChange={value => setForm(current => ({ ...current, preferred_language: value }))} placeholder="English" ariaLabel={t("Preferred language")} options={[{ value: "en", label: "English" }, { value: "tr", label: "Türkçe" }, { value: "ru", label: "Русский" }, { value: "de", label: "Deutsch" }]} />
       </label>
       {error && <SellerNotice>{error}</SellerNotice>}
-      <button className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} aria-hidden="true" />{t(busy ? "Creating…" : "Create account")}</button>
+      <button className="seller-button primary seller-register-submit" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} aria-hidden="true" />{t(busy ? "Creating…" : "Create account")}</button>
     </form>
     <p className="seller-auth-navigation">{t("Already registered?")} <Link className="seller-link" href="/seller/login">{t("Sign in")}</Link></p>
   </main></SellerLocalized>;

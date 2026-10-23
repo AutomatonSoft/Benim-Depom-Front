@@ -1,5 +1,5 @@
 export type SellerDateRange = { from: string; to: string };
-export type SellerDatePreset = "today" | "yesterday" | "thisWeek" | "lastWeek" | "last7Days" | "last30Days" | "thisMonth" | "lastMonth";
+export type SellerDatePreset = "allTime" | "today" | "yesterday" | "thisWeek" | "lastWeek" | "last7Days" | "last30Days" | "thisMonth" | "lastMonth";
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -34,6 +34,7 @@ export function getSellerDatePreset(preset: SellerDatePreset, todayIso = berlinB
   yesterday.setDate(yesterday.getDate() - 1);
 
   switch (preset) {
+    case "allTime": return { from: "", to: "" };
     case "today": return { from: to, to };
     case "yesterday": {
       const date = sellerDateToIso(yesterday);

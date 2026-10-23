@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, LoaderCircle, MessageCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SellerSelect } from "@/components/seller/SellerSelect";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -18,12 +19,19 @@ import {
 import { SellerNotice, SellerPage } from "@/components/SellerShell";
 import { clearSellerToken, sellerRequest } from "@/lib/seller";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
+import { readSellerLocale, setSellerLocale, type SellerLocale } from "@/lib/seller-i18n";
 
 type AccountDeletionResult = { deleted?: boolean };
+const languages = [
+  { value: "ru", label: "Русский" },
+  { value: "en", label: "English" },
+  { value: "tr", label: "Türkçe" },
+  { value: "de", label: "Deutsch" },
+] satisfies { value: SellerLocale; label: string }[];
 
 export default function SellerSettingsPage() {
   const router = useRouter();
-  const { t } = useSellerI18n();
+  const { t, locale } = useSellerI18n();
   const deletionInFlight = useRef(false);
   const [password, setPassword] = useState({ current_password: "", new_password: "", new_password_confirm: "" });
   const [error, setError] = useState("");
@@ -31,12 +39,33 @@ export default function SellerSettingsPage() {
   const [contact, setContact] = useState("");
   const [busy, setBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [languageLoading, setLanguageLoading] = useState(true);
+  const [languageBusy, setLanguageBusy] = useState(false);
+  const [languageError, setLanguageError] = useState("");
 
   useEffect(() => {
     sellerRequest<{ phone?: string; whatsapp_url?: string | null }>("/api/v1/contact/whatsapp/")
       .then(value => setContact(value.whatsapp_url || ""))
       .catch(() => undefined);
+    sellerRequest<{ preferred_language?: string }>("/api/v1/auth/me/")
+      .then(value => { if (value.preferred_language) setSellerLocale(readSellerLocale(value.preferred_language)); })
+      .catch(() => undefined)
+      .finally(() => setLanguageLoading(false));
   }, []);
+
+  async function changeLanguage(value: string) {
+    const language = readSellerLocale(value);
+    setLanguageBusy(true);
+    setLanguageError("");
+    try {
+      await sellerRequest("/api/v1/auth/me/language/", { method: "PATCH", body: JSON.stringify({ language }) });
+      setSellerLocale(language);
+    } catch {
+      setLanguageError("Could not update interface language.");
+    } finally {
+      setLanguageBusy(false);
+    }
+  }
 
   async function changePassword(event: FormEvent) {
     event.preventDefault();
@@ -83,12 +112,16 @@ export default function SellerSettingsPage() {
           <label key={key} className="seller-field">{label}
             <input type="password" required minLength={key === "current_password" ? 1 : 8} autoComplete={key === "current_password" ? "current-password" : "new-password"} value={password[key]} onChange={event => setPassword(value => ({ ...value, [key]: event.target.value }))} />
           </label>)}
-        <Button variant="accent" className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Update password"}</Button>
+        <Button variant="accent" className="seller-button primary seller-settings-password-submit" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Update password"}</Button>
       </form>
 
-      <section className="seller-card seller-settings-row">
-        <div><h2>Notifications</h2><p>See product updates and requests in your notifications.</p></div>
-        <Button asChild variant="outline" className="seller-button"><Link href="/seller/notifications">Open notifications</Link></Button>
+      <section className="seller-card seller-settings-row seller-settings-language">
+        <div><h2>{t("Interface language")}</h2><p>{t("Choose the language used across the seller portal.")}</p></div>
+        <div className="seller-settings-language-control">
+          <SellerSelect ariaLabel={t("Interface language")} value={locale} onValueChange={value => void changeLanguage(value)} disabled={busy || languageLoading || languageBusy} placeholder={t("Interface language")} options={languages} />
+          {(languageLoading || languageBusy) && <span role="status">{t(languageLoading ? "Loading…" : "Saving…")}</span>}
+          {languageError && <SellerNotice>{t(languageError)}</SellerNotice>}
+        </div>
       </section>
 
       <section className="seller-card seller-support-card">
@@ -108,7 +141,7 @@ export default function SellerSettingsPage() {
       <section className="seller-card seller-danger-zone">
         <div><h2>Delete account</h2><p>Active marketplace listings may be removed before deletion completes. The account can be disabled while that work finishes.</p></div>
         <AlertDialog open={deleteOpen} onOpenChange={open => { if (!deletionInFlight.current) { setDeleteOpen(open); setError(""); } }}>
-          <AlertDialogTrigger asChild><Button variant="destructive" className="seller-button danger" disabled={busy}>{t("Request account deletion")}</Button></AlertDialogTrigger>
+          <AlertDialogTrigger asChild><Button variant="destructive" className="seller-button danger seller-delete-trigger" disabled={busy}>{t("Delete account")}</Button></AlertDialogTrigger>
           <AlertDialogContent className="seller-delete-dialog" size="sm">
             <AlertDialogHeader>
               <span className="seller-delete-icon"><TriangleAlert size={24} aria-hidden="true" /></span>
@@ -118,7 +151,7 @@ export default function SellerSettingsPage() {
             {error && deleteOpen && <SellerNotice>{error}</SellerNotice>}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
-              <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={() => void deleteAccount()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{t(busy ? "Please wait…" : "Delete account")}</Button>
+              <Button variant="destructive" className="seller-button danger seller-delete-confirm" disabled={busy} onClick={() => void deleteAccount()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{t(busy ? "Please wait…" : "Delete account")}</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

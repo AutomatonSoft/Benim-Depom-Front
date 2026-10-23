@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Ellipsis, FileClock, Package, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
@@ -35,10 +36,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { sellerRequest, type PageResult, type SellerProduct } from "@/lib/seller";
+import { sellerProductTypeLabel } from "@/lib/seller-product-form";
 
-const statuses = ["", "draft", "submitted", "approved", "rejected", "withdrawn", "deactivated", "archived"];
+const statuses = ["", "submitted", "approved", "rejected", "withdrawn", "deactivated", "archived"];
 const statusLabel: Record<string, string> = {
-  draft: "Draft", submitted: "Submitted", approved: "Approved", rejected: "Needs changes",
+  draft: "Draft", submitted: "Submitted", approved: "Approved", rejected: "Rejected",
   withdrawn: "Withdrawn", deactivated: "Deactivated", archived: "Archived",
 };
 const sortOptions = [
@@ -88,11 +90,12 @@ function ProductActions({ product, t }: { product: SellerProduct; t: Translate }
 }
 
 function StatusBadges({ product, t }: { product: SellerProduct; t: Translate }) {
+  const deactivated = product.status === "deactivated" || Boolean(product.deactivation_requested_at || product.deactivated_at);
   return <div className="seller-product-badges">
-    <span className={`seller-badge ${product.status}`}>{t(statusLabel[product.status] || product.status.replaceAll("_", " "))}</span>
-    {product.deactivation_requested_at && <span className="seller-badge pending">{t("Deactivation requested")}</span>}
-    {product.deactivated_at && <span className="seller-badge deactivated">{t("Deactivated")}</span>}
-    {!product.is_available && <span className="seller-badge">{t("Unavailable")}</span>}
+    {deactivated
+      ? <span className="seller-badge deactivated">{t("Deactivated")}</span>
+      : <span className={`seller-badge ${product.status}`}>{t(statusLabel[product.status] || product.status.replaceAll("_", " "))}</span>}
+    {!deactivated && !product.is_available && <span className="seller-badge">{t("Unavailable")}</span>}
   </div>;
 }
 
@@ -105,6 +108,7 @@ function ProductPhoto({ product, t }: { product: SellerProduct; t: Translate }) 
 
 export default function SellerProductsPage() {
   const { t, locale } = useSellerI18n();
+  const router = useRouter();
   const [page, setPage] = useState<PageResult<SellerProduct> | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -153,7 +157,7 @@ export default function SellerProductsPage() {
   return <SellerPage
     title="My products"
     description="Manage your catalogue and track product review status."
-    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus key="add-product-icon" size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
+    actions={<Link href="/seller/products/new" className="seller-button primary seller-link-content"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</Link>}
   >
     <div className="seller-products-toolbar">
       <label className="seller-product-search">
@@ -191,8 +195,8 @@ export default function SellerProductsPage() {
             <TableBody>{page.results.map(product => {
               return <TableRow key={product.id}>
                 <TableCell><div className="seller-table-product"><ProductPhoto product={product} t={t} /><div>
-                  <Link className="seller-link" data-seller-translate="skip" href={`/seller/products/${product.id}`}>{product.title}</Link>
-                  <span data-seller-translate="skip">{product.product_type}</span>
+                  <button type="button" className="seller-link seller-link-button seller-product-title-button" data-seller-translate="skip" onClick={() => router.push(`/seller/products/${product.id}`)}>{product.title}</button>
+                  <span>{t(sellerProductTypeLabel(product.product_type))}</span>
                 </div></div></TableCell>
                 <TableCell><StatusBadges product={product} t={t} /></TableCell>
                 <TableCell className="seller-numeric-cell"><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong></TableCell>
@@ -208,8 +212,8 @@ export default function SellerProductsPage() {
           return <article className="seller-product" key={product.id}>
             <ProductPhoto product={product} t={t} />
             <div className="seller-product-summary">
-              <h2><Link className="seller-link" data-seller-translate="skip" href={`/seller/products/${product.id}`}>{product.title}</Link></h2>
-              <p data-seller-translate="skip">{product.product_type}</p>
+              <h2><button type="button" className="seller-link seller-link-button seller-product-title-button" data-seller-translate="skip" onClick={() => router.push(`/seller/products/${product.id}`)}>{product.title}</button></h2>
+              <p>{t(sellerProductTypeLabel(product.product_type))}</p>
               <p><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong> · <span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</p>
               <p>{t("Dimensions")}: {variant ? <span data-seller-translate="skip">{variant.width_cm} × {variant.height_cm} × {variant.length_cm} cm</span> : t("Dimensions not provided")}</p>
               <StatusBadges product={product} t={t} />

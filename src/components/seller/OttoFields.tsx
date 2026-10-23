@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Accordion } from "radix-ui";
-import { ChevronDown, Search, Shapes } from "lucide-react";
+import { Plus, RotateCcw, Shapes, Trash2 } from "lucide-react";
 import { ottoCatalogPath, type OttoCatalogLanguage } from "@/lib/listings";
-import { loadOttoCatalogPages, parseOttoAttributeValue, type OttoCatalogPage } from "@/lib/otto-catalog";
+import { loadOttoCatalogPages, parseOttoAttributeValue, type OttoCatalogPage, updateOttoAttribute } from "@/lib/otto-catalog";
 import { sellerRequest } from "@/lib/seller";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import { SellerMultiSelect, SellerSearchableSelect } from "@/components/seller/SellerSelect";
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -45,8 +45,8 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [invalid, setInvalid] = useState<string[]>([]);
   const [search, setSearch] = useState("");
-  const [openGroups, setOpenGroups] = useState<string[]>([]);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [selectedAttributeIds, setSelectedAttributeIds] = useState<number[]>(() => Object.keys(value.attributes).map(Number).filter(Number.isSafeInteger));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState("");
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -96,11 +96,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
   }, [value.group, language]);
 
   function updateAttribute(id: number, next: unknown) {
-    const key = String(id);
-    const nextAttributes = { ...value.attributes };
-    if (!hasValue(next)) delete nextAttributes[key];
-    else nextAttributes[key] = next;
-    onChange({ ...value, attributes: nextAttributes });
+    onChange({ ...value, attributes: updateOttoAttribute(value.attributes, id, next) });
   }
 
   function updateFreeValue(attribute: Attribute, raw: string) {
@@ -116,7 +112,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
     const parsed = values.map(item => parseOttoAttributeValue(attribute.type, item));
     const isValid = parsed.every(item => item !== null);
     setInvalid(current => isValid ? current.filter(id => id !== key) : [...new Set([...current, key])]);
-    updateAttribute(attribute.attribute_id, isValid ? attribute.multi_value ? parsed : parsed[0] : undefined);
+    if (isValid) updateAttribute(attribute.attribute_id, attribute.multi_value ? parsed : parsed[0]);
   }
 
   function changeGroup(group: number | null) {
@@ -126,26 +122,18 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
     setDrafts({});
     setInvalid([]);
     setSearch("");
-    setOpenGroups([]);
-    setAdvancedOpen(false);
+    setSelectedAttributeIds([]);
     onChange({ group, category: null, attributes: {} });
   }
 
-  const grouped = new Map<string, Attribute[]>();
-  for (const attribute of attributes) {
-    const name = attribute.attribute_group?.trim() || t("Other");
-    grouped.set(name, [...(grouped.get(name) || []), attribute]);
-  }
-  const needle = search.trim().toLocaleLowerCase(locale);
-  const visibleGroups = [...grouped.entries()].map(([name, fields]) => [name, fields.filter(attribute =>
-    !needle || invalid.includes(String(attribute.attribute_id)) || [attribute.name, attribute.description, name].some(text => text.toLocaleLowerCase(locale).includes(needle)),
-  )] as const).filter(([, fields]) => fields.length > 0);
-  const filledAttributes = attributes.filter(attribute => hasValue(value.attributes[String(attribute.attribute_id)]));
-  const errorsPresent = invalid.length > 0;
+  const selectedAttributes = attributes.filter(attribute => selectedAttributeIds.includes(attribute.attribute_id) || hasValue(value.attributes[String(attribute.attribute_id)]));
 
-  const invalidGroups = [...grouped.entries()].filter(([, fields]) => fields.some(attribute => invalid.includes(String(attribute.attribute_id)))).map(([name]) => name);
-  const searchGroups = needle ? visibleGroups.map(([name]) => name) : [];
-  const expandedGroups = [...new Set([...openGroups, ...invalidGroups, ...searchGroups])];
+  function removeAttribute(id: number) {
+    setSelectedAttributeIds(current => current.filter(currentId => currentId !== id));
+    setInvalid(current => current.filter(currentId => currentId !== String(id)));
+    setDrafts(current => { const next = { ...current }; delete next[String(id)]; return next; });
+    updateAttribute(id, undefined);
+  }
 
   function renderAttribute(attribute: Attribute) {
     const key = String(attribute.attribute_id);
@@ -202,14 +190,15 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
       </> : <>
         {current !== undefined && <small data-seller-translate="skip">{t("Saved value")}: {savedText}</small>}
         <small className="seller-field-hint">{t("This optional field uses a format that is not supported here.")}</small>
-        {current !== undefined && <button type="button" className="seller-link-button" onClick={() => updateAttribute(attribute.attribute_id, undefined)}>{t("Remove saved value")}</button>}
       </>}
     </label>;
   }
 
+  const categoryPlaceholder = !value.group ? t("Select a category group first") : loadingDetails ? t("Loading…") : t("No category");
+
   return <SellerLocalized>
     <section className="seller-card seller-otto-card">
-      <div className="seller-editor-heading orange"><span className="seller-editor-icon"><Shapes size={20} aria-hidden="true" /></span><h2>{t("Optional OTTO category")}</h2></div>
+      <div className="seller-editor-heading orange"><span className="seller-editor-icon"><Shapes size={20} aria-hidden="true" /></span><h2>{t("Optional OTTO category")}</h2><button type="button" className="seller-button seller-otto-clear" disabled={value.group == null && value.category == null && Object.keys(value.attributes).length === 0} onClick={() => changeGroup(null)}><RotateCcw size={15} aria-hidden="true" />{t("Clear")}</button></div>
       <p>{t("Add optional catalog details when they apply to your product.")}</p>
       <div className="seller-form-grid">
         <div className="seller-form-grid seller-otto-selects">
@@ -226,41 +215,52 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
             <SellerSearchableSelect
               value={value.category == null ? "" : String(value.category)}
               disabled={!value.group || loadingDetails}
-              placeholder={loadingDetails ? t("Loading…") : t("No category")}
-              options={[{ value: "", label: loadingDetails ? t("Loading…") : t("No category") }, ...categories.map(category => ({ value: String(category.category_id), label: category.name }))]}
+              placeholder={categoryPlaceholder}
+              options={[{ value: "", label: categoryPlaceholder }, ...categories.map(category => ({ value: String(category.category_id), label: category.name }))]}
               onValueChange={selected => onChange({ ...value, category: Number(selected) || null })}
             />
           </label>
         </div>
 
         {loadingDetails && <p className="seller-field-hint" role="status">{t("Loading catalog attributes…")}</p>}
-        {attributes.length > 0 && <details className="seller-otto-advanced" open={advancedOpen || errorsPresent} onToggle={event => setAdvancedOpen(event.currentTarget.open)}>
-          <summary className="seller-otto-summary">
-            <span><strong>{t("Optional attributes · {count}", { count: attributes.length })}</strong><small>{t("{count} filled", { count: filledAttributes.length })}{errorsPresent ? ` · ${t("{count} needs attention", { count: invalid.length })}` : ""}</small></span>
-            <ChevronDown size={18} aria-hidden="true" />
-          </summary>
-          <div className="seller-otto-expanded">
-            <label className="seller-otto-search">
-              <Search size={17} aria-hidden="true" />
-              <Input value={search} onChange={event => setSearch(event.target.value)} placeholder={t("Search attributes")} aria-label={t("Search attributes")} />
-            </label>
-            {filledAttributes.length > 0 && <div className="seller-otto-filled" aria-label={t("Filled attributes")}>
-              {filledAttributes.slice(0, 4).map(attribute => <span key={attribute.attribute_id} data-seller-translate="skip">{attribute.name}</span>)}
-              {filledAttributes.length > 4 && <span>{t("+{count} more", { count: filledAttributes.length - 4 })}</span>}
-            </div>}
-            {visibleGroups.length ? <Accordion.Root type="multiple" value={expandedGroups} onValueChange={setOpenGroups} className="seller-otto-accordion">
-              {visibleGroups.map(([name, fields]) => {
-                const filledCount = fields.filter(attribute => hasValue(value.attributes[String(attribute.attribute_id)])).length;
-                return <Accordion.Item key={name} value={name} className="seller-otto-group">
-                  <Accordion.Header className="seller-otto-group-heading">
-                    <Accordion.Trigger className="seller-otto-group-trigger"><span>{name}<small>{filledCount}/{fields.length} · {t("attributes")}</small></span><ChevronDown size={17} aria-hidden="true" /></Accordion.Trigger>
-                  </Accordion.Header>
-                  <Accordion.Content className="seller-otto-group-content"><div className="seller-otto-attribute-grid">{fields.map(renderAttribute)}</div></Accordion.Content>
-                </Accordion.Item>;
-              })}
-            </Accordion.Root> : <p className="seller-field-hint">{t("No attributes match your search.")}</p>}
+        {value.group && !value.category && <p className="seller-field-hint">{t("Choose an OTTO category before adding attributes.")}</p>}
+        {value.category && <div className="seller-otto-selected">
+          <div className="seller-otto-attributes-heading">
+            <strong>{t("Added attributes · {count}", { count: selectedAttributes.length })}</strong>
+            <button type="button" className="seller-button" disabled={loadingDetails || attributes.length === 0} onClick={() => setPickerOpen(true)}><Plus size={17} aria-hidden="true" />{t("Add attribute")}</button>
           </div>
-        </details>}
+          {selectedAttributes.length ? selectedAttributes.map(attribute => <div className="seller-otto-selected-attribute" key={attribute.attribute_id}>
+            {renderAttribute(attribute)}
+            <button type="button" className="seller-icon-button danger" aria-label={`${t("Remove attribute")}: ${attribute.name}`} title={t("Remove attribute")} onClick={() => removeAttribute(attribute.attribute_id)}><Trash2 size={17} aria-hidden="true" /></button>
+          </div>) : <p className="seller-field-hint">{t("No attributes selected yet.")}</p>}
+          <CommandDialog
+            open={pickerOpen}
+            onOpenChange={open => { setPickerOpen(open); if (!open) setSearch(""); }}
+            title={t("Add attribute")}
+            description={t("Search the OTTO catalog and choose an attribute.")}
+            className="seller-otto-picker"
+          >
+            <Command>
+              <CommandInput value={search} onValueChange={setSearch} placeholder={t("Search OTTO attributes")} />
+              <CommandList>
+                <CommandEmpty>{t("No attributes match your search.")}</CommandEmpty>
+                <CommandGroup>
+                  {attributes.filter(attribute => !selectedAttributes.some(selected => selected.attribute_id === attribute.attribute_id)).map(attribute => <CommandItem
+                    key={attribute.attribute_id}
+                    value={`${attribute.name} ${attribute.attribute_group}`}
+                    onSelect={() => {
+                      setSelectedAttributeIds(current => current.includes(attribute.attribute_id) ? current : [...current, attribute.attribute_id]);
+                      setPickerOpen(false);
+                      setSearch("");
+                    }}
+                  >
+                    <span className="seller-otto-option" data-seller-translate="skip"><strong>{attribute.name}</strong>{attribute.attribute_group && <small>{attribute.attribute_group}</small>}</span>
+                  </CommandItem>)}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </CommandDialog>
+        </div>}
         {error && <p className="seller-notice seller-notice-error" data-seller-translate="skip">{error}</p>}
       </div>
     </section>

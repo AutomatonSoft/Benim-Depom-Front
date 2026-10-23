@@ -1,14 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sellerAvatarInitial, sellerLogin, sellerRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
+import { sellerAvatarInitial, sellerLogin, sellerRequest, sellerPublicRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
 import { readSellerLocale, setSellerLocale, translateSeller } from "../src/lib/seller-i18n.ts";
-import { loadOttoCatalogPages, parseOttoAttributeValue } from "../src/lib/otto-catalog.ts";
+import { loadOttoCatalogPages, parseOttoAttributeValue, updateOttoAttribute } from "../src/lib/otto-catalog.ts";
 import { answerAvailabilityOnce, availabilityResponseState, SellerAvailabilityGuard } from "../src/lib/seller-availability.ts";
 import { getSellerDatePreset, berlinBusinessDate, parseSellerIsoDate, sellerDateToIso, shiftSellerCalendarMonth } from "../src/lib/seller-date-range.ts";
 import { firstSellerProductOptions, sellerProductSearchUrl } from "../src/lib/seller-product-search.ts";
 import { toggleSellerMultiValue } from "../src/lib/seller-select.ts";
 import { sellerProductErrorDetails } from "../src/lib/seller-product-errors.ts";
-import { sellerMaterialInputs, sellerMaterials } from "../src/lib/seller-product-form.ts";
+import { sellerMaterialInputs, sellerMaterials, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "../src/lib/seller-product-form.ts";
 import { sellerNotificationTone } from "../src/lib/seller-notification-style.ts";
 import { LANDING_I18N, SELLER_LOGIN_PATH } from "../src/lib/landing-content.ts";
 import "./seller-account-deletion.test.mjs";
@@ -32,6 +32,19 @@ test("seller labels translate and interpolate in every supported language", () =
   assert.equal(translateSeller("Filters", "ru"), "Фильтры");
   assert.equal(translateSeller("Send for review", "de"), "Zur Prüfung einreichen");
   assert.equal(translateSeller("Show password", "tr"), "Şifreyi göster");
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Product type", locale)), ["Product type", "Тип товара", "Ürün türü", "Produkttyp"]);
+  assert.equal(translateSeller("Save product", "ru"), "Сохранить товар");
+  assert.equal(translateSeller("You may list only new products. Used products cannot be uploaded.", "ru"), "Вы можете размещать только новые товары. Уже использованные товары загружать нельзя");
+  assert.equal(translateSeller("Each product has one color. To sell this product in another color, add it as a new product.", "ru"), "У каждого товара один цвет. Чтобы продавать этот товар в другом цвете, добавьте его как новый товар");
+  assert.equal(translateSeller("For soft materials such as fabric: 70% polyester, 25% cotton, 5% elastane. Hard materials such as wood or metal do not require a composition.", "ru"), "Для мягких материалов, например ткани: 70% полиэстер, 25% хлопок, 5% эластан. Для твёрдых материалов, таких как дерево или металл, не требуется.");
+  for (const key of [
+    "You may list only new products. Used products cannot be uploaded.",
+    "Each product has one color. To sell this product in another color, add it as a new product.",
+    "For soft materials such as fabric: 70% polyester, 25% cotton, 5% elastane. Hard materials such as wood or metal do not require a composition.",
+    "Size options", "Add attribute", "Save product",
+  ]) {
+    for (const locale of ["ru", "tr", "de"]) assert.notEqual(translateSeller(key, locale), key);
+  }
   for (const locale of ["ru", "tr", "de"]) {
     assert.notEqual(translateSeller("Delete account?", locale), "Delete account?");
     assert.notEqual(translateSeller("Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.", locale), "Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.");
@@ -91,6 +104,36 @@ test("seller login verifies role and stores a separate access token", async (t) 
   assert.equal(values.get("benim_seller_locale"), "de");
   assert.equal(calls[0][1].headers["X-Refresh-Token-Cookie"], "seller");
   assert.equal(calls[0][1].credentials, "same-origin");
+  assert.equal(calls[0][1].body, JSON.stringify({ email: "seller@example.com", password: "password" }));
+});
+
+test("public seller forms preserve registration and password reset API payloads", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const calls = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push([String(input), init]);
+    return Response.json({ ok: true });
+  };
+  const registration = {
+    username: "seller", email: "seller@example.com", password: "password", password_confirm: "password",
+    first_name: "A", last_name: "Seller", phone: "+905551234567", preferred_language: "tr",
+  };
+  await sellerPublicRequest("/api/v1/auth/register/", registration);
+  const resetRequest = { email: "seller@example.com" };
+  const resetVerification = { email: "seller@example.com", code: "123456" };
+  const resetCompletion = { reset_token: "reset-token", new_password: "new-password", new_password_confirm: "new-password" };
+  await sellerPublicRequest("/api/v1/auth/password/reset/request/", resetRequest);
+  await sellerPublicRequest("/api/v1/auth/password/reset/verify/", resetVerification);
+  await sellerPublicRequest("/api/v1/auth/password/reset/complete/", resetCompletion);
+  assert.equal(calls[0][0], "/api/v1/auth/register/");
+  assert.equal(calls[0][1].body, JSON.stringify(registration));
+  assert.equal(calls[1][0], "/api/v1/auth/password/reset/request/");
+  assert.equal(calls[1][1].body, JSON.stringify(resetRequest));
+  assert.equal(calls[2][0], "/api/v1/auth/password/reset/verify/");
+  assert.equal(calls[2][1].body, JSON.stringify(resetVerification));
+  assert.equal(calls[3][0], "/api/v1/auth/password/reset/complete/");
+  assert.equal(calls[3][1].body, JSON.stringify(resetCompletion));
 });
 
 test("seller login rejects manager role without saving its token", async (t) => {
@@ -197,6 +240,43 @@ test("product material inputs preserve the existing materials array payload", ()
   assert.deepEqual(sellerMaterialInputs(["Cotton", "Linen"]), { material1: "Cotton", material2: "Linen" });
   assert.deepEqual(sellerMaterials(" Cotton ", ""), ["Cotton"]);
   assert.deepEqual(sellerMaterials("Cotton", "Linen"), ["Cotton", "Linen"]);
+});
+
+test("product type choices use API keys and retain legacy product labels", () => {
+  assert.deepEqual(sellerProductTypes, ["Sofa", "Armchair", "Table", "Chair", "Bed", "Wardrobe", "Cabinet", "Bookshelf", "Desk", "Dresser", "Nightstand", "TV Unit", "Other"]);
+  assert.equal(sellerProductTypeLabel("Стол"), "Table");
+  assert.equal(sellerProductTypeLabel("Vintage cupboard"), "Vintage cupboard");
+  assert.equal(sellerProductTypeLabel(""), "");
+  for (const [key, english, russian, turkish, german] of [
+    ["Sofa", "Sofa", "Диван", "Kanepe", "Sofa"],
+    ["Armchair", "Armchair", "Кресло", "Koltuk", "Sessel"],
+    ["Table", "Table", "Стол", "Masa", "Tisch"],
+    ["Chair", "Chair", "Стул", "Sandalye", "Stuhl"],
+    ["Bed", "Bed", "Кровать", "Yatak", "Bett"],
+    ["Wardrobe", "Wardrobe", "Шкаф", "Gardırop", "Kleiderschrank"],
+    ["Cabinet", "Cabinet", "Тумба", "Dolap", "Schrank"],
+    ["Bookshelf", "Bookshelf", "Книжный шкаф", "Kitaplık", "Bücherregal"],
+    ["Desk", "Desk", "Письменный стол", "Çalışma masası", "Schreibtisch"],
+    ["Dresser", "Dresser", "Комод", "Şifonyer", "Kommode"],
+    ["Nightstand", "Nightstand", "Прикроватная тумбочка", "Komodin", "Nachttisch"],
+    ["TV Unit", "TV Unit", "ТВ-тумба", "TV Ünitesi", "TV-Möbel"],
+    ["Other", "Other", "Другое", "Diğer", "Sonstiges"],
+  ]) {
+    assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller(key, locale)), [english, russian, turkish, german]);
+  }
+});
+
+test("main dimensions, materials, OTTO IDs, and set parts keep their API shapes", () => {
+  assert.deepEqual(sellerProductVariant({
+    color: " Navy ", material_composition: " cotton ", width_cm: "30", height_cm: "40", length_cm: "50", quantity: "3",
+  }, ["Oak", "Linen"]), {
+    color: "Navy", materials: ["Oak", "Linen"], material_composition: "cotton", width_cm: "30", height_cm: "40", length_cm: "50", quantity: 3,
+  });
+  assert.deepEqual(sellerSetPartsPayload([{ id: 7, description: " Table top ", width_cm: "80", height_cm: "4", length_cm: "120" }]), [
+    { description: "Table top", width_cm: "80", height_cm: "4", length_cm: "120" },
+  ]);
+  assert.deepEqual(updateOttoAttribute({ "415": "Oak", "416": [2, 3] }, 415, "Walnut"), { "415": "Walnut", "416": [2, 3] });
+  assert.deepEqual(updateOttoAttribute({ "415": "Oak", "416": [2, 3] }, 415, undefined), { "416": [2, 3] });
 });
 
 test("seller notifications receive category-specific visual tones", () => {

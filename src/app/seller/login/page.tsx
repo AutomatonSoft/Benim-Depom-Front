@@ -49,7 +49,7 @@ function LoginForm() {
         <SellerPasswordInput required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />
       </label>
       {error && <SellerNotice>{error}</SellerNotice>}
-      <button className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? t("Signing in…") : t("Sign in")}</button>
+      <button className="seller-button primary seller-login-submit" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? t("Signing in…") : t("Sign in")}</button>
     </form>
     <p className="seller-auth-navigation"><Link className="seller-link" href="/seller/forgot-password">{t("Forgot password?")}</Link></p>
     <p className="seller-auth-navigation">{t("New to Benim Depom?")} <Link className="seller-link" href="/seller/register">{t("Create seller account")}</Link></p>

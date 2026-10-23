@@ -1,6 +1,14 @@
 export type OttoAttributeValue = string | number;
 export type OttoCatalogPage<T> = { results: T[]; next: number | null };
 
+export function updateOttoAttribute(attributes: Record<string, unknown>, id: number, value: unknown) {
+  const next = { ...attributes };
+  const key = String(id);
+  if (value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0)) delete next[key];
+  else next[key] = value;
+  return next;
+}
+
 export function parseOttoAttributeValue(type: string, raw: unknown): OttoAttributeValue | null {
   if (raw == null) return null;
   if (type === "STRING") return String(raw);

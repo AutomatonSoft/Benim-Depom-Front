@@ -3,16 +3,16 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Star, Tag, Trash2, Warehouse, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Save, Star, Tag, Trash2, Warehouse, type LucideIcon } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
 import SellerProductImage from "@/components/seller/SellerProductImage";
-import { SellerSelect } from "@/components/seller/SellerSelect";
+import { SellerSearchableSelect, SellerSelect } from "@/components/seller/SellerSelect";
 import { SellerApiError, sellerRequest, type SellerProduct, type SellerVariant } from "@/lib/seller";
 import { sellerProductErrorDetails } from "@/lib/seller-product-errors";
 import { Input } from "@/components/ui/input";
-import { sellerMaterialInputs, sellerMaterials } from "@/lib/seller-product-form";
+import { sellerMaterialInputs, sellerMaterials, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
 
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
@@ -44,7 +44,7 @@ function fieldsFor(product: SellerProduct): Fields {
   const variant = product.variants[0];
   return {
     title: product.title,
-    product_type: product.product_type,
+    product_type: sellerProductTypeLabel(product.product_type),
     unit_price: product.unit_price,
     currency: product.currency,
     warehouse_city: product.warehouse_city,
@@ -64,7 +64,6 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(product ? () => fieldsFor(product) : empty);
   const [setParts, setSetParts] = useState<SetPart[]>(() => product?.set_parts || []);
-  const [setPartsOpen, setSetPartsOpen] = useState(() => Boolean(product?.set_parts.length));
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -80,8 +79,26 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   const idempotencyKey = useRef<string | null>(null);
   const submitInFlight = useRef(false);
   const submitted = useRef(false);
+  const invalidFieldScrollScheduled = useRef(false);
 
   useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
+
+  function centerInvalidField(event: FormEvent<HTMLFormElement>) {
+    if (invalidFieldScrollScheduled.current) return true;
+    const selector = "input:invalid, select:invalid, textarea:invalid";
+    const firstInvalid = event.currentTarget.querySelector<HTMLElement>(selector);
+    if (!firstInvalid) return false;
+    const errors = Array.from(event.currentTarget.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selector))
+      .filter(field => field.name)
+      .map(field => [field.name, field.validity.valueMissing ? t("This field is required.") : field.validationMessage] as const);
+    setFieldErrors(current => ({ ...current, ...Object.fromEntries(errors) }));
+    invalidFieldScrollScheduled.current = true;
+    window.setTimeout(() => {
+      firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+      invalidFieldScrollScheduled.current = false;
+    }, 0);
+    return true;
+  }
 
   function set<K extends keyof Fields>(key: K, value: Fields[K]) {
     idempotencyKey.current = null;
@@ -89,8 +106,15 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     setFields(current => ({ ...current, [key]: value }));
   }
 
+  function updateFiles(next: File[]) {
+    setFiles(next);
+    setPreviews(next.map(file => URL.createObjectURL(file)));
+  }
+
   function chooseFiles(selected: File[]) {
-    if (selected.length + (product?.images.length || 0) > 20) {
+    if (selected.length === 0) return;
+    const next = [...files, ...selected];
+    if (next.length + (product?.images.length || 0) > 20) {
       setError(t("A product can have at most 20 photos."));
       return;
     }
@@ -104,13 +128,12 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     idempotencyKey.current = null;
     setError("");
     setFieldErrors(current => { const next = { ...current }; delete next.images; return next; });
-    setFiles(selected);
-    setPreviews(selected.map(file => URL.createObjectURL(file)));
+    updateFiles(next);
   }
 
   function updateSetPart(index: number, key: SetPartField, value: string) {
     idempotencyKey.current = null;
-    setFieldErrors(current => { const next = { ...current }; delete next.set_parts; return next; });
+    setFieldErrors(current => { const next = { ...current }; delete next.set_parts; delete next[`set_part_${index}_${key}`]; return next; });
     setSetParts(current => current.map((part, position) => position === index ? { ...part, [key]: value } : part));
   }
 
@@ -119,19 +142,25 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     if (target < 0 || target >= files.length) return;
     const reordered = [...files];
     [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    chooseFiles(reordered);
+    updateFiles(reordered);
   }
 
   function removeFile(index: number) {
-    chooseFiles(files.filter((_, current) => current !== index));
+    updateFiles(files.filter((_, current) => current !== index));
   }
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitInFlight.current || submitted.current) return;
+    if (centerInvalidField(event)) return;
     setError("");
     setFieldErrors({});
     setSuccess("");
+    if (!fields.product_type.trim()) {
+      setFieldErrors({ product_type: t("This field is required.") });
+      event.currentTarget.querySelector<HTMLElement>(".seller-product-type-field")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     const materials = sellerMaterials(fields.material1, fields.material2);
     if (materials.length < 1 || materials.length > 2) {
       setFieldErrors({ materials: t("Add at least one material.") });
@@ -141,26 +170,18 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       !part.description.trim() ||
       [part.width_cm, part.height_cm, part.length_cm].some(value => !Number.isFinite(Number(value)) || Number(value) <= 0),
     )) {
-      setSetPartsOpen(true);
       setFieldErrors({ set_parts: t("Complete the description and positive dimensions for each set part.") });
       return;
     }
     if (!product && files.length === 0) {
       setFieldErrors({ images: t("Add at least one product photo.") });
+      event.currentTarget.querySelector<HTMLElement>(".seller-photo-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     submitInFlight.current = true;
     setBusy(true);
-    const variant: SellerVariant = {
-      color: fields.color.trim(),
-      materials,
-      material_composition: fields.material_composition.trim(),
-      width_cm: fields.width_cm,
-      height_cm: fields.height_cm,
-      length_cm: fields.length_cm,
-      quantity: Number(fields.quantity),
-    };
+    const variant: SellerVariant = sellerProductVariant(fields, materials);
     const body = {
       title: fields.title.trim(),
       product_type: fields.product_type.trim(),
@@ -168,7 +189,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       currency: fields.currency,
       warehouse_city: fields.warehouse_city,
       variants: [variant],
-      set_parts: setParts.map(({ description, width_cm, height_cm, length_cm }) => ({ description: description.trim(), width_cm, height_cm, length_cm })),
+      set_parts: sellerSetPartsPayload(setParts),
       otto_category_group_id: otto.group,
       otto_category_id: otto.category,
       otto_attributes: otto.attributes,
@@ -217,7 +238,6 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       if (e instanceof SellerApiError) {
         const details = sellerProductErrorDetails(e.data);
         setFieldErrors(details.fields);
-        if (details.fields.set_parts) setSetPartsOpen(true);
         setError(details.message || (Object.keys(details.fields).length ? t("Some product details need attention. Review the highlighted fields.") : e.message));
       } else {
         setError(e instanceof Error ? e.message : t("Could not save product."));
@@ -277,6 +297,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   const field = (name: keyof Fields, label: string, type = "text", required = true) => <label className="seller-field">
     {t(label)}
       <Input
+      name={name}
       required={required}
       type={type}
       aria-invalid={Boolean(fieldErrors[name])}
@@ -291,31 +312,30 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   const heading = (title: string, Icon: LucideIcon, accent = "navy") => <div className={`seller-editor-heading ${accent}`}><span className="seller-editor-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span><h2>{t(title)}</h2></div>;
 
   return <SellerLocalized>
-    <form className="seller-product-form" onSubmit={submit}>
+    <form className="seller-product-form" noValidate onSubmit={submit}>
       {error && <SellerNotice>{error}</SellerNotice>}
       {success && <SellerNotice kind="success">{success}</SellerNotice>}
       <div className="seller-product-form-layout">
         <div className="seller-product-form-main">
           <section className="seller-card seller-photo-upload" onDragOver={event => event.preventDefault()} onDrop={event => {
             event.preventDefault();
-            chooseFiles([...files, ...Array.from(event.dataTransfer.files)]);
+            chooseFiles(Array.from(event.dataTransfer.files));
           }}>
             {heading(product ? "Add photos" : "Product photos", Camera, "orange")}
-            {fieldErrors.images && <small className="seller-field-error">{fieldErrors.images}</small>}
-            <p>{t(product ? "Select or drop additional photos for this product." : "Select or drop up to 20 JPEG, PNG or WebP images. The first photo will be the main image.")} {t("Maximum 40 MB each.")}</p>
-            <label className="seller-photo-dropzone">
+            <label className={`seller-photo-dropzone${fieldErrors.images ? " invalid" : ""}`}>
               <span className="seller-upload-camera"><Camera size={30} strokeWidth={1.8} aria-hidden="true" /></span>
               <strong>{t("Photograph your product")}</strong>
               <span>{t("Select or drop photos")}</span>
-              <small>{t("JPEG, PNG, or WebP · Maximum 40 MB each.")}</small>
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("Photos")} aria-required={!product} onChange={event => {
+              <small>{t(product ? "Add JPEG, PNG, or WebP photos up to 40 MB each. 20 photos total, including existing photos." : "Up to 20 photos. The first photo will be the main image. JPEG, PNG, or WebP, up to 40 MB each.")}</small>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("Photos")} aria-required={!product} aria-invalid={Boolean(fieldErrors.images)} onChange={event => {
                 chooseFiles(Array.from(event.target.files || []));
                 event.currentTarget.value = "";
               }} />
             </label>
+            {fieldErrors.images && <small className="seller-field-error seller-photo-error">{fieldErrors.images}</small>}
             <label className="seller-button seller-camera-picker"><Camera size={18} strokeWidth={1.8} aria-hidden="true" />{t("Take photo")}<input className="seller-camera-picker-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
               const captured = Array.from(event.target.files || []);
-              if (captured.length) chooseFiles([...files, ...captured]);
+              if (captured.length) chooseFiles(captured);
               event.currentTarget.value = "";
             }} /></label>
             {files.length > 0 && <div className="seller-photo-list">{files.map((file, index) => <div className="seller-photo-row" key={`${file.name}-${index}`}>
@@ -330,7 +350,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             </div>)}</div>}
           </section>
 
-          <div className="seller-product-policy"><Info size={22} aria-hidden="true" /><p>{t("Only new, unused products can be submitted. Used goods are not accepted.")}</p></div>
+          <div className="seller-product-policy"><Info size={22} aria-hidden="true" /><p>{t("You may list only new products. Used products cannot be uploaded.")}</p></div>
 
           {product && product.images.length > 0 && <section className="seller-card">
             {heading("Current photos", Camera, "orange")}
@@ -362,7 +382,22 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
 
           <section className="seller-card">
             {heading("Product type", Layers, "orange")}
-            {field("product_type", "Product type")}
+            <div className="seller-field seller-product-type-field">
+              <span>{t("Product type")}</span>
+              <SellerSearchableSelect
+                value={fields.product_type}
+                onValueChange={value => set("product_type", value)}
+                placeholder={t("Choose a product type")}
+                ariaLabel={t("Product type")}
+                options={[
+                  ...sellerProductTypes.map(value => ({ value, label: t(value) })),
+                  ...(fields.product_type && !sellerProductTypes.includes(fields.product_type as (typeof sellerProductTypes)[number])
+                    ? [{ value: fields.product_type, label: fields.product_type }]
+                    : []),
+                ]}
+              />
+              {fieldErrors.product_type && <small className="seller-field-error">{fieldErrors.product_type}</small>}
+            </div>
           </section>
 
           <OttoFields value={otto} onChange={value => {
@@ -375,49 +410,60 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           <section className="seller-card">
             {heading("Color", Palette)}
             {fieldErrors.variants && <small className="seller-field-error">{fieldErrors.variants}</small>}
-            <p className="seller-editor-tip">{t("Each product has one main color. Create a separate product for another color.")}</p>
+            <div className="seller-info-notice"><Info size={18} aria-hidden="true" /><p>{t("Each product has one color. To sell this product in another color, add it as a new product.")}</p></div>
             <div className="seller-form-grid">
               {field("color", "Color")}
             </div>
           </section>
 
-          <section className="seller-card">
-            {heading("Dimensions", Ruler, "orange")}
+          <section className="seller-card seller-size-card">
+            {heading("Size options", Ruler, "orange")}
+            <div className="seller-info-notice"><Info size={18} aria-hidden="true" /><p>{t("For a single item, enter one size. For a set, add each part below. Additional sizes are saved as set parts.")}</p></div>
+            <fieldset className="seller-size-variant">
+              <legend>{t("Product size 1")}</legend>
               <div className="seller-dimensions-row">
                 {field("length_cm", "Length (cm)", "number")}
                 {field("width_cm", "Width (cm)", "number")}
                 {field("height_cm", "Height (cm)", "number")}
               </div>
-          </section>
-
-          <details className="seller-card seller-optional-parts" open={setPartsOpen} onToggle={event => setSetPartsOpen(event.currentTarget.open)}>
-            <summary className="seller-optional-parts-summary">
-              <span><strong>{t("Set parts (optional)")}</strong><small>{t("Add dimensions for the separate pieces of a product set.")}</small></span>
-              <span className="seller-badge">{setParts.length}</span>
-            </summary>
-            <div className="seller-optional-parts-content">
+            </fieldset>
+            <div className="seller-size-parts" role="group" aria-labelledby="seller-size-parts-heading">
+              <div className="seller-size-parts-summary">
+                <span><strong id="seller-size-parts-heading">{t("Set part sizes (optional)")}</strong><small>{t("Add dimensions for the separate pieces of a product set.")}</small></span>
+                <span className="seller-badge">{setParts.length}</span>
+              </div>
+              <div className="seller-size-parts-content">
               {fieldErrors.set_parts && <small className="seller-field-error">{fieldErrors.set_parts}</small>}
-              <button type="button" className="seller-button" disabled={setParts.length >= 20} onClick={() => {
-                idempotencyKey.current = null;
-                setSetParts(current => [...current, { description: "", width_cm: "", height_cm: "", length_cm: "" }]);
-              }}><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add set part")}</button>
-            {setParts.length > 0 ? <div className="seller-stack">{setParts.map((part, index) => <fieldset className="seller-set-part" key={part.id ?? index}>
-              <legend>{t("Piece")} {index + 1}</legend>
-              <label className="seller-field">{t("Description")}
-                <Input required maxLength={2000} value={part.description} onChange={event => updateSetPart(index, "description", event.target.value)} />
+              {setParts.length > 0 ? <div className="seller-stack">{setParts.map((part, index) => <fieldset className="seller-set-part" key={part.id ?? index}>
+              <legend>{t("Set part size {number}", { number: index + 1 })}</legend>
+              <label className="seller-field">{t("Part description")}
+                <Input name={`set_part_${index}_description`} required maxLength={2000} value={part.description} aria-invalid={Boolean(fieldErrors[`set_part_${index}_description`])} onChange={event => updateSetPart(index, "description", event.target.value)} />
+                {fieldErrors[`set_part_${index}_description`] && <small className="seller-field-error">{fieldErrors[`set_part_${index}_description`]}</small>}
               </label>
               <div className="seller-dimensions-row">
                 {(["length_cm", "width_cm", "height_cm"] as const).map(key => <label key={key} className="seller-field">{t(key === "width_cm" ? "Width (cm)" : key === "height_cm" ? "Height (cm)" : "Length (cm)")}
-                  <Input required type="number" min="0.01" step="0.01" value={part[key]} onChange={event => updateSetPart(index, key, event.target.value)} />
+                  <Input name={`set_part_${index}_${key}`} required type="number" min="0.01" step="0.01" value={part[key]} aria-invalid={Boolean(fieldErrors[`set_part_${index}_${key}`])} onChange={event => updateSetPart(index, key, event.target.value)} />
+                  {fieldErrors[`set_part_${index}_${key}`] && <small className="seller-field-error">{fieldErrors[`set_part_${index}_${key}`]}</small>}
                 </label>)}
               </div>
               <button type="button" className="seller-button danger" onClick={() => {
                 idempotencyKey.current = null;
+                setFieldErrors(current => {
+                  const next = { ...current };
+                  delete next.set_parts;
+                  Object.keys(next).filter(name => name.startsWith("set_part_")).forEach(name => delete next[name]);
+                  return next;
+                });
                 setSetParts(current => current.filter((_, position) => position !== index));
               }}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" />{t("Remove set part")}</button>
             </fieldset>)}</div> : <p className="seller-field-hint">{t("No additional set parts.")}</p>}
+              <button type="button" className="seller-button" disabled={setParts.length >= 20} onClick={() => {
+                idempotencyKey.current = null;
+                setSetParts(current => [...current, { description: "", width_cm: "", height_cm: "", length_cm: "" }]);
+              }}><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add set part size")}</button>
+              </div>
             </div>
-          </details>
+          </section>
 
           <section className="seller-card">
             {heading("Materials", Layers)}
@@ -428,12 +474,12 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
                 {field("material2", "Material 2 (optional)", "text", false)}
               </div>
               {field("material_composition", "Material composition", "text", false)}
-              <small className="seller-field-hint">{t("For example: 70% polyester, 25% cotton, 5% elastane.")}</small>
+              <div className="seller-info-notice seller-material-helper"><Info size={18} aria-hidden="true" /><p>{t("For soft materials such as fabric: 70% polyester, 25% cotton, 5% elastane. Hard materials such as wood or metal do not require a composition.")}</p></div>
             </div>
           </section>
         </div>
 
-        <aside className="seller-product-form-side">
+        <div className="seller-product-form-side">
           <section className="seller-card seller-price-stock">
             {heading("Stock and warehouse", Warehouse, "orange")}
             <div className="seller-form-grid">
@@ -463,11 +509,11 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
 
           <div className="seller-form-actions">
             <button className="seller-button primary" disabled={busy}>
-              <LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />
-              {busy ? t(files.length ? "Uploading photos…" : "Saving…") : product ? t("Save changes") : t("Send for review")}
+              {busy ? <LoaderCircle className="seller-spinner" size={18} strokeWidth={1.8} aria-hidden="true" /> : <Save size={18} strokeWidth={1.8} aria-hidden="true" />}
+              {busy ? t(files.length ? "Uploading photos…" : "Saving…") : t("Save product")}
             </button>
           </div>
-        </aside>
+        </div>
       </div>
     </form>
   </SellerLocalized>;

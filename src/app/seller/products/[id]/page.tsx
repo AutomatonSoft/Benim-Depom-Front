@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { sellerAllPages, sellerRequest, type PriceNegotiation, type SellerProduct } from "@/lib/seller";
+import { sellerProductTypeLabel } from "@/lib/seller-product-form";
 
 type HistoryRow = {
   id: number;
@@ -148,7 +149,7 @@ export default function SellerProductDetailsPage() {
 
   return <SellerPage
     title={product.title}
-    description={`${product.product_type} · ${product.unit_price} ${product.currency} · ${product.total_quantity} ${t("units")}`}
+    description={`${t(sellerProductTypeLabel(product.product_type))} · ${product.unit_price} ${product.currency} · ${product.total_quantity} ${t("units")}`}
     dynamicTitle
     dynamicDescription
     actions={<div className="seller-toolbar">
@@ -181,7 +182,7 @@ export default function SellerProductDetailsPage() {
           <SellerProductImage key={image.id} src={image.preview || image.image} alt={image.is_primary ? t("Main product photo") : t("Product photo")} />,
         )}</div>}
         <dl className="seller-definition-grid seller-product-definitions">
-          <div><dt>{t("Product type")}</dt><dd data-seller-translate="skip">{product.product_type}</dd></div>
+          <div><dt>{t("Product type")}</dt><dd>{t(sellerProductTypeLabel(product.product_type))}</dd></div>
           <div><dt>{t("Unit price")}</dt><dd data-seller-translate="skip">{product.unit_price} {product.currency}</dd></div>
           <div><dt>{t("Total catalogue value")}</dt><dd data-seller-translate="skip">{product.total_amount} {product.currency}</dd></div>
           <div><dt>{t("Warehouse city")}</dt><dd data-seller-translate="skip">{product.warehouse_city}</dd></div>

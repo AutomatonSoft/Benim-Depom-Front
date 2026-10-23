@@ -36,10 +36,12 @@ function loadPage(requestSeller) {
     "next/navigation": { useRouter: () => router },
     "lucide-react": lucide,
     "@/components/ui/button": { Button: "Button" },
+    "@/components/seller/SellerSelect": { SellerSelect: "SellerSelect" },
     "@/components/ui/alert-dialog": dialog,
     "@/components/SellerShell": { SellerNotice: "SellerNotice", SellerPage: "SellerPage" },
     "@/lib/seller": { clearSellerToken: () => { router.cleared = true; }, sellerRequest: requestSeller },
     "@/components/seller/SellerI18n": { useSellerI18n: () => ({ t: value => value }) },
+    "@/lib/seller-i18n": { readSellerLocale: value => value, setSellerLocale() {} },
   };
   const loaded = new Module(filename);
   loaded.filename = filename;
@@ -64,6 +66,10 @@ function text(node) {
   if (Array.isArray(node)) return node.map(text).join(" ");
   if (typeof node === "string") return node;
   return node?.props ? text(node.props.children) : "";
+}
+
+function confirmButton(tree) {
+  return flatten(tree).find(node => node.type === "Button" && node.props.className?.includes("seller-delete-confirm"));
 }
 
 test("account deletion requires final confirmation, prevents double submit and handles 202/204", async () => {
@@ -101,7 +107,7 @@ test("account deletion requires final confirmation, prevents double submit and h
     assert.equal(calls, 0, "dismissal must not call DELETE");
 
     ({ tree } = render());
-    const confirm = flatten(tree).find(node => node.type === "Button" && text(node).includes("Delete account"));
+    const confirm = confirmButton(tree);
     confirm.props.onClick();
     confirm.props.onClick();
     assert.equal(calls, 1, "confirmation must submit once even on double click");
@@ -119,12 +125,12 @@ test("account deletion keeps dialog open and exposes API errors for a safe retry
   const root = flatten(tree).find(node => node.type === "AlertDialog");
   root.props.onOpenChange(true);
   ({ tree } = render());
-  let confirm = flatten(tree).find(node => node.type === "Button" && text(node).includes("Delete account"));
+  let confirm = confirmButton(tree);
   confirm.props.onClick();
   await new Promise(resolve => setImmediate(resolve));
   ({ tree } = render());
   assert.equal(flatten(tree).some(node => node.type === "SellerNotice" && text(node).includes("Deletion failed")), true);
-  confirm = flatten(tree).find(node => node.type === "Button" && text(node).includes("Delete account"));
+  confirm = confirmButton(tree);
   confirm.props.onClick();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(calls, 2);

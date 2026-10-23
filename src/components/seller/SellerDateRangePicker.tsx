@@ -7,6 +7,7 @@ import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { berlinBusinessDate, getSellerDatePreset, parseSellerIsoDate, sellerDateToIso, shiftSellerCalendarMonth, type SellerDatePreset, type SellerDateRange } from "@/lib/seller-date-range";
 
 const presets: Array<[SellerDatePreset, string]> = [
+  ["allTime", "All time"],
   ["today", "Today"], ["yesterday", "Yesterday"], ["thisWeek", "This week"], ["lastWeek", "Last week"],
   ["last7Days", "Last 7 days"], ["last30Days", "Last 30 days"], ["thisMonth", "This month"], ["lastMonth", "Last month"],
 ];
@@ -43,7 +44,7 @@ export default function SellerDateRangePicker({ from, to, onChange }: {
     return new Intl.DateTimeFormat(dateLocale, { weekday: "short", timeZone: "UTC" }).format(date);
   }), [dateLocale]);
   const formatter = new Intl.DateTimeFormat(dateLocale, { day: "numeric", month: "short", year: "numeric" });
-  const label = from && to ? `${formatter.format(parseSellerIsoDate(from))} – ${formatter.format(parseSellerIsoDate(to))}` : t("Select date range");
+  const label = !from && !to ? t("All time") : from && to ? `${formatter.format(parseSellerIsoDate(from))} – ${formatter.format(parseSellerIsoDate(to))}` : t("Select date range");
   const rangeFrom = draftFrom;
   const rangeTo = draftTo || draftFrom;
 
@@ -51,7 +52,7 @@ export default function SellerDateRangePicker({ from, to, onChange }: {
     setDraftFrom(range.from);
     setDraftTo(range.to);
     onChange(range);
-    setLeftMonth(monthStart(parseSellerIsoDate(range.from)));
+    setLeftMonth(monthStart(parseSellerIsoDate(range.from || today)));
     setOpen(false);
   }
 
