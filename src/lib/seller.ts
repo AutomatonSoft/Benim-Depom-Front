@@ -31,7 +31,7 @@ export type SellerProduct = {
   pending_changes?: Record<string, unknown> | null; pending_changes_submitted_at?: string | null;
 };
 export type PriceNegotiation = { id: number; manager_username: string; proposed_unit_price: string; current_unit_price: string; currency: string; message: string; status: string; seller_comment: string; created_at: string; responded_at: string | null };
-export type SellerNotification = { id: number; notification_type: string; product_id: number | null; product_title: string | null; is_read: boolean; created_at: string; title: string; body: string; proposed_unit_price: string | null; proposed_currency: string | null; price_negotiation_status: string | null; seller_comment?: string; price_accepted?: boolean | null; responded_at?: string | null; sender_name?: string | null; manager_name?: string | null };
+export type SellerNotification = { id: number; notification_type: string; product_id: number | null; product_title: string | null; is_read: boolean; created_at: string; title: string; body: string; proposed_unit_price: string | null; proposed_currency: string | null; price_negotiation_status: string | null; seller_comment?: string; price_accepted?: boolean | null; responded_at?: string | null; sender_name?: string | null; manager_name?: string | null; afterbuy_marketplace?: string | null; afterbuy_account?: string | null; afterbuy_qty_sold?: number | null; afterbuy_stock_synced?: boolean; afterbuy_seller_notified?: boolean };
 export type PageResult<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const TOKEN_KEY = "benim_seller_access_token";

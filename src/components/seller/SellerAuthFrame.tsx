@@ -11,7 +11,7 @@ export default function SellerAuthFrame({ children }: { children: ReactNode }) {
   return <div className="seller-auth-frame">
     <aside className="seller-auth-story">
       <Link className="seller-auth-brand" href="/seller/login" aria-label={t("Benim Depom seller workspace")}>
-        <span>BENIM</span><b>DEPOM</b><small>{t("SELLER WORKSPACE")}</small>
+        <span className="seller-auth-brand-copy"><span>BENIM</span><b>DEPOM</b><small>{t("SELLER WORKSPACE")}</small></span>
       </Link>
       <div className="seller-auth-story-copy">
         <span className="seller-auth-eyebrow">{t("Official seller workspace")}</span>

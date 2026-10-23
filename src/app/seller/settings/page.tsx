@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, LoaderCircle, MessageCircle, ShieldCheck } from "lucide-react";
+import { ChevronRight, LoaderCircle, MessageCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -17,11 +17,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SellerNotice, SellerPage } from "@/components/SellerShell";
 import { clearSellerToken, sellerRequest } from "@/lib/seller";
+import { useSellerI18n } from "@/components/seller/SellerI18n";
 
 type AccountDeletionResult = { deleted?: boolean };
 
 export default function SellerSettingsPage() {
   const router = useRouter();
+  const { t } = useSellerI18n();
+  const deletionInFlight = useRef(false);
   const [password, setPassword] = useState({ current_password: "", new_password: "", new_password_confirm: "" });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -52,6 +55,8 @@ export default function SellerSettingsPage() {
   }
 
   async function deleteAccount() {
+    if (deletionInFlight.current) return;
+    deletionInFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -61,9 +66,10 @@ export default function SellerSettingsPage() {
       setDeleteOpen(false);
       router.replace(`/seller/login${result?.deleted === false ? "?deletion=pending" : "?deletion=complete"}`);
     } catch (error) {
+      deletionInFlight.current = false;
       setError(error instanceof Error ? error.message : "Could not request account deletion.");
     } finally {
-      setBusy(false);
+      if (!deletionInFlight.current) setBusy(false);
     }
   }
 
@@ -101,17 +107,18 @@ export default function SellerSettingsPage() {
 
       <section className="seller-card seller-danger-zone">
         <div><h2>Delete account</h2><p>Active marketplace listings may be removed before deletion completes. The account can be disabled while that work finishes.</p></div>
-        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-          <AlertDialogTrigger asChild><Button variant="destructive" className="seller-button danger" disabled={busy}>Request account deletion</Button></AlertDialogTrigger>
-          <AlertDialogContent>
+        <AlertDialog open={deleteOpen} onOpenChange={open => { if (!deletionInFlight.current) { setDeleteOpen(open); setError(""); } }}>
+          <AlertDialogTrigger asChild><Button variant="destructive" className="seller-button danger" disabled={busy}>{t("Request account deletion")}</Button></AlertDialogTrigger>
+          <AlertDialogContent className="seller-delete-dialog" size="sm">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete your seller account?</AlertDialogTitle>
-              <AlertDialogDescription>Active marketplace listings may need to be removed first. Your account may be disabled while removal finishes. This action cannot be undone.</AlertDialogDescription>
+              <span className="seller-delete-icon"><TriangleAlert size={24} aria-hidden="true" /></span>
+              <AlertDialogTitle>{t("Delete account?")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.")}<span className="seller-delete-pending-note">{t("Marketplace listings may need processing before deletion can finish. Your account may be disabled during this time.")}</span></AlertDialogDescription>
             </AlertDialogHeader>
             {error && deleteOpen && <SellerNotice>{error}</SellerNotice>}
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-              <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={() => void deleteAccount()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Please wait…" : "Delete account"}</Button>
+              <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
+              <Button variant="destructive" className="seller-button danger" disabled={busy} onClick={() => void deleteAccount()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{t(busy ? "Please wait…" : "Delete account")}</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

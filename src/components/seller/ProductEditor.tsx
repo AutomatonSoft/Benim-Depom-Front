@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Camera, LoaderCircle, Plus, Star, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Star, Tag, Trash2, Warehouse, type LucideIcon } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
@@ -12,6 +12,7 @@ import { SellerSelect } from "@/components/seller/SellerSelect";
 import { SellerApiError, sellerRequest, type SellerProduct, type SellerVariant } from "@/lib/seller";
 import { sellerProductErrorDetails } from "@/lib/seller-product-errors";
 import { Input } from "@/components/ui/input";
+import { sellerMaterialInputs, sellerMaterials } from "@/lib/seller-product-form";
 
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
@@ -21,7 +22,8 @@ type Fields = {
   currency: "TRY" | "EUR" | "USD";
   warehouse_city: string;
   color: string;
-  materials: string;
+  material1: string;
+  material2: string;
   material_composition: string;
   width_cm: string;
   height_cm: string;
@@ -34,7 +36,7 @@ type SetPartField = "description" | "width_cm" | "height_cm" | "length_cm";
 
 const empty: Fields = {
   title: "", product_type: "", unit_price: "", currency: "TRY", warehouse_city: "INE",
-  color: "", materials: "", material_composition: "", width_cm: "", height_cm: "",
+  color: "", material1: "", material2: "", material_composition: "", width_cm: "", height_cm: "",
   length_cm: "", quantity: "1", comment: "",
 };
 
@@ -47,7 +49,7 @@ function fieldsFor(product: SellerProduct): Fields {
     currency: product.currency,
     warehouse_city: product.warehouse_city,
     color: variant?.color || "",
-    materials: variant?.materials.join(", ") || "",
+    ...sellerMaterialInputs(variant?.materials),
     material_composition: variant?.material_composition || "",
     width_cm: variant?.width_cm || "",
     height_cm: variant?.height_cm || "",
@@ -130,15 +132,16 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     setError("");
     setFieldErrors({});
     setSuccess("");
-    const materials = fields.materials.split(",").map(value => value.trim()).filter(Boolean);
+    const materials = sellerMaterials(fields.material1, fields.material2);
     if (materials.length < 1 || materials.length > 2) {
-      setFieldErrors({ materials: t("Enter one or two materials, separated by commas.") });
+      setFieldErrors({ materials: t("Add at least one material.") });
       return;
     }
     if (setParts.some(part =>
       !part.description.trim() ||
       [part.width_cm, part.height_cm, part.length_cm].some(value => !Number.isFinite(Number(value)) || Number(value) <= 0),
     )) {
+      setSetPartsOpen(true);
       setFieldErrors({ set_parts: t("Complete the description and positive dimensions for each set part.") });
       return;
     }
@@ -214,6 +217,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       if (e instanceof SellerApiError) {
         const details = sellerProductErrorDetails(e.data);
         setFieldErrors(details.fields);
+        if (details.fields.set_parts) setSetPartsOpen(true);
         setError(details.message || (Object.keys(details.fields).length ? t("Some product details need attention. Review the highlighted fields.") : e.message));
       } else {
         setError(e instanceof Error ? e.message : t("Could not save product."));
@@ -284,6 +288,8 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     {fieldErrors[name] && <small className="seller-field-error">{fieldErrors[name]}</small>}
   </label>;
 
+  const heading = (title: string, Icon: LucideIcon, accent = "navy") => <div className={`seller-editor-heading ${accent}`}><span className="seller-editor-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span><h2>{t(title)}</h2></div>;
+
   return <SellerLocalized>
     <form className="seller-product-form" onSubmit={submit}>
       {error && <SellerNotice>{error}</SellerNotice>}
@@ -294,11 +300,12 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             event.preventDefault();
             chooseFiles([...files, ...Array.from(event.dataTransfer.files)]);
           }}>
-            <h2>{t(product ? "Add photos" : "Product photos")}</h2>
+            {heading(product ? "Add photos" : "Product photos", Camera, "orange")}
             {fieldErrors.images && <small className="seller-field-error">{fieldErrors.images}</small>}
             <p>{t(product ? "Select or drop additional photos for this product." : "Select or drop up to 20 JPEG, PNG or WebP images. The first photo will be the main image.")} {t("Maximum 40 MB each.")}</p>
             <label className="seller-photo-dropzone">
-              <Upload size={24} strokeWidth={1.8} aria-hidden="true" />
+              <span className="seller-upload-camera"><Camera size={30} strokeWidth={1.8} aria-hidden="true" /></span>
+              <strong>{t("Photograph your product")}</strong>
               <span>{t("Select or drop photos")}</span>
               <small>{t("JPEG, PNG, or WebP · Maximum 40 MB each.")}</small>
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("Photos")} aria-required={!product} onChange={event => {
@@ -323,8 +330,10 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             </div>)}</div>}
           </section>
 
+          <div className="seller-product-policy"><Info size={22} aria-hidden="true" /><p>{t("Only new, unused products can be submitted. Used goods are not accepted.")}</p></div>
+
           {product && product.images.length > 0 && <section className="seller-card">
-            <h2>{t("Current photos")}</h2>
+            {heading("Current photos", Camera, "orange")}
             <p className="seller-field-hint">{t("Sellers can add, remove, reorder, or choose the main photo. Replacing an existing photo is not available to seller accounts.")}</p>
             <div className="seller-photo-grid">{product.images.map((image, index) => <div className="seller-photo-tile" key={image.id}>
               <SellerProductImage src={image.thumbnail || image.image} alt={image.is_primary ? t("Main product photo") : t("Product photo")} />
@@ -338,33 +347,52 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           </section>}
 
           <section className="seller-card">
-            <h2>{t("Product information")}</h2>
+            {heading("Product information", Tag)}
             <div className="seller-form-grid">
               {field("title", "Product title")}
-              {field("product_type", "Product type")}
-            </div>
-          </section>
-
-          <section className="seller-card">
-            <h2>{t("Color and materials")}</h2>
-            {fieldErrors.variants && <small className="seller-field-error">{fieldErrors.variants}</small>}
-            <p>{t("One color variant is supported per product. Add materials separated by commas.")}</p>
-            <div className="seller-form-grid">
-              {field("color", "Color")}
-              {field("materials", "Materials (up to 2)")}
-              {field("material_composition", "Material composition", "text", false)}
-              <h3 className="seller-subsection-title">{t("Dimensions")}</h3>
-              <div className="seller-dimensions-row">
-                {field("width_cm", "Width (cm)", "number")}
-                {field("height_cm", "Height (cm)", "number")}
-                {field("length_cm", "Length (cm)", "number")}
+              <div className="seller-price-row">
+                {field("unit_price", "Unit price", "number")}
+                <label className="seller-field">{t("Currency")}
+                  <SellerSelect value={fields.currency} onValueChange={value => set("currency", value as Fields["currency"])} placeholder={t("Currency")} options={["TRY", "EUR", "USD"].map(currency => ({ value: currency, label: currency }))} />
+                  {fieldErrors.currency && <small className="seller-field-error">{fieldErrors.currency}</small>}
+                </label>
               </div>
             </div>
           </section>
 
+          <section className="seller-card">
+            {heading("Product type", Layers, "orange")}
+            {field("product_type", "Product type")}
+          </section>
+
+          <OttoFields value={otto} onChange={value => {
+            idempotencyKey.current = null;
+            setFieldErrors(current => { const next = { ...current }; delete next.otto_attributes; return next; });
+            setOtto(value);
+          }} />
+          {fieldErrors.otto_attributes && <small className="seller-field-error">{fieldErrors.otto_attributes}</small>}
+
+          <section className="seller-card">
+            {heading("Color", Palette)}
+            {fieldErrors.variants && <small className="seller-field-error">{fieldErrors.variants}</small>}
+            <p className="seller-editor-tip">{t("Each product has one main color. Create a separate product for another color.")}</p>
+            <div className="seller-form-grid">
+              {field("color", "Color")}
+            </div>
+          </section>
+
+          <section className="seller-card">
+            {heading("Dimensions", Ruler, "orange")}
+              <div className="seller-dimensions-row">
+                {field("length_cm", "Length (cm)", "number")}
+                {field("width_cm", "Width (cm)", "number")}
+                {field("height_cm", "Height (cm)", "number")}
+              </div>
+          </section>
+
           <details className="seller-card seller-optional-parts" open={setPartsOpen} onToggle={event => setSetPartsOpen(event.currentTarget.open)}>
             <summary className="seller-optional-parts-summary">
-              <span><strong>{t("Set parts (optional)")}</strong><small>{t("Add up to 20 additional pieces with their own dimensions.")}</small></span>
+              <span><strong>{t("Set parts (optional)")}</strong><small>{t("Add dimensions for the separate pieces of a product set.")}</small></span>
               <span className="seller-badge">{setParts.length}</span>
             </summary>
             <div className="seller-optional-parts-content">
@@ -379,7 +407,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
                 <Input required maxLength={2000} value={part.description} onChange={event => updateSetPart(index, "description", event.target.value)} />
               </label>
               <div className="seller-dimensions-row">
-                {(["width_cm", "height_cm", "length_cm"] as const).map(key => <label key={key} className="seller-field">{t(key === "width_cm" ? "Width (cm)" : key === "height_cm" ? "Height (cm)" : "Length (cm)")}
+                {(["length_cm", "width_cm", "height_cm"] as const).map(key => <label key={key} className="seller-field">{t(key === "width_cm" ? "Width (cm)" : key === "height_cm" ? "Height (cm)" : "Length (cm)")}
                   <Input required type="number" min="0.01" step="0.01" value={part[key]} onChange={event => updateSetPart(index, key, event.target.value)} />
                 </label>)}
               </div>
@@ -391,27 +419,25 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             </div>
           </details>
 
-          <OttoFields value={otto} onChange={value => {
-            idempotencyKey.current = null;
-            setFieldErrors(current => { const next = { ...current }; delete next.otto_attributes; return next; });
-            setOtto(value);
-          }} />
-          {fieldErrors.otto_attributes && <small className="seller-field-error">{fieldErrors.otto_attributes}</small>}
-
+          <section className="seller-card">
+            {heading("Materials", Layers)}
+            <div className="seller-form-grid">
+              {fieldErrors.materials && <small className="seller-field-error">{fieldErrors.materials}</small>}
+              <div className="seller-field-row">
+                {field("material1", "Material 1")}
+                {field("material2", "Material 2 (optional)", "text", false)}
+              </div>
+              {field("material_composition", "Material composition", "text", false)}
+              <small className="seller-field-hint">{t("For example: 70% polyester, 25% cotton, 5% elastane.")}</small>
+            </div>
+          </section>
         </div>
 
         <aside className="seller-product-form-side">
           <section className="seller-card seller-price-stock">
-            <h2>{t("Price and stock")}</h2>
+            {heading("Stock and warehouse", Warehouse, "orange")}
             <div className="seller-form-grid">
-              {field("unit_price", "Unit price", "number")}
-              <div className="seller-field-row">
-                <label className="seller-field">{t("Currency")}
-                  <SellerSelect value={fields.currency} onValueChange={value => set("currency", value as Fields["currency"])} placeholder={t("Currency")} options={["TRY", "EUR", "USD"].map(currency => ({ value: currency, label: currency }))} />
-                  {fieldErrors.currency && <small className="seller-field-error">{fieldErrors.currency}</small>}
-                </label>
-                {field("quantity", "Quantity", "number")}
-              </div>
+              {field("quantity", "Stock quantity", "number")}
               <label className="seller-field">{t("Warehouse city")}
                 <SellerSelect value={fields.warehouse_city} onValueChange={value => set("warehouse_city", value)} placeholder={t("Warehouse city")} options={cities.map(([value, label]) => ({ value, label: t(label) }))} />
                 {fieldErrors.warehouse_city && <small className="seller-field-error">{fieldErrors.warehouse_city}</small>}

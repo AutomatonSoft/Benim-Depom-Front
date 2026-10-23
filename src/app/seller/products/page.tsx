@@ -82,7 +82,7 @@ function ProductActions({ product, t }: { product: SellerProduct; t: Translate }
       {(["draft", "rejected", "withdrawn", "approved"].includes(product.status)) &&
         <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/edit`}>{t("Edit product")}</Link></DropdownMenuItem>}
       <DropdownMenuSeparator />
-      <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/history`}><span className="seller-link-content"><FileClock size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</span></Link></DropdownMenuItem>
+      <DropdownMenuItem asChild><Link href={`/seller/products/${product.id}/history`}><span className="seller-link-content"><FileClock key="history-icon" size={18} strokeWidth={1.8} aria-hidden="true" />{t("Review history")}</span></Link></DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>;
 }
@@ -153,7 +153,7 @@ export default function SellerProductsPage() {
   return <SellerPage
     title="My products"
     description="Manage your catalogue and track product review status."
-    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
+    actions={<Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus key="add-product-icon" size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
   >
     <div className="seller-products-toolbar">
       <label className="seller-product-search">
@@ -185,11 +185,10 @@ export default function SellerProductsPage() {
             <TableHeader><TableRow>
               <TableHead>{t("Product")}</TableHead><TableHead>{t("Status")}</TableHead>
               <TableHead className="seller-numeric-cell">{t("Unit price")}</TableHead><TableHead className="seller-numeric-cell">{t("Quantity")}</TableHead>
-              <TableHead>{t("Dimensions")}</TableHead><TableHead>{t("Updated")}</TableHead>
+              <TableHead>{t("Updated")}</TableHead>
               <TableHead><span className="sr-only">{t("Actions")}</span></TableHead>
             </TableRow></TableHeader>
             <TableBody>{page.results.map(product => {
-              const variant = product.variants?.[0];
               return <TableRow key={product.id}>
                 <TableCell><div className="seller-table-product"><ProductPhoto product={product} t={t} /><div>
                   <Link className="seller-link" data-seller-translate="skip" href={`/seller/products/${product.id}`}>{product.title}</Link>
@@ -198,30 +197,33 @@ export default function SellerProductsPage() {
                 <TableCell><StatusBadges product={product} t={t} /></TableCell>
                 <TableCell className="seller-numeric-cell"><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong></TableCell>
                 <TableCell className="seller-numeric-cell"><span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</TableCell>
-                <TableCell><span data-seller-translate="skip">{variant ? `${variant.width_cm} × ${variant.height_cm} × ${variant.length_cm} cm` : t("Dimensions not provided")}</span></TableCell>
                 <TableCell>{new Date(product.updated_at).toLocaleDateString(locale)}</TableCell>
                 <TableCell><ProductActions product={product} t={t} /></TableCell>
               </TableRow>;
             })}</TableBody>
           </Table>
         </div>
-        <div className="seller-products-mobile">{page.results.map(product => <article className="seller-product" key={product.id}>
-          <ProductPhoto product={product} t={t} />
-          <div className="seller-product-summary">
-            <h2><Link className="seller-link" data-seller-translate="skip" href={`/seller/products/${product.id}`}>{product.title}</Link></h2>
-            <p data-seller-translate="skip">{product.product_type}</p>
-            <p><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong> · <span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</p>
-            <StatusBadges product={product} t={t} />
-          </div>
-          <div className="seller-product-actions">
-            <ProductActions product={product} t={t} />
-          </div>
-        </article>)}</div>
+        <div className="seller-products-mobile">{page.results.map(product => {
+          const variant = product.variants?.[0];
+          return <article className="seller-product" key={product.id}>
+            <ProductPhoto product={product} t={t} />
+            <div className="seller-product-summary">
+              <h2><Link className="seller-link" data-seller-translate="skip" href={`/seller/products/${product.id}`}>{product.title}</Link></h2>
+              <p data-seller-translate="skip">{product.product_type}</p>
+              <p><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong> · <span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</p>
+              <p>{t("Dimensions")}: {variant ? <span data-seller-translate="skip">{variant.width_cm} × {variant.height_cm} × {variant.length_cm} cm</span> : t("Dimensions not provided")}</p>
+              <StatusBadges product={product} t={t} />
+            </div>
+            <div className="seller-product-actions">
+              <ProductActions product={product} t={t} />
+            </div>
+          </article>;
+        })}</div>
       </> : <div className="seller-empty seller-products-empty">
         <Package size={28} aria-hidden="true" />
         <strong>{t(search || status || available ? "No products found." : "Your catalogue is empty.")}</strong>
         <span>{t(search || status || available ? "Try changing your search or filters." : "Add your first product to start your catalogue.")}</span>
-        {!search && !status && !available && <Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
+        {!search && !status && !available && <Button asChild variant="accent" className="seller-button primary"><Link href="/seller/products/new"><span className="seller-link-content"><Plus key="add-product-icon" size={18} strokeWidth={1.8} aria-hidden="true" />{t("Add product")}</span></Link></Button>}
       </div>}
 
     {page && !error && <div className="seller-pagination">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Accordion } from "radix-ui";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search, Shapes } from "lucide-react";
 import { ottoCatalogPath, type OttoCatalogLanguage } from "@/lib/listings";
 import { loadOttoCatalogPages, parseOttoAttributeValue, type OttoCatalogPage } from "@/lib/otto-catalog";
 import { sellerRequest } from "@/lib/seller";
@@ -209,7 +209,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
 
   return <SellerLocalized>
     <section className="seller-card seller-otto-card">
-      <h2>{t("Optional OTTO category")}</h2>
+      <div className="seller-editor-heading orange"><span className="seller-editor-icon"><Shapes size={20} aria-hidden="true" /></span><h2>{t("Optional OTTO category")}</h2></div>
       <p>{t("Add optional catalog details when they apply to your product.")}</p>
       <div className="seller-form-grid">
         <div className="seller-form-grid seller-otto-selects">

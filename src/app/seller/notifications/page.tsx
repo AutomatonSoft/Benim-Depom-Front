@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BadgeDollarSign, Bell, Check, CheckCheck, CircleCheck, CircleX, LoaderCircle, MessageCircle, Search, ShoppingBag } from "lucide-react";
+import { BadgeDollarSign, Bell, Check, CheckCheck, CircleAlert, CircleCheck, CircleX, LoaderCircle, MessageCircle, Search, ShoppingBag } from "lucide-react";
 import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import { SellerSelect } from "@/components/seller/SellerSelect";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { sellerRequest, type PageResult, type SellerNotification } from "@/lib/seller";
 import { answerAvailabilityOnce, availabilityResponseState, SellerAvailabilityGuard } from "@/lib/seller-availability";
+import { sellerNotificationTone } from "@/lib/seller-notification-style";
 
 const filters = [
   ["", "All notifications"],
@@ -29,6 +30,8 @@ function categoryFor(type: string) {
 }
 
 function iconFor(type: string) {
+  if (type.includes("rejected") || type.includes("change_requested")) return CircleAlert;
+  if (type.includes("approved")) return CircleCheck;
   if (type.includes("price")) return BadgeDollarSign;
   if (type.includes("availability") || type.includes("confirmation")) return CircleCheck;
   if (type.includes("message")) return MessageCircle;
@@ -204,6 +207,9 @@ export default function SellerNotificationsPage() {
       {items.map(item => {
         const type = item.notification_type.toLowerCase();
         const Icon = iconFor(type);
+        const tone = sellerNotificationTone(type);
+        const isSale = tone === "sale";
+        const hasSaleDetails = isSale && (item.afterbuy_qty_sold != null || item.afterbuy_marketplace || item.afterbuy_stock_synced != null);
         const isPriceOffer = type === "price_negotiation_offer";
         const responseState = availabilityResponseState(item, item.product_id ? answeredProducts.has(item.product_id) : false);
         const productName = item.product_title?.trim();
@@ -213,11 +219,11 @@ export default function SellerNotificationsPage() {
         const uncertain = productId !== null && uncertainProducts.has(productId);
         const answered = responseState === "answered";
         const pending = responseState === "pending" && filter !== "outgoing";
-        return <article className={`seller-card seller-notification${item.is_read ? " read" : " unread"}${answered ? " answered" : ""}`} key={item.id}>
+        return <article className={`seller-card seller-notification seller-notification-${tone}${item.is_read ? " read" : " unread"}${answered ? " answered" : ""}`} key={item.id}>
           <div className="seller-notification-heading">
             <div className="seller-notification-main">
               <div className="seller-notification-meta"><span className="seller-notification-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-badge">{t(categoryFor(type))}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString(locale)}</time></div>
-              <h2 data-seller-translate="skip">{item.title || type.replaceAll("_", " ")}</h2>
+              <h2 data-seller-translate="skip">{isSale ? t("Your product has sold") : item.title || type.replaceAll("_", " ")}</h2>
             </div>
             <div className="seller-notification-states">
               <span className={`seller-badge${item.is_read ? "" : " pending"}`}>{t(item.is_read ? "Read" : "Unread")}</span>
@@ -225,8 +231,16 @@ export default function SellerNotificationsPage() {
               {answered && <span className="seller-badge approved">{t("Response sent")}</span>}
             </div>
           </div>
-          {item.body && <p data-seller-translate="skip">{item.body}</p>}
-          {productName && !productNameAlreadyShown && <p className="seller-notification-product">{t("Product")}: <span data-seller-translate="skip">{productName}</span></p>}
+          {item.body && !hasSaleDetails && <p data-seller-translate="skip">{item.body}</p>}
+          {productName && (isSale || !productNameAlreadyShown) && <p className="seller-notification-product">{t("Product")}: <strong data-seller-translate="skip">{productName}</strong></p>}
+          {hasSaleDetails && <>
+            <dl className="seller-sale-details">
+              {item.afterbuy_qty_sold != null && <div><dt>{t("Quantity sold")}</dt><dd data-seller-translate="skip">{new Intl.NumberFormat(locale).format(item.afterbuy_qty_sold)}</dd></div>}
+              {item.afterbuy_marketplace && <div><dt>{t("Marketplace")}</dt><dd data-seller-translate="skip">{item.afterbuy_marketplace}</dd></div>}
+              {item.afterbuy_stock_synced != null && <div><dt>{t("Stock update")}</dt><dd>{t(item.afterbuy_stock_synced ? "Stock synchronized" : "Stock synchronization pending")}</dd></div>}
+            </dl>
+            {(item.body || item.title) && <details className="seller-notification-original"><summary>{t("Original notification")}</summary><p data-seller-translate="skip">{item.title}</p><p data-seller-translate="skip">{item.body}</p></details>}
+          </>}
           {isPriceOffer && item.proposed_unit_price && <p>{t("Proposed price")}: <strong data-seller-translate="skip">{item.proposed_unit_price} {item.proposed_currency}</strong></p>}
           {pending && <p className="seller-notification-availability-help">{t("Please confirm whether this product is currently available.")}</p>}
           <div className="seller-toolbar seller-notification-actions">

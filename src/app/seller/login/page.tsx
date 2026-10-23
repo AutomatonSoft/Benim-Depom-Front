@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
-import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
+import SellerPasswordInput from "@/components/seller/SellerPasswordInput";
 import { sellerLogin } from "@/lib/seller";
 
 function LoginForm() {
@@ -14,7 +15,6 @@ function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(params.get("denied") ? "This portal is available to seller accounts only." : "");
   const [notice] = useState(
     params.get("deletion") === "pending"
@@ -46,18 +46,13 @@ function LoginForm() {
         <input type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} />
       </label>
       <label className="seller-field">{t("Password")}
-        <span className="seller-password-field">
-          <input type={showPassword ? "text" : "password"} required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />
-          <button className="seller-password-toggle" type="button" aria-label={t(showPassword ? "Hide password" : "Show password")} onClick={() => setShowPassword(value => !value)}>
-            {showPassword ? <EyeOff size={18} strokeWidth={1.8} aria-hidden="true" /> : <Eye size={18} strokeWidth={1.8} aria-hidden="true" />}
-          </button>
-        </span>
+        <SellerPasswordInput required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />
       </label>
       {error && <SellerNotice>{error}</SellerNotice>}
       <button className="seller-button primary" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? t("Signing in…") : t("Sign in")}</button>
     </form>
-    <p><Link className="seller-link" href="/seller/forgot-password">{t("Forgot password?")}</Link></p>
-    <p>{t("New to Benim Depom?")} <Link className="seller-link" href="/seller/register">{t("Create seller account")}</Link></p>
+    <p className="seller-auth-navigation"><Link className="seller-link" href="/seller/forgot-password">{t("Forgot password?")}</Link></p>
+    <p className="seller-auth-navigation">{t("New to Benim Depom?")} <Link className="seller-link" href="/seller/register">{t("Create seller account")}</Link></p>
   </main></SellerLocalized>;
 }
 

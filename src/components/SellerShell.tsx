@@ -93,7 +93,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
           : pathname === href || pathname.startsWith(`${href}/`);
         return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={active ? "active" : ""}><span className="seller-nav-link-content"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t(label)}</span>{href === "/seller/notifications" && unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</span></Link>;
       })}</nav>
-      <button className="seller-logout" type="button" onClick={logout}><LogOut size={18} strokeWidth={1.8} aria-hidden="true" />{t("Sign out")}</button>
+      <button className="seller-logout" type="button" onClick={logout}><LogOut size={18} strokeWidth={1.8} aria-hidden="true" /><span>{t("Sign out")}</span></button>
     </aside>
     <div className="seller-main-column">
       <header className="seller-topbar">

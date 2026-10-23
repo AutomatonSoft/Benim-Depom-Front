@@ -8,7 +8,10 @@ import { getSellerDatePreset, berlinBusinessDate, parseSellerIsoDate, sellerDate
 import { firstSellerProductOptions, sellerProductSearchUrl } from "../src/lib/seller-product-search.ts";
 import { toggleSellerMultiValue } from "../src/lib/seller-select.ts";
 import { sellerProductErrorDetails } from "../src/lib/seller-product-errors.ts";
+import { sellerMaterialInputs, sellerMaterials } from "../src/lib/seller-product-form.ts";
+import { sellerNotificationTone } from "../src/lib/seller-notification-style.ts";
 import { LANDING_I18N, SELLER_LOGIN_PATH } from "../src/lib/landing-content.ts";
+import "./seller-account-deletion.test.mjs";
 
 const values = new Map([["benim_access_token", "manager-access"]]);
 const events = [];
@@ -29,6 +32,10 @@ test("seller labels translate and interpolate in every supported language", () =
   assert.equal(translateSeller("Filters", "ru"), "Фильтры");
   assert.equal(translateSeller("Send for review", "de"), "Zur Prüfung einreichen");
   assert.equal(translateSeller("Show password", "tr"), "Şifreyi göster");
+  for (const locale of ["ru", "tr", "de"]) {
+    assert.notEqual(translateSeller("Delete account?", locale), "Delete account?");
+    assert.notEqual(translateSeller("Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.", locale), "Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.");
+  }
   for (const locale of ["ru", "tr", "de"]) {
     assert.notEqual(translateSeller("Optional attributes", locale), "Optional attributes");
     assert.notEqual(translateSeller("Select or drop photos", locale), "Select or drop photos");
@@ -184,6 +191,19 @@ test("seller avatars use one trimmed initial and fall back to username", () => {
 test("seller multi-select toggles each selected value once", () => {
   assert.deepEqual(toggleSellerMultiValue(["oak"], "linen"), ["oak", "linen"]);
   assert.deepEqual(toggleSellerMultiValue(["oak", "linen"], "oak"), ["linen"]);
+});
+
+test("product material inputs preserve the existing materials array payload", () => {
+  assert.deepEqual(sellerMaterialInputs(["Cotton", "Linen"]), { material1: "Cotton", material2: "Linen" });
+  assert.deepEqual(sellerMaterials(" Cotton ", ""), ["Cotton"]);
+  assert.deepEqual(sellerMaterials("Cotton", "Linen"), ["Cotton", "Linen"]);
+});
+
+test("seller notifications receive category-specific visual tones", () => {
+  assert.equal(sellerNotificationTone("product_sold"), "sale");
+  assert.equal(sellerNotificationTone("product_rejected"), "warning");
+  assert.equal(sellerNotificationTone("manager_message"), "message");
+  assert.equal(sellerNotificationTone("product_availability_reminder"), "availability");
 });
 
 test("product validation errors map to friendly field names without exposing API paths", () => {
