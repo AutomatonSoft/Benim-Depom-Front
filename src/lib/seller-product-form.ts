@@ -1,3 +1,11 @@
+export function sellerProductFormData(payload: Record<string, unknown>) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    form.append(key, ["variants", "set_parts", "otto_attributes"].includes(key) ? JSON.stringify(value) : value == null ? "" : String(value));
+  }
+  return form;
+}
+
 export function sellerMaterialInputs(materials: string[] = []) {
   return { material1: materials[0] || "", material2: materials[1] || "" };
 }

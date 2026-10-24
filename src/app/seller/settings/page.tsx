@@ -17,7 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { SellerNotice, SellerPage } from "@/components/SellerShell";
-import { clearSellerToken, sellerRequest } from "@/lib/seller";
+import { clearSellerSession, sellerRequest } from "@/lib/seller";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { readSellerLocale, setSellerLocale, type SellerLocale } from "@/lib/seller-i18n";
 
@@ -91,7 +91,7 @@ export default function SellerSettingsPage() {
     setNotice("");
     try {
       const result = await sellerRequest<AccountDeletionResult>("/api/v1/auth/me/", { method: "DELETE" });
-      clearSellerToken();
+      clearSellerSession();
       setDeleteOpen(false);
       router.replace(`/seller/login${result?.deleted === false ? "?deletion=pending" : "?deletion=complete"}`);
     } catch (error) {

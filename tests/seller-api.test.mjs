@@ -1,17 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sellerAvatarInitial, sellerLogin, sellerRequest, sellerPublicRequest, sellerLogout, clearSellerToken, errorMessage } from "../src/lib/seller.ts";
+import { sellerAvatarInitial, sellerLogin, sellerRequest, sellerPublicRequest, sellerLogout, clearSellerToken, clearSellerSession, sellerProfileId, saveSellerProfileId, readAvailabilityAnswers, rememberAvailabilityAnswer, errorMessage, respondToPriceNegotiation, sellerReviewNotifications } from "../src/lib/seller.ts";
 import { readSellerLocale, setSellerLocale, translateSeller } from "../src/lib/seller-i18n.ts";
 import { loadOttoCatalogPages, parseOttoAttributeValue, updateOttoAttribute } from "../src/lib/otto-catalog.ts";
-import { answerAvailabilityOnce, availabilityResponseState, SellerAvailabilityGuard } from "../src/lib/seller-availability.ts";
+import { answerAvailabilityOnce, availabilityAnswerDisplayState, availabilityResponseState, SellerAvailabilityGuard } from "../src/lib/seller-availability.ts";
 import { getSellerDatePreset, berlinBusinessDate, parseSellerIsoDate, sellerDateToIso, shiftSellerCalendarMonth } from "../src/lib/seller-date-range.ts";
 import { firstSellerProductOptions, sellerProductSearchUrl } from "../src/lib/seller-product-search.ts";
 import { toggleSellerMultiValue } from "../src/lib/seller-select.ts";
 import { sellerProductErrorDetails } from "../src/lib/seller-product-errors.ts";
-import { sellerMaterialInputs, sellerMaterials, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "../src/lib/seller-product-form.ts";
+import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "../src/lib/seller-product-form.ts";
 import { sellerNotificationTone } from "../src/lib/seller-notification-style.ts";
+import { sellerNotificationDateFormatter } from "../src/lib/seller-notification-date.ts";
+import { formatNotificationPrice, hasStructuredSaleDetails, priceOfferDisplayState, runNotificationActionOnce, sellerNotificationFilters, sellerSaleBodyDetails } from "../src/lib/seller-notification-content.ts";
 import { LANDING_I18N, SELLER_LOGIN_PATH } from "../src/lib/landing-content.ts";
 import "./seller-account-deletion.test.mjs";
+import "./seller-notifications.test.mjs";
 
 const values = new Map([["benim_access_token", "manager-access"]]);
 const events = [];
@@ -32,8 +35,19 @@ test("seller labels translate and interpolate in every supported language", () =
   assert.equal(translateSeller("Filters", "ru"), "Фильтры");
   assert.equal(translateSeller("Send for review", "de"), "Zur Prüfung einreichen");
   assert.equal(translateSeller("Show password", "tr"), "Şifreyi göster");
+  assert.deepEqual(
+    ["en", "ru", "tr", "de"].map(locale => translateSeller("Review updates about your products and respond to supported requests.", locale)),
+    ["Review updates about your products and respond to supported requests.", "Следите за изменениями товаров и сообщениями менеджеров.", "Ürünlerinizdeki değişiklikleri ve yöneticilerin mesajlarını takip edin.", "Verfolgen Sie Änderungen an Ihren Produkten und Nachrichten von Managern."],
+  );
   assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Product type", locale)), ["Product type", "Тип товара", "Ürün türü", "Produkttyp"]);
   assert.equal(translateSeller("Save product", "ru"), "Сохранить товар");
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Offer accepted", locale)), ["Offer accepted", "Предложение принято", "Teklif kabul edildi", "Angebot angenommen"]);
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Offer declined", locale)), ["Offer declined", "Предложение отклонено", "Teklif reddedildi", "Angebot abgelehnt"]);
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Offer no longer active", locale)), ["Offer no longer active", "Предложение больше не действует", "Teklif artık etkin değil", "Angebot ist nicht mehr aktiv"]);
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Product sold", locale)), ["Product sold", "Товар продан", "Ürün satıldı", "Produkt verkauft"]);
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Your answer", locale)), ["Your answer", "Ваш ответ", "Yanıtınız", "Ihre Antwort"]);
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("More sale details", locale)), ["More sale details", "Подробности продажи", "Satış ayrıntıları", "Weitere Verkaufsdetails"]);
+  assert.deepEqual(["en", "ru", "tr", "de"].map(locale => translateSeller("Sending…", locale)), ["Sending…", "Отправка…", "Gönderiliyor…", "Wird gesendet…"]);
   assert.equal(translateSeller("You may list only new products. Used products cannot be uploaded.", "ru"), "Вы можете размещать только новые товары. Уже использованные товары загружать нельзя");
   assert.equal(translateSeller("Each product has one color. To sell this product in another color, add it as a new product.", "ru"), "У каждого товара один цвет. Чтобы продавать этот товар в другом цвете, добавьте его как новый товар");
   assert.equal(translateSeller("For soft materials such as fabric: 70% polyester, 25% cotton, 5% elastane. Hard materials such as wood or metal do not require a composition.", "ru"), "Для мягких материалов, например ткани: 70% полиэстер, 25% хлопок, 5% эластан. Для твёрдых материалов, таких как дерево или металл, не требуется.");
@@ -107,6 +121,27 @@ test("seller login verifies role and stores a separate access token", async (t) 
   assert.equal(calls[0][1].body, JSON.stringify({ email: "seller@example.com", password: "password" }));
 });
 
+test("seller price offer responses reuse the existing negotiation endpoint", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const previousToken = values.get("benim_seller_access_token");
+  t.after(() => previousToken ? values.set("benim_seller_access_token", previousToken) : values.delete("benim_seller_access_token"));
+  t.after(() => { globalThis.fetch = originalFetch; });
+  values.set("benim_seller_access_token", "seller-access");
+  const calls = [];
+  globalThis.fetch = async (input, init) => {
+    calls.push([String(input), init]);
+    return Response.json({ latest_price_negotiation: { status: "accepted" } });
+  };
+
+  await respondToPriceNegotiation(20, true, "Looks good");
+  await respondToPriceNegotiation(21, false);
+
+  assert.deepEqual(calls.map(([url, init]) => [url, init.method, init.body]), [
+    ["/api/v1/products/20/price-negotiation/respond/", "POST", JSON.stringify({ accepted: true, comment: "Looks good" })],
+    ["/api/v1/products/21/price-negotiation/respond/", "POST", JSON.stringify({ accepted: false, comment: "" })],
+  ]);
+});
+
 test("public seller forms preserve registration and password reset API payloads", async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -175,6 +210,48 @@ test("nested serializer errors remain readable", () => {
     errorMessage({ variants: [{ materials: ["Enter at least one material."] }] }),
     "variants[0].materials[0]: Enter at least one material.",
   );
+});
+
+test("seller review filter requests seller decisions and follows every result page", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; clearSellerToken(); });
+  values.set("benim_seller_access_token", "seller-access");
+  const calls = [];
+  const controller = new AbortController();
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input), "https://app.test");
+    calls.push(url);
+    assert.equal(init.signal, controller.signal);
+    const type = url.searchParams.get("notification_type");
+    assert.ok(["product_approved", "product_rejected"].includes(type));
+    assert.equal(url.searchParams.get("search"), "chair");
+    assert.equal(url.searchParams.has("category"), false);
+    if (type === "product_approved" && !url.searchParams.has("page")) {
+      return Response.json({ results: [{ id: 1, created_at: "2026-10-01T10:00:00Z" }], next: `${url}&page=2` });
+    }
+    return Response.json({ results: [{ id: type === "product_rejected" ? 2 : 3, created_at: type === "product_rejected" ? "2026-10-03T10:00:00Z" : "2026-10-02T10:00:00Z" }], next: null });
+  };
+  const result = await sellerReviewNotifications(" chair ", controller.signal);
+  assert.deepEqual(result.results.map(item => item.id), [2, 3, 1]);
+  assert.equal(result.count, 3);
+  assert.equal(result.next, null);
+  assert.equal(calls.length, 3);
+});
+
+test("temporary refresh and profile verification failures preserve the existing seller token", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; clearSellerToken(); });
+  for (const failingStep of ["refresh", "profile"]) {
+    values.set("benim_seller_access_token", "expired-access");
+    globalThis.fetch = async input => {
+      const url = String(input);
+      if (url.endsWith("/refresh/")) return failingStep === "refresh" ? new Response(null, { status: 503 }) : Response.json({ access: "fresh" });
+      if (url.endsWith("/auth/me/")) return new Response(null, { status: 503 });
+      return new Response(null, { status: 401 });
+    };
+    await assert.rejects(sellerRequest("/api/v1/products/"), { status: 503 });
+    assert.equal(values.get("benim_seller_access_token"), "expired-access");
+  }
 });
 
 test("parallel expired requests share one refresh request", async (t) => {
@@ -286,6 +363,69 @@ test("seller notifications receive category-specific visual tones", () => {
   assert.equal(sellerNotificationTone("product_availability_reminder"), "availability");
 });
 
+test("notification dates are localized and omit seconds", () => {
+  const date = new Date("2026-10-15T13:00:01Z");
+  for (const locale of ["en", "ru", "tr", "de"]) {
+    const formatter = sellerNotificationDateFormatter(locale);
+    assert.equal(formatter.resolvedOptions().second, undefined);
+    assert.doesNotMatch(formatter.format(date), /:\d{2}:\d{2}/);
+  }
+});
+
+test("seller notification filters retain useful categories and remove price responses", () => {
+  assert.deepEqual(sellerNotificationFilters.map(([value]) => value), ["", "unread", "review", "availability", "price-offers", "afterbuy", "outgoing"]);
+});
+
+test("product multipart forms send empty optional OTTO IDs instead of the string null", () => {
+  const form = sellerProductFormData({ otto_category_id: null, otto_category_group_id: null, otto_attributes: {}, variants: [{ quantity: 0 }], set_parts: [], title: "Office chair" });
+  assert.equal(form.get("otto_category_id"), "");
+  assert.equal(form.get("otto_category_group_id"), "");
+  assert.equal(form.get("otto_attributes"), "{}");
+  assert.equal(form.get("variants"), '[{"quantity":0}]');
+  assert.equal(form.get("title"), "Office chair");
+  const selected = sellerProductFormData({ otto_category_id: 12, otto_category_group_id: 3 });
+  assert.equal(selected.get("otto_category_id"), "12");
+  assert.equal(selected.get("otto_category_group_id"), "3");
+  assert.deepEqual(["ru", "en", "tr", "de"].map(locale => translateSeller("Yes", locale)), ["Да", "Yes", "Evet", "Ja"]);
+  assert.deepEqual(["ru", "en", "tr", "de"].map(locale => translateSeller("No", locale)), ["Нет", "No", "Hayır", "Nein"]);
+});
+
+test("price offer state comes from negotiation response fields, not read state", () => {
+  assert.equal(priceOfferDisplayState({ price_negotiation_status: "pending", price_accepted: null, responded_at: null, is_read: true }), "pending");
+  assert.equal(priceOfferDisplayState({ price_negotiation_status: "accepted", price_accepted: true, responded_at: "2026-10-20T10:00:00Z" }), "accepted");
+  assert.equal(priceOfferDisplayState({ price_negotiation_status: "rejected", price_accepted: false, responded_at: "2026-10-20T10:00:00Z" }), "declined");
+  assert.equal(priceOfferDisplayState({ price_negotiation_status: null, price_accepted: null, responded_at: "2026-10-20T10:00:00Z" }), "unknown");
+  assert.equal(priceOfferDisplayState({ price_negotiation_status: "superseded", price_accepted: null, responded_at: null }), "inactive");
+});
+
+test("price offer responses are protected from duplicate in-flight requests", async () => {
+  const inFlight = new Set();
+  let resolveAction;
+  let calls = 0;
+  const action = () => { calls++; return new Promise(resolve => { resolveAction = resolve; }); };
+  const first = runNotificationActionOnce(inFlight, 4201, action);
+  assert.equal(await runNotificationActionOnce(inFlight, 4201, action), false);
+  assert.equal(calls, 1);
+  resolveAction();
+  assert.equal(await first, true);
+  assert.equal(inFlight.has(4201), false);
+});
+
+test("sale cards preserve legacy details and remove only represented duplicate lines", () => {
+  const body = "Your product was sold.\n\nProduct: Black office chair\nTime: 2026-10-20 11:45\nSold: 2 pcs.";
+  assert.equal(sellerSaleBodyDetails(body, "Your product was sold", "Black office chair", 2), "Time: 2026-10-20 11:45");
+  assert.equal(sellerSaleBodyDetails("Your product was sold.\n\nProduct: Black office chair\nTime: 11:45", "Your product was sold", "Black office chair", null), "Time: 11:45");
+  assert.equal(sellerSaleBodyDetails("Your product was sold.\nTime: 11:45", "Your product was sold", null, null), "Time: 11:45");
+  assert.equal(sellerSaleBodyDetails("Time: 11:45\nPrice: 500 TRY", "Different title", null, null), "Time: 11:45\nPrice: 500 TRY");
+});
+
+test("only real sale fields complete the structured summary and negotiated prices are localized", () => {
+  assert.equal(hasStructuredSaleDetails({ afterbuy_qty_sold: 2, afterbuy_marketplace: "OTTO", afterbuy_stock_synced: false }), true);
+  assert.equal(hasStructuredSaleDetails({ afterbuy_qty_sold: null, afterbuy_marketplace: null, afterbuy_stock_synced: false }), false);
+  assert.equal(formatNotificationPrice("3000.00", "EUR", "en"), "3,000.00 EUR");
+  assert.equal(formatNotificationPrice("unknown", "TRY", "en"), "unknown TRY");
+});
+
 test("product validation errors map to friendly field names without exposing API paths", () => {
   const details = sellerProductErrorDetails({
     variants: [{ materials: ["Choose one or two materials."], width_cm: ["Enter a valid number."] }],
@@ -322,6 +462,67 @@ test("availability actions only apply to unanswered incoming reminders", () => {
   assert.equal(availabilityResponseState({ ...unanswered, responded_at: "2026-01-01T00:00:00Z" }), "answered");
   assert.equal(availabilityResponseState({ ...unanswered, notification_type: "product_confirmation" }), "none");
   assert.equal(availabilityResponseState(unanswered, true), "answered");
+});
+
+test("availability answer state distinguishes Yes, No and unknown history", () => {
+  const reminder = { notification_type: "product_availability_reminder", product_id: 12 };
+  assert.equal(availabilityAnswerDisplayState(reminder, "answered", true), "available");
+  assert.equal(availabilityAnswerDisplayState(reminder, "answered", false), "unavailable");
+  assert.equal(availabilityAnswerDisplayState(reminder, "answered"), "unknown");
+  assert.equal(availabilityAnswerDisplayState(reminder, "pending", true), "pending");
+  assert.equal(availabilityAnswerDisplayState({ ...reminder, notification_type: "product_confirmation" }, "none"), "none");
+});
+
+test("only successful availability answers persist by seller and notification ID", async (t) => {
+  const sellerId = 9201;
+  const notificationId = 9301;
+  clearSellerSession();
+  saveSellerProfileId(sellerId);
+  t.after(() => clearSellerSession());
+  const reminder = { id: notificationId, notification_type: "product_availability_reminder", product_id: 92, responded_at: null };
+  const guard = new SellerAvailabilityGuard();
+  await answerAvailabilityOnce({
+    guard,
+    productId: 92,
+    send: async () => {},
+    markRead: async () => {},
+    onAnswered: () => rememberAvailabilityAnswer(sellerId, notificationId, false),
+    onReadError: () => {},
+  });
+
+  const refreshedAnswers = readAvailabilityAnswers(sellerId);
+  assert.equal(refreshedAnswers[notificationId], false);
+  assert.equal(availabilityResponseState(reminder, refreshedAnswers[notificationId] !== undefined), "answered");
+  assert.equal(availabilityAnswerDisplayState(reminder, "answered", refreshedAnswers[notificationId]), "unavailable");
+  // A changed current product value is not input to the saved historical answer.
+  assert.equal(availabilityAnswerDisplayState(reminder, "answered", readAvailabilityAnswers(sellerId)[notificationId]), "unavailable");
+
+  const failedId = notificationId + 1;
+  const failedGuard = new SellerAvailabilityGuard();
+  await assert.rejects(answerAvailabilityOnce({
+    guard: failedGuard,
+    productId: 93,
+    send: async () => { throw Object.assign(new Error("Rejected"), { status: 422 }); },
+    markRead: async () => {},
+    onAnswered: () => rememberAvailabilityAnswer(sellerId, failedId, true),
+    onReadError: () => {},
+  }), /Rejected/);
+  assert.equal(readAvailabilityAnswers(sellerId)[failedId], undefined);
+});
+
+test("availability history is isolated by seller and cleared on account change or logout", (t) => {
+  clearSellerSession();
+  t.after(() => clearSellerSession());
+  saveSellerProfileId(9401);
+  rememberAvailabilityAnswer(9401, 9501, true);
+  saveSellerProfileId(9402);
+  assert.equal(readAvailabilityAnswers(9401)[9501], undefined);
+  assert.equal(sellerProfileId(), 9402);
+  rememberAvailabilityAnswer(9402, 9501, false);
+  assert.equal(readAvailabilityAnswers(9402)[9501], false);
+  clearSellerSession();
+  assert.equal(sellerProfileId(), null);
+  assert.equal(readAvailabilityAnswers(9402)[9501], undefined);
 });
 
 test("one availability response guards same-product double clicks and duplicate reminders", async () => {

@@ -38,7 +38,7 @@ import {
 import { sellerRequest, type PageResult, type SellerProduct } from "@/lib/seller";
 import { sellerProductTypeLabel } from "@/lib/seller-product-form";
 
-const statuses = ["", "submitted", "approved", "rejected", "withdrawn", "deactivated", "archived"];
+const statuses = ["", "submitted", "approved", "rejected", "withdrawn", "deactivated"];
 const statusLabel: Record<string, string> = {
   draft: "Draft", submitted: "Submitted", approved: "Approved", rejected: "Rejected",
   withdrawn: "Withdrawn", deactivated: "Deactivated", archived: "Archived",

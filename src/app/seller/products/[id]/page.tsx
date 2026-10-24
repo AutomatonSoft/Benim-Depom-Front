@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Ban, CircleCheck, CircleX, History, LoaderCircle, Pencil } from "lucide-react";
 import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import SellerProductImage from "@/components/seller/SellerProductImage";
@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { sellerAllPages, sellerRequest, type PriceNegotiation, type SellerProduct } from "@/lib/seller";
+import { respondToPriceNegotiation, sellerAllPages, sellerRequest, type PriceNegotiation, type SellerProduct } from "@/lib/seller";
 import { sellerProductTypeLabel } from "@/lib/seller-product-form";
 
 type HistoryRow = {
@@ -54,6 +54,7 @@ export default function SellerProductDetailsPage() {
   const [offers, setOffers] = useState<PriceNegotiation[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const mutationInFlight = useRef(false);
   const [comment, setComment] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
@@ -85,6 +86,8 @@ export default function SellerProductDetailsPage() {
   );
 
   async function action(kind: "withdraw" | "deactivate") {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -94,11 +97,14 @@ export default function SellerProductDetailsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed.");
     } finally {
+      mutationInFlight.current = false;
       setBusy(false);
     }
   }
 
   async function archive() {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -108,18 +114,18 @@ export default function SellerProductDetailsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not archive product.");
     } finally {
+      mutationInFlight.current = false;
       setBusy(false);
     }
   }
 
   async function respond(accepted: boolean) {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     setBusy(true);
     setError("");
     try {
-      await sellerRequest(`/api/v1/products/${id}/price-negotiation/respond/`, {
-        method: "POST",
-        body: JSON.stringify({ accepted, comment }),
-      });
+      await respondToPriceNegotiation(Number(id), accepted, comment);
       setComment("");
       await load();
       setConfirmation(null);
@@ -127,6 +133,7 @@ export default function SellerProductDetailsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not respond to the offer.");
     } finally {
+      mutationInFlight.current = false;
       setBusy(false);
     }
   }

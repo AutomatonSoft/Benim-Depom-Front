@@ -1,31 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { BadgeDollarSign, Bell, Check, CheckCheck, CircleAlert, CircleCheck, CircleX, LoaderCircle, MessageCircle, Search, ShoppingBag } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BadgeDollarSign, Bell, Check, CheckCheck, CircleAlert, CircleCheck, CircleQuestionMark, CircleX, Eye, LoaderCircle, MessageCircle, Search, ShoppingBag } from "lucide-react";
 import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/SellerShell";
 import { SellerSelect } from "@/components/seller/SellerSelect";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
-import { sellerRequest, type PageResult, type SellerNotification } from "@/lib/seller";
+import { readAvailabilityAnswers, rememberAvailabilityAnswer, respondToPriceNegotiation, SELLER_PROFILE_CHANGED_EVENT, sellerProfileId, sellerRequest, sellerReviewNotifications, type PageResult, type SellerNotification } from "@/lib/seller";
 import { answerAvailabilityOnce, availabilityResponseState, SellerAvailabilityGuard } from "@/lib/seller-availability";
+import { sellerNotificationDateFormatter } from "@/lib/seller-notification-date";
+import { formatNotificationPrice, hasStructuredSaleDetails, priceOfferDisplayState, runNotificationActionOnce, sellerNotificationFilters, sellerSaleBodyDetails } from "@/lib/seller-notification-content";
 import { sellerNotificationTone } from "@/lib/seller-notification-style";
-
-const filters = [
-  ["", "All notifications"],
-  ["unread", "Unread"],
-  ["review", "Review"],
-  ["availability", "Availability"],
-  ["price-offers", "Price offers"],
-  ["price", "Price responses"],
-  ["afterbuy", "Afterbuy"],
-  ["outgoing", "Sent by me"],
-] as const;
 
 function categoryFor(type: string) {
   if (type.includes("price")) return "Price";
   if (type.includes("availability") || type.includes("confirmation")) return "Availability";
   if (type.includes("review") || type.includes("approved") || type.includes("rejected") || type.includes("change_requested")) return "Review";
-  if (type.includes("sold")) return "Afterbuy";
+  if (type.includes("sold")) return "Sale";
   return "Update";
 }
 
@@ -41,6 +32,7 @@ function iconFor(type: string) {
 
 export default function SellerNotificationsPage() {
   const { t, locale } = useSellerI18n();
+  const dateFormatter = useMemo(() => sellerNotificationDateFormatter(locale), [locale]);
   const [items, setItems] = useState<SellerNotification[]>([]);
   const [next, setNext] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -50,14 +42,44 @@ export default function SellerNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [busyProducts, setBusyProducts] = useState<Set<number>>(() => new Set());
-  const [answeredProducts, setAnsweredProducts] = useState<Set<number>>(() => new Set());
+  const [availabilityAnswers, setAvailabilityAnswers] = useState<Record<number, boolean>>({});
   const [uncertainProducts, setUncertainProducts] = useState<Set<number>>(() => new Set());
+  const [priceComments, setPriceComments] = useState<Record<number, string>>({});
+  const [priceOfferActions, setPriceOfferActions] = useState<Map<number, boolean>>(() => new Map());
+  const priceOfferInFlight = useRef(new Set<number>());
   const availabilityGuard = useRef(new SellerAvailabilityGuard());
+
+  useEffect(() => {
+    let currentSellerId = sellerProfileId();
+    const syncAnswers = () => {
+      const nextSellerId = sellerProfileId();
+      const storedAnswers = readAvailabilityAnswers(nextSellerId);
+      if (nextSellerId !== currentSellerId) {
+        currentSellerId = nextSellerId;
+        setAvailabilityAnswers(storedAnswers);
+        setUncertainProducts(new Set());
+        availabilityGuard.current = new SellerAvailabilityGuard();
+      } else {
+        setAvailabilityAnswers(current => ({ ...current, ...storedAnswers }));
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === "benim_seller_profile_id" || event.key.startsWith("benim_seller_availability_answers:")) syncAnswers();
+    };
+    const timer = window.setTimeout(syncAnswers, 0);
+    window.addEventListener(SELLER_PROFILE_CHANGED_EVENT, syncAnswers);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(SELLER_PROFILE_CHANGED_EVENT, syncAnswers);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const query = new URLSearchParams();
   if (search.trim()) query.set("search", search.trim());
   if (filter === "unread") query.set("is_read", "false");
-  else if (filter === "outgoing" || filter === "review" || filter === "availability" || filter === "price" || filter === "afterbuy") query.set("category", filter);
+  else if (filter === "outgoing" || filter === "availability" || filter === "afterbuy") query.set("category", filter);
   else if (filter === "price-offers") query.set("notification_type", "price_negotiation_offer");
   const queryString = query.toString();
   const firstPage = `/api/v1/notifications/${queryString ? `?${queryString}` : ""}`;
@@ -66,7 +88,7 @@ export default function SellerNotificationsPage() {
     setLoading(true);
     setError("");
     try {
-      const result = await sellerRequest<PageResult<SellerNotification>>(url, { signal });
+      const result = filter === "review" ? await sellerReviewNotifications(search, signal) : await sellerRequest<PageResult<SellerNotification>>(url, { signal });
       if (!signal?.aborted) {
         setItems(previous => append ? [...previous, ...result.results] : result.results);
         setNext(result.next);
@@ -78,7 +100,7 @@ export default function SellerNotificationsPage() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [firstPage]);
+  }, [firstPage, filter, search]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -119,23 +141,79 @@ export default function SellerNotificationsPage() {
     }
   }
 
+  async function respondToPriceOffer(item: SellerNotification, accepted: boolean) {
+    const productId = item.product_id;
+    if (!productId || item.price_negotiation_status !== "pending") return;
+    await runNotificationActionOnce(priceOfferInFlight.current, item.id, async () => {
+      setPriceOfferActions(current => new Map(current).set(item.id, accepted));
+      setError("");
+      setNotice("");
+      try {
+        const product = await respondToPriceNegotiation(productId, accepted, priceComments[item.id] ?? "");
+        const offer = product.latest_price_negotiation;
+        const status = offer?.status === "accepted" || offer?.status === "rejected"
+          ? offer.status
+          : accepted ? "accepted" : "rejected";
+        setItems(current => current.map(notification => notification.id === item.id ? {
+          ...notification,
+          is_read: true,
+          price_negotiation_status: status,
+          price_accepted: status === "accepted",
+          seller_comment: offer?.seller_comment ?? priceComments[item.id]?.trim() ?? "",
+          responded_at: offer?.responded_at ?? new Date().toISOString(),
+        } : notification));
+        setPriceComments(current => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
+        setNotice(t("Response sent"));
+        window.dispatchEvent(new Event("seller-notifications-updated"));
+      } catch {
+        setError(t("Could not respond to the offer."));
+      } finally {
+        setPriceOfferActions(current => {
+          const next = new Map(current);
+          next.delete(item.id);
+          return next;
+        });
+      }
+    });
+  }
+
   async function availability(item: SellerNotification, isAvailable: boolean) {
     const productId = item.product_id;
-    if (!productId || availabilityResponseState(item, answeredProducts.has(productId)) !== "pending") return;
-    if (availabilityGuard.current.isBlocked(productId)) return;
+    if (!productId || availabilityResponseState(item, availabilityAnswers[item.id] !== undefined) !== "pending") return;
+    const guard = availabilityGuard.current;
+    if (guard.isBlocked(productId, item.id)) return;
+    const pendingIds = new Set(items.filter(notification => notification.product_id === productId && availabilityResponseState(notification) === "pending").map(notification => notification.id));
     setBusyProducts(current => new Set(current).add(productId));
     setError("");
     setNotice("");
     try {
-      const sent = await answerAvailabilityOnce({
-        guard: availabilityGuard.current,
+      await answerAvailabilityOnce({
+        guard,
         productId,
+        notificationId: item.id,
         send: () => sellerRequest(`/api/v1/products/${productId}/availability/`, { method: "POST", body: JSON.stringify({ is_available: isAvailable }) }),
-        markRead: () => sellerRequest(`/api/v1/notifications/${item.id}/read/`, { method: "POST", body: "{}" }),
-        onAnswered: () => setAnsweredProducts(current => new Set(current).add(productId)),
+        markRead: async () => {
+          await sellerRequest(`/api/v1/notifications/${item.id}/read/`, { method: "POST", body: "{}" });
+          if (availabilityGuard.current === guard) setItems(current => current.map(notification => notification.id === item.id ? { ...notification, is_read: true } : notification));
+        },
+        onAnswered: () => {
+          if (availabilityGuard.current !== guard) return;
+          const answers = Object.fromEntries([...pendingIds].map(id => [id, isAvailable]));
+          setAvailabilityAnswers(current => ({ ...current, ...answers }));
+          for (const id of pendingIds) {
+            guard.answered.add(id);
+            rememberAvailabilityAnswer(sellerProfileId(), id, isAvailable);
+          }
+          const respondedAt = new Date().toISOString();
+          setItems(current => current.map(notification => pendingIds.has(notification.id) ? { ...notification, responded_at: respondedAt } : notification));
+          setNotice(t("Response sent"));
+        },
         onReadError: () => setNotice(t("Response sent, but the notification could not be marked as read.")),
       });
-      if (sent) await reload();
     } catch (e) {
       if (availabilityGuard.current.uncertain.has(productId)) {
         setUncertainProducts(current => new Set(current).add(productId));
@@ -153,30 +231,26 @@ export default function SellerNotificationsPage() {
     }
   }
 
-  async function refreshAvailabilityStatus(productId: number) {
+  async function refreshAvailabilityStatus(productId: number, notificationId: number) {
     setBusyProducts(current => new Set(current).add(productId));
     setError("");
     try {
       const result = await sellerRequest<PageResult<SellerNotification>>(firstPage);
       setItems(result.results);
       setNext(result.next);
-      const reminders = result.results.filter(item => item.product_id === productId && item.notification_type === "product_availability_reminder");
-      const answered = reminders.some(item => availabilityResponseState(item) === "answered");
-      if (answered) {
-        availabilityGuard.current.answered.add(productId);
-        setAnsweredProducts(current => new Set(current).add(productId));
-      } else if (reminders.length) {
-        availabilityGuard.current.resolveUncertain(productId);
-        setUncertainProducts(current => {
-          const nextUncertain = new Set(current);
-          nextUncertain.delete(productId);
-          return nextUncertain;
-        });
-        setNotice(t("No response is recorded. You can safely try again."));
-      } else {
+      const reminder = result.results.find(item => item.id === notificationId && item.product_id === productId && item.notification_type === "product_availability_reminder");
+      if (!reminder) {
         setError(t("Could not refresh notification status."));
         return;
       }
+      if (availabilityResponseState(reminder) === "answered") availabilityGuard.current.answered.add(notificationId);
+      else setNotice(t("No response is recorded. You can safely try again."));
+      availabilityGuard.current.resolveUncertain(productId);
+      setUncertainProducts(current => {
+        const nextUncertain = new Set(current);
+        nextUncertain.delete(productId);
+        return nextUncertain;
+      });
       window.dispatchEvent(new Event("seller-notifications-updated"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("Could not refresh notification status."));
@@ -189,7 +263,7 @@ export default function SellerNotificationsPage() {
     }
   }
 
-  const filterOptions = filters.map(([value, label]) => ({ value, label: t(label) }));
+  const filterOptions = sellerNotificationFilters.map(([value, label]) => ({ value, label: t(label) }));
 
   return <SellerPage title="Notifications" description="Review updates about your products and respond to supported requests." actions={filter !== "outgoing" ? <button className="seller-button" disabled={busy} onClick={() => void markAll()}><CheckCheck size={18} strokeWidth={1.8} aria-hidden="true" />{t("Mark all as read")}</button> : undefined}>
     <div className="seller-toolbar seller-notifications-toolbar">
@@ -206,46 +280,73 @@ export default function SellerNotificationsPage() {
     {loading && !items.length ? <SellerLoadingState label={t("Loading notifications…")} rows={3} /> : items.length ? <div className="seller-stack seller-notifications-list">
       {items.map(item => {
         const type = item.notification_type.toLowerCase();
-        const Icon = iconFor(type);
         const tone = sellerNotificationTone(type);
         const isSale = tone === "sale";
-        const hasSaleDetails = isSale && (item.afterbuy_qty_sold != null || item.afterbuy_marketplace || item.afterbuy_stock_synced != null);
         const isPriceOffer = type === "price_negotiation_offer";
-        const responseState = availabilityResponseState(item, item.product_id ? answeredProducts.has(item.product_id) : false);
         const productName = item.product_title?.trim();
-        const productNameAlreadyShown = !!productName && [item.title, item.body].some(text => text.toLocaleLowerCase(locale).includes(productName.toLocaleLowerCase(locale)));
+        const savedAnswer = availabilityAnswers[item.id];
+        const responseState = availabilityResponseState(item, savedAnswer !== undefined);
+        const Icon = responseState === "pending" ? CircleQuestionMark : responseState === "answered" ? Bell : iconFor(type);
+        const hasSaleDetails = isSale && hasStructuredSaleDetails(item);
+        const saleBodyDetails = isSale ? sellerSaleBodyDetails(item.body, item.title, productName ?? null, item.afterbuy_qty_sold ?? null) : "";
+        const priceState = priceOfferDisplayState(item);
+        const priceAccepted = priceState === "accepted";
+        const priceDeclined = priceState === "declined";
+        const priceSuperseded = item.price_negotiation_status === "superseded";
+        const priceResponded = isPriceOffer && ["accepted", "declined", "unknown"].includes(priceState);
+        const pricePending = isPriceOffer && priceState === "pending" && filter !== "outgoing";
+        const visibleProductContext = isPriceOffer ? item.body : `${item.title}\n${item.body}`;
+        const productNameAlreadyShown = !!productName && visibleProductContext.toLocaleLowerCase(locale).includes(productName.toLocaleLowerCase(locale));
         const productId = item.product_id;
         const isBusy = productId !== null && busyProducts.has(productId);
         const uncertain = productId !== null && uncertainProducts.has(productId);
-        const answered = responseState === "answered";
-        const pending = responseState === "pending" && filter !== "outgoing";
-        return <article className={`seller-card seller-notification seller-notification-${tone}${item.is_read ? " read" : " unread"}${answered ? " answered" : ""}`} key={item.id}>
+        const isPriceBusy = priceOfferActions.has(item.id);
+        const answered = isPriceOffer && priceAccepted;
+        const pending = isPriceOffer ? pricePending : responseState === "pending" && filter !== "outgoing";
+        const availabilityClass = responseState === "answered" ? " availability-unknown" : responseState === "pending" ? " availability-pending" : "";
+        return <article className={`seller-card seller-notification seller-notification-${tone}${item.is_read ? " read" : " unread"}${answered ? " answered" : ""}${availabilityClass}${isPriceOffer && priceDeclined ? " price-declined" : ""}${isPriceOffer && priceState === "unknown" ? " price-unknown" : ""}`} key={item.id}>
           <div className="seller-notification-heading">
             <div className="seller-notification-main">
-              <div className="seller-notification-meta"><span className="seller-notification-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-badge">{t(categoryFor(type))}</span><time dateTime={item.created_at}>{new Date(item.created_at).toLocaleString(locale)}</time></div>
-              <h2 data-seller-translate="skip">{isSale ? t("Your product has sold") : item.title || type.replaceAll("_", " ")}</h2>
+              <div className="seller-notification-meta"><span className="seller-notification-icon"><Icon size={18} strokeWidth={1.8} aria-hidden="true" /></span><span className="seller-badge">{t(categoryFor(type))}</span><time dateTime={item.created_at}>{dateFormatter.format(new Date(item.created_at))}</time></div>
+              <h2 data-seller-translate={isSale || isPriceOffer ? undefined : "skip"}>{isSale ? t("Product sold") : isPriceOffer ? t("Price offer") : item.title || type.replaceAll("_", " ")}</h2>
             </div>
             <div className="seller-notification-states">
               <span className={`seller-badge${item.is_read ? "" : " pending"}`}>{t(item.is_read ? "Read" : "Unread")}</span>
               {pending && <span className="seller-badge pending">{t("Awaiting response")}</span>}
-              {answered && <span className="seller-badge approved">{t("Response sent")}</span>}
+              {isPriceOffer && priceSuperseded && <span className="seller-badge">{t("Offer no longer active")}</span>}
             </div>
           </div>
-          {item.body && !hasSaleDetails && <p data-seller-translate="skip">{item.body}</p>}
+          {!isSale && item.body && <p data-seller-translate="skip">{item.body}</p>}
           {productName && (isSale || !productNameAlreadyShown) && <p className="seller-notification-product">{t("Product")}: <strong data-seller-translate="skip">{productName}</strong></p>}
-          {hasSaleDetails && <>
-            <dl className="seller-sale-details">
+          {isSale && <>
+            {hasSaleDetails && <dl className="seller-sale-details">
               {item.afterbuy_qty_sold != null && <div><dt>{t("Quantity sold")}</dt><dd data-seller-translate="skip">{new Intl.NumberFormat(locale).format(item.afterbuy_qty_sold)}</dd></div>}
               {item.afterbuy_marketplace && <div><dt>{t("Marketplace")}</dt><dd data-seller-translate="skip">{item.afterbuy_marketplace}</dd></div>}
-              {item.afterbuy_stock_synced != null && <div><dt>{t("Stock update")}</dt><dd>{t(item.afterbuy_stock_synced ? "Stock synchronized" : "Stock synchronization pending")}</dd></div>}
-            </dl>
-            {(item.body || item.title) && <details className="seller-notification-original"><summary>{t("Original notification")}</summary><p data-seller-translate="skip">{item.title}</p><p data-seller-translate="skip">{item.body}</p></details>}
+            </dl>}
+            {item.afterbuy_stock_synced === true && <p className="seller-sale-stock"><CircleCheck size={16} aria-hidden="true" />{t("Stock synchronized")}</p>}
+            {saleBodyDetails && (hasSaleDetails
+              ? <details className="seller-notification-original"><summary>{t("More sale details")}</summary><p className="seller-sale-message" data-seller-translate="skip">{saleBodyDetails}</p></details>
+              : <p className="seller-sale-message" data-seller-translate="skip">{saleBodyDetails}</p>)}
           </>}
-          {isPriceOffer && item.proposed_unit_price && <p>{t("Proposed price")}: <strong data-seller-translate="skip">{item.proposed_unit_price} {item.proposed_currency}</strong></p>}
-          {pending && <p className="seller-notification-availability-help">{t("Please confirm whether this product is currently available.")}</p>}
-          <div className="seller-toolbar seller-notification-actions">
-            {productId && <Link className="seller-button" href={`/seller/products/${productId}`}>{isPriceOffer ? t("Review offer") : t("View product")}</Link>}
-            {pending && productId && !answered && !uncertain && <>
+          {isPriceOffer && priceResponded && <div className={`seller-price-result ${priceState}`}>
+            {priceAccepted ? <CircleCheck size={18} aria-hidden="true" /> : priceDeclined ? <CircleX size={18} aria-hidden="true" /> : <Bell size={18} aria-hidden="true" />}
+            <strong>{t(priceAccepted ? "Offer accepted" : priceDeclined ? "Offer declined" : "Response sent")}</strong>
+          </div>}
+          {isPriceOffer && item.proposed_unit_price != null && <div className="seller-price-proposal"><span>{t("Proposed price")}</span><strong data-seller-translate="skip">{formatNotificationPrice(item.proposed_unit_price, item.proposed_currency, locale)}</strong></div>}
+          {isPriceOffer && priceResponded && item.seller_comment?.trim() && <p className="seller-price-offer-response-comment">{t("Your comment")}: <strong data-seller-translate="skip">{item.seller_comment}</strong></p>}
+          {!isPriceOffer && pending && <p className="seller-notification-availability-help">{t("Please confirm whether this product is currently available.")}</p>}
+          {pricePending && productId && <label className="seller-field seller-price-offer-comment"><span>{t("Optional comment")}</span><textarea rows={2} maxLength={2000} disabled={isPriceBusy} value={priceComments[item.id] ?? ""} placeholder={t("Optional comment")} onChange={event => setPriceComments(current => ({ ...current, [item.id]: event.target.value }))} /></label>}
+          <div className={`seller-toolbar seller-notification-actions${isPriceOffer ? " seller-price-offer-actions" : ""}`}>
+            {pricePending && productId && <>
+              <button className="seller-button primary" disabled={isPriceBusy} onClick={() => void respondToPriceOffer(item, true)}>
+                {isPriceBusy && priceOfferActions.get(item.id) ? <LoaderCircle className="seller-spinner" size={18} aria-hidden="true" /> : <CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />}{isPriceBusy && priceOfferActions.get(item.id) ? t("Sending…") : t("Accept offer")}
+              </button>
+              <button className="seller-button danger" disabled={isPriceBusy} onClick={() => void respondToPriceOffer(item, false)}>
+                {isPriceBusy && !priceOfferActions.get(item.id) ? <LoaderCircle className="seller-spinner" size={18} aria-hidden="true" /> : <CircleX size={18} strokeWidth={1.8} aria-hidden="true" />}{isPriceBusy && !priceOfferActions.get(item.id) ? t("Sending…") : t("Decline offer")}
+              </button>
+            </>}
+            {productId && <Link className="seller-button" href={`/seller/products/${productId}`}>{isPriceOffer ? <><Eye size={18} strokeWidth={1.8} aria-hidden="true" />{t("View product")}</> : t("View product")}</Link>}
+            {!isPriceOffer && pending && productId && !answered && !uncertain && <>
               <button className="seller-button primary" disabled={isBusy} onClick={() => void availability(item, true)}>
                 {isBusy ? <LoaderCircle className="seller-spinner" size={18} aria-hidden="true" /> : <CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />}{t("Available")}
               </button>
@@ -253,7 +354,7 @@ export default function SellerNotificationsPage() {
                 {isBusy ? <LoaderCircle className="seller-spinner" size={18} aria-hidden="true" /> : <CircleX size={18} strokeWidth={1.8} aria-hidden="true" />}{t("Unavailable")}
               </button>
             </>}
-            {uncertain && productId && <button className="seller-button" disabled={isBusy} onClick={() => void refreshAvailabilityStatus(productId)}>
+            {uncertain && productId && <button className="seller-button" disabled={isBusy} onClick={() => void refreshAvailabilityStatus(productId, item.id)}>
               {isBusy ? <LoaderCircle className="seller-spinner" size={18} aria-hidden="true" /> : <Check size={18} strokeWidth={1.8} aria-hidden="true" />}{t("Refresh status")}
             </button>}
             {filter !== "outgoing" && !item.is_read && <button className="seller-button" disabled={busy || isBusy} onClick={() => void markRead(item)}><Check size={18} strokeWidth={1.8} aria-hidden="true" />{t("Mark read")}</button>}

@@ -39,7 +39,7 @@ function loadPage(requestSeller) {
     "@/components/seller/SellerSelect": { SellerSelect: "SellerSelect" },
     "@/components/ui/alert-dialog": dialog,
     "@/components/SellerShell": { SellerNotice: "SellerNotice", SellerPage: "SellerPage" },
-    "@/lib/seller": { clearSellerToken: () => { router.cleared = true; }, sellerRequest: requestSeller },
+    "@/lib/seller": { clearSellerSession: () => { router.cleared = true; }, sellerRequest: requestSeller },
     "@/components/seller/SellerI18n": { useSellerI18n: () => ({ t: value => value }) },
     "@/lib/seller-i18n": { readSellerLocale: value => value, setSellerLocale() {} },
   };

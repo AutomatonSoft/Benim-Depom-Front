@@ -71,8 +71,23 @@ async function refreshAccessTokenRequest() {
   }
 
   const tokens = (await response.json()) as RefreshResponse;
+  // Both portals share a refresh cookie, so its access token may belong to a seller.
+  if (!tokens.access || await hasManagerRole(tokens.access) !== true) {
+    clearTokens();
+    return null;
+  }
   writeToken(ACCESS_TOKEN_KEY, tokens.access);
   return tokens.access;
+}
+
+async function hasManagerRole(access: string): Promise<boolean | null> {
+  const response = await fetch("/api/v1/auth/me/", {
+    credentials: "same-origin",
+    headers: { Authorization: `Bearer ${access}` },
+  });
+  if (!response.ok) return null;
+  const profile = await response.json() as { role?: string };
+  return profile.role === "manager" || profile.role === "admin";
 }
 
 export function apiErrorMessage(data: unknown, fallback: string) {
@@ -108,6 +123,10 @@ export async function authorizedFetch(input: RequestInfo | URL, init: RequestIni
   if (!access) return new Response(null, { status: 401 });
 
   const response = await request(access);
+  if (response.status === 403 && await hasManagerRole(access) === false) {
+    clearTokens();
+    return new Response(null, { status: 401 });
+  }
   if (response.status !== 401) return response;
 
   const refreshedAccess = await refreshAccessToken();

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Bell, ChartNoAxesCombined, CircleAlert, CircleCheck, CircleUserRound, House, LogOut, Package, Plus, Settings } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { clearSellerToken, sellerAvatarInitial, sellerLogout, sellerRequest, type SellerProfile } from "@/lib/seller";
+import { clearSellerSession, clearSellerToken, saveSellerProfileId, sellerAvatarInitial, sellerLogout, sellerRequest, type SellerProfile } from "@/lib/seller";
 import { readSellerLocale, setSellerLocale } from "@/lib/seller-i18n";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import SellerAuthFrame from "@/components/seller/SellerAuthFrame";
@@ -54,6 +54,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
     sellerRequest<SellerProfile>("/api/v1/auth/me/").then((data) => {
       if (!active) return;
       if (data.role !== "seller") { clearSellerToken(); router.replace("/seller/login?denied=1"); return; }
+      saveSellerProfileId(data.id);
       if (data.preferred_language) setSellerLocale(readSellerLocale(data.preferred_language));
       setProfile(data); setSessionError("");
       sellerRequest<{ unread_total?: number }>("/api/v1/notifications/summary/").then((summary) => active && setUnread(summary.unread_total ?? 0)).catch(() => undefined);
@@ -81,7 +82,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   if (!profile && sessionError) return <main className="seller-loading"><div className="seller-card"><p role="alert">{t(sessionError)}</p><button className="seller-button" onClick={()=>setRetry(value=>value+1)}>{t("Retry session check")}</button></div></main>;
   if (!profile) return <main className="seller-loading"><SellerLoadingState label={t("Loading your workspace…")} rows={4} /></main>;
 
-  async function logout() { try { await sellerLogout(); } catch { clearSellerToken(); } router.replace("/seller/login"); }
+  async function logout() { try { await sellerLogout(); } catch { clearSellerSession(); } router.replace("/seller/login"); }
   const avatarInitial = sellerAvatarInitial(profile);
 
   return <div className="seller-shell">

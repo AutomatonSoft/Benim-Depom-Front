@@ -34,11 +34,9 @@ export default function SellerProfilePage() {
     setNotice("");
     setBusy(true);
     try {
-      const { preferred_language, ...fields } = form;
-      await sellerRequest("/api/v1/auth/me/", { method: "PATCH", body: JSON.stringify(fields) });
-      await sellerRequest("/api/v1/auth/me/language/", { method: "PATCH", body: JSON.stringify({ language: preferred_language }) });
-      setSellerLocale(readSellerLocale(preferred_language));
-      setProfile(current => current ? { ...current, ...fields, preferred_language: readSellerLocale(preferred_language) } : current);
+      const saved = await sellerRequest<SellerProfile>("/api/v1/auth/me/", { method: "PATCH", body: JSON.stringify(form) });
+      setSellerLocale(readSellerLocale(saved.preferred_language));
+      setProfile(saved);
       setNotice("Profile saved.");
     } catch (value) {
       setError(value instanceof Error ? value.message : "Could not save profile.");

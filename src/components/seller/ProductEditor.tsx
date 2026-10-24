@@ -12,7 +12,7 @@ import { SellerSearchableSelect, SellerSelect } from "@/components/seller/Seller
 import { SellerApiError, sellerRequest, type SellerProduct, type SellerVariant } from "@/lib/seller";
 import { sellerProductErrorDetails } from "@/lib/seller-product-errors";
 import { Input } from "@/components/ui/input";
-import { sellerMaterialInputs, sellerMaterials, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
+import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
 
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
@@ -107,6 +107,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   }
 
   function updateFiles(next: File[]) {
+    idempotencyKey.current = null;
     setFiles(next);
     setPreviews(next.map(file => URL.createObjectURL(file)));
   }
@@ -201,10 +202,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
         let updateBody: BodyInit;
         const headers: HeadersInit = {};
         if (files.length) {
-          const form = new FormData();
-          Object.entries(payload).forEach(([key, value]) =>
-            form.append(key, ["variants", "set_parts", "otto_attributes"].includes(key) ? JSON.stringify(value) : String(value)),
-          );
+          const form = sellerProductFormData(payload);
           files.forEach(file => form.append("images", file));
           updateBody = form;
         } else {
@@ -217,10 +215,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
         setSuccess(saved.status === "submitted" || pending ? t("Your changes were sent for review.") : t("Product saved."));
         window.setTimeout(() => router.push(`/seller/products/${product.id}`), 700);
       } else {
-        const form = new FormData();
-        Object.entries(body).forEach(([key, value]) =>
-          form.append(key, ["variants", "set_parts", "otto_attributes"].includes(key) ? JSON.stringify(value) : String(value)),
-        );
+        const form = sellerProductFormData(body);
         files.forEach(file => form.append("images", file));
         idempotencyKey.current ??= crypto.randomUUID();
         const created = await sellerRequest<SellerProduct>("/api/v1/products/", {
@@ -249,7 +244,8 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   }
 
   async function removeImage(imageId: number) {
-    if (!product || !window.confirm(t("Remove this product photo?"))) return;
+    if (!product || submitInFlight.current || !window.confirm(t("Remove this product photo?"))) return;
+    submitInFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -258,12 +254,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     } catch (e) {
       setError(e instanceof Error ? e.message : t("Could not remove image."));
     } finally {
+      submitInFlight.current = false;
       setBusy(false);
     }
   }
 
   async function makePrimary(imageId: number) {
-    if (!product) return;
+    if (!product || submitInFlight.current) return;
+    submitInFlight.current = true;
     setBusy(true);
     setError("");
     try {
@@ -272,14 +270,16 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     } catch (e) {
       setError(e instanceof Error ? e.message : t("Could not update primary image."));
     } finally {
+      submitInFlight.current = false;
       setBusy(false);
     }
   }
 
   async function moveExisting(index: number, step: number) {
-    if (!product) return;
+    if (!product || submitInFlight.current) return;
     const target = index + step;
     if (target < 0 || target >= product.images.length) return;
+    submitInFlight.current = true;
     const imageIds = product.images.map(image => image.id);
     [imageIds[index], imageIds[target]] = [imageIds[target], imageIds[index]];
     setBusy(true);
@@ -290,6 +290,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     } catch (e) {
       setError(e instanceof Error ? e.message : t("Could not reorder photos."));
     } finally {
+      submitInFlight.current = false;
       setBusy(false);
     }
   }
