@@ -95,9 +95,8 @@ async function loadFallbackDashboard(): Promise<Dashboard> {
     authorizedFetch("/api/v1/manager/users/sellers/?is_active=true&page=1"),
   ]);
 
-  if (!submittedResponse.ok || !sellersResponse.ok) {
-    throw new Error("fallback failed");
-  }
+  if (!submittedResponse.ok) throw new Error(`Products HTTP ${submittedResponse.status}`);
+  if (!sellersResponse.ok) throw new Error(`Sellers HTTP ${sellersResponse.status}`);
 
   const submitted = (await submittedResponse.json()) as ListResponse<FallbackProduct>;
   const sellers = (await sellersResponse.json()) as ListResponse<{ date_joined?: string }>;
@@ -125,6 +124,7 @@ export default function Home() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     if (!window.localStorage.getItem("benim_access_token")) {
@@ -160,17 +160,23 @@ export default function Home() {
             free_eans: data.free_eans ?? { jv: 0, xl: 0, total: 0 },
           });
         } else {
-          setDashboard(await loadFallbackDashboard());
+          try {
+            setDashboard(await loadFallbackDashboard());
+          } catch (fallbackError) {
+            const detail = fallbackError instanceof Error ? fallbackError.message : "fallback failed";
+            throw new Error(`Dashboard HTTP ${dashboardResponse.status}; ${detail}`);
+          }
         }
-      } catch {
-        setError(t("overview.loadError"));
+      } catch (cause) {
+        const detail = cause instanceof Error ? cause.message : "";
+        setError(detail ? `${t("overview.loadError")} (${detail})` : t("overview.loadError"));
       } finally {
         setLoading(false);
       }
     }
 
     void loadOverview();
-  }, [t]);
+  }, [reloadCount, t]);
 
   const hello = greetingHello(new Date().getHours(), t);
   const name = greetingName(profile, t("overview.there"));
@@ -190,7 +196,14 @@ export default function Home() {
         }
       />
 
-      {error ? <Feedback className="mb-4">{error}</Feedback> : null}
+      {error ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Feedback>{error}</Feedback>
+          <Button type="button" variant="secondary" onClick={() => setReloadCount((count) => count + 1)}>
+            {t("common.refresh")}
+          </Button>
+        </div>
+      ) : null}
 
       <OverviewSectionBanner
         className="mb-4"
@@ -201,24 +214,26 @@ export default function Home() {
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <MetricCard
           label={t("overview.awaitingReview")}
-          value={loading ? "—" : dashboard?.awaiting_review ?? 0}
-          hint={t("overview.today", { count: dashboard?.awaiting_review_today ?? 0 })}
+          value={loading || !dashboard ? "—" : dashboard.awaiting_review}
+          hint={dashboard ? t("overview.today", { count: dashboard.awaiting_review_today }) : "—"}
         />
         <MetricCard
           label={t("overview.publishedToday")}
-          value={loading ? "—" : dashboard?.published_today ?? 0}
+          value={loading || !dashboard ? "—" : dashboard.published_today}
           hint={
-            (dashboard?.published_today_marketplaces ?? 0) === 0
+            !dashboard
+              ? "—"
+              : dashboard.published_today_marketplaces === 0
               ? t("overview.noListingsToday")
-              : dashboard?.published_today_marketplaces === 1
-                ? t("overview.acrossMarketplaces", { count: dashboard?.published_today_marketplaces ?? 0 })
-                : t("overview.acrossMarketplacesPlural", { count: dashboard?.published_today_marketplaces ?? 0 })
+              : dashboard.published_today_marketplaces === 1
+                ? t("overview.acrossMarketplaces", { count: dashboard.published_today_marketplaces })
+                : t("overview.acrossMarketplacesPlural", { count: dashboard.published_today_marketplaces })
           }
         />
         <MetricCard
           label={t("overview.activeSellers")}
-          value={loading ? "—" : dashboard?.active_sellers ?? 0}
-          hint={t("overview.thisMonth", { count: dashboard?.sellers_joined_this_month ?? 0 })}
+          value={loading || !dashboard ? "—" : dashboard.active_sellers}
+          hint={dashboard ? t("overview.thisMonth", { count: dashboard.sellers_joined_this_month }) : "—"}
         />
       </div>
 
@@ -227,8 +242,8 @@ export default function Home() {
           <ChannelCard
             key={`${listing.marketplace}-${listing.account}`}
             label={channelLabel(listing)}
-            value={loading ? "—" : listing.count}
-            active={!loading && listing.count > 0}
+            value={loading || !dashboard ? "—" : listing.count}
+            active={!loading && Boolean(dashboard) && listing.count > 0}
             hint={t("overview.activeListings")}
           />
         ))}
@@ -236,15 +251,15 @@ export default function Home() {
 
       <div className="mb-8 grid gap-3 sm:grid-cols-2">
         <MetricCard
-          tone={(dashboard?.free_eans?.jv ?? 0) < 20 ? "warning" : "default"}
+          tone={dashboard && dashboard.free_eans.jv < 20 ? "warning" : "default"}
           label={t("overview.freeEanJv")}
-          value={loading ? "—" : dashboard?.free_eans?.jv ?? 0}
+          value={loading || !dashboard ? "—" : dashboard.free_eans.jv}
           hint={t("overview.availableInPool")}
         />
         <MetricCard
-          tone={(dashboard?.free_eans?.xl ?? 0) < 20 ? "warning" : "default"}
+          tone={dashboard && dashboard.free_eans.xl < 20 ? "warning" : "default"}
           label={t("overview.freeEanXl")}
-          value={loading ? "—" : dashboard?.free_eans?.xl ?? 0}
+          value={loading || !dashboard ? "—" : dashboard.free_eans.xl}
           hint={t("overview.availableInPool")}
         />
       </div>

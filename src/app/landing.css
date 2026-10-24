@@ -102,6 +102,7 @@
 .bd-landing .btn-whatsapp:hover { background: #1ebe59; }
 .bd-landing .btn-block { width: 100%; }
 .bd-landing .btn svg { width: 18px; height: 18px; flex: none; }
+.bd-landing .btn > span { display: inline-flex; align-items: center; gap: 8px; }
 
 /* header */
 .bd-landing .site-header {
@@ -127,6 +128,7 @@
 .bd-landing .main-nav a:hover { background: var(--surface-alt); color: var(--ink); }
 
 .bd-landing .header-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.bd-landing .seller-login-nav-btn { padding: 9px 13px; font-size: 0.84rem; }
 .bd-landing .lang-switch { display: flex; align-items: center; gap: 2px; background: var(--surface-alt); border-radius: 999px; padding: 3px; flex: none; }
 .bd-landing .lang-switch button {
   border: none; background: transparent; padding: 5px 9px; border-radius: 999px; white-space: nowrap;
@@ -164,6 +166,7 @@
 @media (max-width: 560px) {
   .bd-landing .wa-nav-btn,
   .bd-landing .privacy-nav-btn { display: none; }
+  .bd-landing .seller-login-nav-btn { display: none; }
 }
 
 /* hero */

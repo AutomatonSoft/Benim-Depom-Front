@@ -21,20 +21,23 @@ jobs:
 
     steps:
       - name: Validate allowed Pull Request direction
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_BRANCH: ${{ github.head_ref }}
         shell: bash
         run: |
-          if [[ "${{ github.base_ref }}" == "local" && "${{ github.head_ref }}" != feature/* ]]; then
+          if [[ "$BASE_BRANCH" == "local" && "$HEAD_BRANCH" != feature/* ]]; then
             echo "Only Pull Requests feature/* -> local are allowed."
             exit 1
           fi
 
-          if [[ "${{ github.base_ref }}" == "stage" && "${{ github.head_ref }}" != "local" ]]; then
-            echo "Only Pull Requests local -> stage are allowed."
+          if [[ "$BASE_BRANCH" == "stage" && "$HEAD_BRANCH" != "local" && "$HEAD_BRANCH" != feature/* && "$HEAD_BRANCH" != hotfix/* ]]; then
+            echo "Only Pull Requests feature/*, local or hotfix/* -> stage are allowed."
             exit 1
           fi
 
-          if [[ "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" != "stage" ]]; then
-            echo "Only Pull Requests stage -> main are allowed."
+          if [[ "$BASE_BRANCH" == "main" && "$HEAD_BRANCH" != "stage" && "$HEAD_BRANCH" != hotfix/* ]]; then
+            echo "Only Pull Requests stage or hotfix/* -> main are allowed."
             exit 1
           fi
 

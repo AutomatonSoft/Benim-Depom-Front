@@ -144,11 +144,10 @@ export default function DeleteAccountPage() {
     setIsLoading(true);
 
     try {
-      const loginResponse = await fetch("/api/v1/auth/login/", {
+      const loginResponse = await fetch("/portal-auth/seller/login/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Refresh-Token-Cookie": "seller",
         },
         credentials: "same-origin",
         body: JSON.stringify({ email: email.trim(), password }),
