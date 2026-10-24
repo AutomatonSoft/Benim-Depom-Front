@@ -39,7 +39,7 @@ export default function LoginPage() {
       });
 
       if (!loginResponse.ok) {
-        setError(t("login.badCredentials"));
+        setError(t(loginResponse.status === 401 ? "login.badCredentials" : loginResponse.status === 403 ? "login.verifyFailed" : "common.apiUnreachable"));
         return;
       }
 
