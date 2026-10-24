@@ -16,6 +16,8 @@ const useLocalApiProxy = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Saving 20 photos to FTP can exceed the dev proxy's default 30 seconds.
+  ...(useLocalApiProxy ? { experimental: { proxyTimeout: 180_000 } } : {}),
   // Dev API proxy needs the Django trailing slash kept. Without this, Next
   // 308-redirects /api/.../login/ → /api/.../login and the login POST never hits Django.
   // Stage/prod: /api is served by nginx, not Next, so this only affects page URLs lightly.

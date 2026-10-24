@@ -1,25 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Save, Star, Tag, Trash2, Warehouse, type LucideIcon } from "lucide-react";
+import { Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Save, Star, Tag, Trash2, Warehouse, X, type LucideIcon } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
 import SellerProductImage from "@/components/seller/SellerProductImage";
 import { SellerSearchableSelect, SellerSelect } from "@/components/seller/SellerSelect";
-import { SellerApiError, sellerRequest, type SellerProduct, type SellerVariant } from "@/lib/seller";
+import { SellerApiError, sellerRequest, type SellerImage, type SellerProduct, type SellerVariant } from "@/lib/seller";
 import { sellerProductErrorDetails } from "@/lib/seller-product-errors";
+import { makeSellerPhotoPrimary, reorderSellerPhoto } from "@/lib/seller-product-photos";
 import { Input } from "@/components/ui/input";
-import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerProductReviewFields, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
 
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
   title: string;
   product_type: string;
   unit_price: string;
-  currency: "TRY" | "EUR" | "USD";
+  currency: "" | "TRY" | "EUR" | "USD";
   warehouse_city: string;
   color: string;
   material1: string;
@@ -32,12 +33,15 @@ type Fields = {
   comment: string;
 };
 type SetPart = SellerProduct["set_parts"][number];
+type EditorPhoto =
+  | { key: string; kind: "saved"; image: SellerImage }
+  | { key: string; kind: "new"; file: File; preview: string };
 type SetPartField = "description" | "width_cm" | "height_cm" | "length_cm";
 
 const empty: Fields = {
-  title: "", product_type: "", unit_price: "", currency: "TRY", warehouse_city: "INE",
+  title: "", product_type: "", unit_price: "", currency: "", warehouse_city: "",
   color: "", material1: "", material2: "", material_composition: "", width_cm: "", height_cm: "",
-  length_cm: "", quantity: "1", comment: "",
+  length_cm: "", quantity: "", comment: "",
 };
 
 function fieldsFor(product: SellerProduct): Fields {
@@ -59,39 +63,61 @@ function fieldsFor(product: SellerProduct): Fields {
   };
 }
 
-export default function ProductEditor({ product }: { product?: SellerProduct }) {
+export default function ProductEditor({ product, onSavingChange, readOnly = false }: { product?: SellerProduct; onSavingChange?: (saving: boolean) => void; readOnly?: boolean }) {
   const { t } = useSellerI18n();
-  const router = useRouter();
-  const [fields, setFields] = useState<Fields>(product ? () => fieldsFor(product) : empty);
-  const [setParts, setSetParts] = useState<SetPart[]>(() => product?.set_parts || []);
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const initialProduct = product ? { ...product, ...product.pending_changes, images: product.images } as SellerProduct : undefined;
+  const [fields, setFields] = useState<Fields>(initialProduct ? () => fieldsFor(initialProduct) : empty);
+  const [setParts, setSetParts] = useState<SetPart[]>(() => initialProduct?.set_parts || []);
+  const [photos, setPhotos] = useState<EditorPhoto[]>(() => [...(product?.images || [])]
+    .sort((first, second) => Number(second.is_primary) - Number(first.is_primary))
+    .map(image => ({ key: `saved-${image.id}`, kind: "saved", image })));
+  const files = photos.flatMap(photo => photo.kind === "new" ? [photo.file] : []);
+  const existingImages = photos.flatMap((photo, index) => photo.kind === "saved" ? [{ ...photo.image, is_primary: index === 0 }] : []);
+  const savedProduct = useRef(product);
+  const previewUrls = useRef(new Set<string>());
+  const draggedPhoto = useRef<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<EditorPhoto | null>(null);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
-  const [resubmit, setResubmit] = useState(false);
   const [otto, setOtto] = useState<OttoValue>(() => ({
-    group: product?.otto_category_group_id ?? null,
-    category: product?.otto_category_id ?? null,
-    attributes: product?.otto_attributes ?? {},
+    group: initialProduct?.otto_category_group_id ?? null,
+    category: initialProduct?.otto_category_id ?? null,
+    attributes: initialProduct?.otto_attributes ?? {},
   }));
   const idempotencyKey = useRef<string | null>(null);
   const submitInFlight = useRef(false);
   const submitted = useRef(false);
   const invalidFieldScrollScheduled = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const scrollToServerError = useRef(false);
 
-  useEffect(() => () => previews.forEach(URL.revokeObjectURL), [previews]);
+  useEffect(() => {
+    if (!scrollToServerError.current) return;
+    scrollToServerError.current = false;
+    formRef.current?.querySelector<HTMLElement>(".seller-field-error")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [fieldErrors]);
+
+  useEffect(() => {
+    const urls = previewUrls.current;
+    return () => { urls.forEach(URL.revokeObjectURL); urls.clear(); };
+  }, []);
 
   function centerInvalidField(event: FormEvent<HTMLFormElement>) {
     if (invalidFieldScrollScheduled.current) return true;
     const selector = "input:invalid, select:invalid, textarea:invalid";
-    const firstInvalid = event.currentTarget.querySelector<HTMLElement>(selector);
+    const missingProductType = !fields.product_type.trim();
+    const missingWarehouseCity = !fields.warehouse_city;
+    const missingCurrency = !fields.currency;
+    const missingPhotos = photos.length === 0;
+    const invalidSelectors = [selector, ...(missingPhotos ? [".seller-photo-dropzone"] : []), ...(missingProductType ? [".seller-product-type-field"] : []), ...(missingWarehouseCity ? [".seller-warehouse-city-field"] : []), ...(missingCurrency ? [".seller-currency-field"] : [])];
+    const firstInvalid = event.currentTarget.querySelector<HTMLElement>(invalidSelectors.join(", "));
     if (!firstInvalid) return false;
     const errors = Array.from(event.currentTarget.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selector))
       .filter(field => field.name)
       .map(field => [field.name, field.validity.valueMissing ? t("This field is required.") : field.validationMessage] as const);
-    setFieldErrors(current => ({ ...current, ...Object.fromEntries(errors) }));
+    setFieldErrors(current => ({ ...current, ...Object.fromEntries(errors), ...(missingPhotos ? { images: t("Add at least one product photo.") } : {}), ...(missingProductType ? { product_type: t("This field is required.") } : {}), ...(missingWarehouseCity ? { warehouse_city: t("This field is required.") } : {}), ...(missingCurrency ? { currency: t("This field is required.") } : {}) }));
     invalidFieldScrollScheduled.current = true;
     window.setTimeout(() => {
       firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -106,16 +132,10 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     setFields(current => ({ ...current, [key]: value }));
   }
 
-  function updateFiles(next: File[]) {
-    idempotencyKey.current = null;
-    setFiles(next);
-    setPreviews(next.map(file => URL.createObjectURL(file)));
-  }
-
   function chooseFiles(selected: File[]) {
+    if (readOnly || submitInFlight.current) return;
     if (selected.length === 0) return;
-    const next = [...files, ...selected];
-    if (next.length + (product?.images.length || 0) > 20) {
+    if (photos.length + selected.length > 20) {
       setError(t("A product can have at most 20 photos."));
       return;
     }
@@ -129,7 +149,12 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     idempotencyKey.current = null;
     setError("");
     setFieldErrors(current => { const next = { ...current }; delete next.images; return next; });
-    updateFiles(next);
+    const added: EditorPhoto[] = selected.map(file => {
+      const preview = URL.createObjectURL(file);
+      previewUrls.current.add(preview);
+      return { key: crypto.randomUUID(), kind: "new", file, preview };
+    });
+    setPhotos(current => [...current, ...added]);
   }
 
   function updateSetPart(index: number, key: SetPartField, value: string) {
@@ -138,30 +163,35 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
     setSetParts(current => current.map((part, position) => position === index ? { ...part, [key]: value } : part));
   }
 
-  function moveFile(index: number, step: number) {
-    const target = index + step;
-    if (target < 0 || target >= files.length) return;
-    const reordered = [...files];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    updateFiles(reordered);
+  function makePrimary(index: number) {
+    if (readOnly || submitInFlight.current) return;
+    idempotencyKey.current = null;
+    setPhotos(current => makeSellerPhotoPrimary(current, index));
   }
 
-  function removeFile(index: number) {
-    updateFiles(files.filter((_, current) => current !== index));
+  function movePhoto(from: number, to: number) {
+    if (readOnly || submitInFlight.current) return;
+    idempotencyKey.current = null;
+    setPhotos(current => reorderSellerPhoto(current, from, to));
+  }
+
+  function removePhoto(key: string) {
+    if (readOnly || submitInFlight.current) return;
+    idempotencyKey.current = null;
+    const photo = photos.find(item => item.key === key);
+    if (photo?.kind === "new") {
+      URL.revokeObjectURL(photo.preview);
+      previewUrls.current.delete(photo.preview);
+    }
+    setPhotos(current => current.filter(photo => photo.key !== key));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitInFlight.current || submitted.current) return;
+    if (readOnly || submitInFlight.current || submitted.current) return;
     if (centerInvalidField(event)) return;
     setError("");
     setFieldErrors({});
-    setSuccess("");
-    if (!fields.product_type.trim()) {
-      setFieldErrors({ product_type: t("This field is required.") });
-      event.currentTarget.querySelector<HTMLElement>(".seller-product-type-field")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
     const materials = sellerMaterials(fields.material1, fields.material2);
     if (materials.length < 1 || materials.length > 2) {
       setFieldErrors({ materials: t("Add at least one material.") });
@@ -174,14 +204,9 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       setFieldErrors({ set_parts: t("Complete the description and positive dimensions for each set part.") });
       return;
     }
-    if (!product && files.length === 0) {
-      setFieldErrors({ images: t("Add at least one product photo.") });
-      event.currentTarget.querySelector<HTMLElement>(".seller-photo-dropzone")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-
     submitInFlight.current = true;
     setBusy(true);
+    onSavingChange?.(true);
     const variant: SellerVariant = sellerProductVariant(fields, materials);
     const body = {
       title: fields.title.trim(),
@@ -196,24 +221,56 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
       otto_attributes: otto.attributes,
     };
 
+    let partiallySaved = false;
+    let saveResult: string;
     try {
       if (product) {
-        const payload = { ...body, change_comment: fields.comment, ...(resubmit ? { resubmit_for_moderation: true } : {}) };
-        let updateBody: BodyInit;
-        const headers: HeadersInit = {};
-        if (files.length) {
-          const form = sellerProductFormData(payload);
-          files.forEach(file => form.append("images", file));
-          updateBody = form;
-        } else {
-          headers["Content-Type"] = "application/json";
-          updateBody = JSON.stringify(payload);
+        const baseline = savedProduct.current || product;
+        const keptIds = new Set(existingImages.map(image => image.id));
+        const removedIds = baseline.images.filter(image => !keptIds.has(image.id)).map(image => image.id);
+        const photosChanged = files.length > 0 || removedIds.length > 0 || existingImages.some((image, index) => image.id !== baseline.images[index]?.id || image.is_primary !== baseline.images[index]?.is_primary);
+        const payload = { ...body, ...sellerProductReviewFields(product.status, fields.comment, !photosChanged) };
+        let saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+        savedProduct.current = saved;
+        partiallySaved = true;
+        if (photosChanged) {
+          let desiredPhotos = [...photos];
+          for (const imageId of removedIds) {
+            if (!saved.images.some(image => image.id === imageId)) continue;
+            await sellerRequest(`/api/v1/products/${product.id}/images/${imageId}/`, { method: "DELETE" });
+            saved.images = saved.images.filter(image => image.id !== imageId);
+          }
+          const uploads = desiredPhotos.filter(photo => photo.kind === "new");
+          for (const photo of uploads) {
+            const form = new FormData();
+            form.append("image", photo.file);
+            const image = await sellerRequest<SellerImage>(`/api/v1/products/${product.id}/images/`, { method: "POST", body: form });
+            saved.images = [...saved.images, image];
+            desiredPhotos = desiredPhotos.map(item => item.key === photo.key ? { key: photo.key, kind: "saved", image } : item);
+            setPhotos([...desiredPhotos]);
+            URL.revokeObjectURL(photo.preview);
+            previewUrls.current.delete(photo.preview);
+          }
+          const imageIds = desiredPhotos.flatMap(photo => photo.kind === "saved" ? [photo.image.id] : []);
+          const primaryId = imageIds[0];
+          if (imageIds.some((imageId, index) => imageId !== saved.images[index]?.id)) {
+            await sellerRequest(`/api/v1/products/${product.id}/images/reorder/`, { method: "POST", body: JSON.stringify({ image_ids: imageIds }) });
+            saved.images = imageIds.map((id, index) => ({ ...saved.images.find(image => image.id === id)!, is_primary: index === 0 }));
+          }
+          if (primaryId && saved.images.find(image => image.is_primary)?.id !== primaryId) {
+            await sellerRequest(`/api/v1/products/${product.id}/images/${primaryId}/make-primary/`, { method: "POST", body: "{}" });
+            saved.images = saved.images.map(image => ({ ...image, is_primary: image.id === primaryId }));
+          }
+          if (["draft", "rejected", "withdrawn"].includes(product.status)) {
+            saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`, { method: "PATCH", body: JSON.stringify(sellerProductReviewFields(product.status, fields.comment, true)) });
+          } else {
+            saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`);
+          }
+          savedProduct.current = saved;
         }
-        const saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`, { method: "PATCH", headers, body: updateBody });
         submitted.current = true;
         const pending = !!saved.pending_changes && Object.keys(saved.pending_changes).length > 0;
-        setSuccess(saved.status === "submitted" || pending ? t("Your changes were sent for review.") : t("Product saved."));
-        window.setTimeout(() => router.push(`/seller/products/${product.id}`), 700);
+        saveResult = saved.status === "submitted" || pending ? "updated-review" : "updated";
       } else {
         const form = sellerProductFormData(body);
         files.forEach(file => form.append("images", file));
@@ -225,73 +282,24 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
         });
         submitted.current = true;
         idempotencyKey.current = null;
-        const status = created.status.replaceAll("_", " ");
-        setSuccess(t("Product created with status: {status}", { status: t(status.charAt(0).toUpperCase() + status.slice(1)) }));
-        window.setTimeout(() => router.push(`/seller/products/${created.id}`), 700);
+        saveResult = created.status === "submitted" ? "created-review" : "created";
       }
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- Fully reload the catalogue after a completed save.
+      window.location.assign(`/seller/products?saved=${saveResult}`);
     } catch (e) {
       if (e instanceof SellerApiError) {
         const details = sellerProductErrorDetails(e.data);
+        scrollToServerError.current = Object.keys(details.fields).length > 0;
         setFieldErrors(details.fields);
         setError(details.message || (Object.keys(details.fields).length ? t("Some product details need attention. Review the highlighted fields.") : e.message));
       } else {
         setError(e instanceof Error ? e.message : t("Could not save product."));
       }
+      if (partiallySaved) setError(current => `${t("Some changes were saved. Save again to finish the remaining changes.")} ${current}`);
     } finally {
       if (!submitted.current) submitInFlight.current = false;
       setBusy(submitted.current);
-    }
-  }
-
-  async function removeImage(imageId: number) {
-    if (!product || submitInFlight.current || !window.confirm(t("Remove this product photo?"))) return;
-    submitInFlight.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      await sellerRequest(`/api/v1/products/${product.id}/images/${imageId}/`, { method: "DELETE" });
-      window.location.reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("Could not remove image."));
-    } finally {
-      submitInFlight.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function makePrimary(imageId: number) {
-    if (!product || submitInFlight.current) return;
-    submitInFlight.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      await sellerRequest(`/api/v1/products/${product.id}/images/${imageId}/make-primary/`, { method: "POST", body: "{}" });
-      window.location.reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("Could not update primary image."));
-    } finally {
-      submitInFlight.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function moveExisting(index: number, step: number) {
-    if (!product || submitInFlight.current) return;
-    const target = index + step;
-    if (target < 0 || target >= product.images.length) return;
-    submitInFlight.current = true;
-    const imageIds = product.images.map(image => image.id);
-    [imageIds[index], imageIds[target]] = [imageIds[target], imageIds[index]];
-    setBusy(true);
-    setError("");
-    try {
-      await sellerRequest(`/api/v1/products/${product.id}/images/reorder/`, { method: "POST", body: JSON.stringify({ image_ids: imageIds }) });
-      window.location.reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t("Could not reorder photos."));
-    } finally {
-      submitInFlight.current = false;
-      setBusy(false);
+      onSavingChange?.(false);
     }
   }
 
@@ -313,9 +321,9 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
   const heading = (title: string, Icon: LucideIcon, accent = "navy") => <div className={`seller-editor-heading ${accent}`}><span className="seller-editor-icon"><Icon size={20} strokeWidth={1.8} aria-hidden="true" /></span><h2>{t(title)}</h2></div>;
 
   return <SellerLocalized>
-    <form className="seller-product-form" noValidate onSubmit={submit}>
+    <form ref={formRef} className="seller-product-form" noValidate onSubmit={submit}>
       {error && <SellerNotice>{error}</SellerNotice>}
-      {success && <SellerNotice kind="success">{success}</SellerNotice>}
+      <fieldset className="seller-editor-fields" disabled={busy || readOnly}>
       <div className="seller-product-form-layout">
         <div className="seller-product-form-main">
           <section className="seller-card seller-photo-upload" onDragOver={event => event.preventDefault()} onDrop={event => {
@@ -323,49 +331,82 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             chooseFiles(Array.from(event.dataTransfer.files));
           }}>
             {heading(product ? "Add photos" : "Product photos", Camera, "orange")}
-            <label className={`seller-photo-dropzone${fieldErrors.images ? " invalid" : ""}`}>
-              <span className="seller-upload-camera"><Camera size={30} strokeWidth={1.8} aria-hidden="true" /></span>
-              <strong>{t("Photograph your product")}</strong>
-              <span>{t("Select or drop photos")}</span>
-              <small>{t(product ? "Add JPEG, PNG, or WebP photos up to 40 MB each. 20 photos total, including existing photos." : "Up to 20 photos. The first photo will be the main image. JPEG, PNG, or WebP, up to 40 MB each.")}</small>
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("Photos")} aria-required={!product} aria-invalid={Boolean(fieldErrors.images)} onChange={event => {
-                chooseFiles(Array.from(event.target.files || []));
-                event.currentTarget.value = "";
-              }} />
-            </label>
+            <div className={existingImages.length + files.length > 0 ? "seller-photo-gallery" : undefined}>
+              {photos.map((photo, index) => <div
+                className={`seller-gallery-photo${dropTarget === photo.key ? " drop-target" : ""}`}
+                key={photo.key}
+                role="group"
+                aria-label={`${t("Product photo")} ${index + 1}`}
+                tabIndex={busy || readOnly ? -1 : 0}
+                aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
+                draggable={!busy && !readOnly}
+                onDragStart={event => {
+                  if (busy || readOnly || submitInFlight.current) { event.preventDefault(); return; }
+                  draggedPhoto.current = photo.key;
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", photo.key);
+                }}
+                onDragOver={event => {
+                  if (!draggedPhoto.current) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.dataTransfer.dropEffect = "move";
+                  setDropTarget(photo.key);
+                }}
+                onDrop={event => {
+                  if (!draggedPhoto.current) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  movePhoto(photos.findIndex(item => item.key === draggedPhoto.current), index);
+                  draggedPhoto.current = null;
+                  setDropTarget(null);
+                }}
+                onDragEnd={() => { draggedPhoto.current = null; setDropTarget(null); }}
+                onKeyDown={event => {
+                  if (event.target !== event.currentTarget || !event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+                  event.preventDefault();
+                  movePhoto(index, index + (event.key === "ArrowLeft" ? -1 : 1));
+                }}
+              >
+                <div className={`seller-gallery-frame${index === 0 ? " main" : ""}`}>
+                  <div className="seller-gallery-preview" role="button" tabIndex={0} aria-label={`${t("View photo")} ${index + 1}`} onClick={() => setViewingPhoto(photo)} onKeyDown={event => {
+                    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewingPhoto(photo); }
+                  }}>
+                  {photo.kind === "saved"
+                    ? <SellerProductImage src={photo.image.thumbnail || photo.image.image} alt={index === 0 ? t("Main product photo") : t("Product photo")} />
+                    : <Image unoptimized draggable={false} src={photo.preview} alt={t("Selected product photo {number}", { number: index + 1 })} width={240} height={240} />}
+                  </div>
+                  <button type="button" className="seller-gallery-star" aria-label={`${t("Make main")} ${index + 1}`} aria-pressed={index === 0} title={t("Make main")} onClick={() => makePrimary(index)}><Star size={18} strokeWidth={1.8} aria-hidden="true" /></button>
+                  <button type="button" className="seller-gallery-remove" aria-label={`${t("Remove")}: ${t("Product photo")} ${index + 1}`} title={t("Remove")} onClick={() => removePhoto(photo.key)}><Trash2 size={17} strokeWidth={1.8} aria-hidden="true" /></button>
+                  {index === 0 ? <span className="seller-gallery-main-label">{t("Main photo")}</span> : photo.kind === "new" ? <span className="seller-gallery-new-label">{t("New photo")}</span> : null}
+                </div>
+              </div>)}
+              {photos.length < 20 && <label className={`seller-photo-dropzone${existingImages.length + files.length > 0 ? " seller-photo-add-card" : ""}${fieldErrors.images ? " invalid" : ""}`}>
+                {existingImages.length + files.length > 0 ? <>
+                  <span className="seller-upload-camera"><Camera size={28} strokeWidth={1.8} aria-hidden="true" /></span>
+                  <strong>{t("Add photos")}</strong>
+                </> : <>
+                  <span className="seller-upload-camera"><Camera size={30} strokeWidth={1.8} aria-hidden="true" /></span>
+                  <strong>{t("Photograph your product")}</strong>
+                  <span>{t("Select or drop photos")}</span>
+                  <small>{t(product ? "Add JPEG, PNG, or WebP photos up to 40 MB each. 20 photos total, including existing photos." : "Up to 20 photos. The first photo will be the main image. JPEG, PNG, or WebP, up to 40 MB each.")}</small>
+                </>}
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label={t("Photos")} aria-required={existingImages.length + files.length === 0} aria-invalid={Boolean(fieldErrors.images)} onChange={event => {
+                  chooseFiles(Array.from(event.target.files || []));
+                  event.currentTarget.value = "";
+                }} />
+              </label>}
+            </div>
+            {photos.length > 1 && <p className="seller-gallery-help">{t("Drag photos to change their order. Click the star to swap a photo with the main one.")}</p>}
             {fieldErrors.images && <small className="seller-field-error seller-photo-error">{fieldErrors.images}</small>}
-            <label className="seller-button seller-camera-picker"><Camera size={18} strokeWidth={1.8} aria-hidden="true" />{t("Take photo")}<input className="seller-camera-picker-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
+            {photos.length < 20 && <label className="seller-button seller-camera-picker"><Camera size={18} strokeWidth={1.8} aria-hidden="true" />{t("Take photo")}<input className="seller-camera-picker-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={event => {
               const captured = Array.from(event.target.files || []);
               if (captured.length) chooseFiles(captured);
               event.currentTarget.value = "";
-            }} /></label>
-            {files.length > 0 && <div className="seller-photo-list">{files.map((file, index) => <div className="seller-photo-row" key={`${file.name}-${index}`}>
-              {/* Local previews use blob URLs created by this form. */}
-              <Image unoptimized src={previews[index]} alt={t("Selected product photo {number}", { number: index + 1 })} width={64} height={64} />
-              <span className="seller-photo-name">{!product && index === 0 ? <><Star size={16} strokeWidth={1.8} aria-hidden="true" />{t("Main photo")} · </> : null}{file.name}</span>
-              {!product && <>
-                <button type="button" className="seller-icon-button" aria-label={`${t("Move earlier")}: ${file.name}`} title={t("Move earlier")} disabled={index === 0} onClick={() => moveFile(index, -1)}><ArrowUp size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-                <button type="button" className="seller-icon-button" aria-label={`${t("Move later")}: ${file.name}`} title={t("Move later")} disabled={index === files.length - 1} onClick={() => moveFile(index, 1)}><ArrowDown size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-              </>}
-              <button type="button" className="seller-icon-button danger" aria-label={`${t("Remove")}: ${file.name}`} title={t("Remove")} onClick={() => removeFile(index)}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-            </div>)}</div>}
+            }} /></label>}
           </section>
 
           <div className="seller-product-policy"><Info size={22} aria-hidden="true" /><p>{t("You may list only new products. Used products cannot be uploaded.")}</p></div>
-
-          {product && product.images.length > 0 && <section className="seller-card">
-            {heading("Current photos", Camera, "orange")}
-            <p className="seller-field-hint">{t("Sellers can add, remove, reorder, or choose the main photo. Replacing an existing photo is not available to seller accounts.")}</p>
-            <div className="seller-photo-grid">{product.images.map((image, index) => <div className="seller-photo-tile" key={image.id}>
-              <SellerProductImage src={image.thumbnail || image.image} alt={image.is_primary ? t("Main product photo") : t("Product photo")} />
-              {image.is_primary ? <span className="seller-badge approved"><Star size={16} strokeWidth={1.8} aria-hidden="true" />{t("Main photo")}</span> : <button type="button" className="seller-icon-button" aria-label={`${t("Make main")} ${index + 1}`} title={t("Make main")} disabled={busy} onClick={() => void makePrimary(image.id)}><Star size={18} strokeWidth={1.8} aria-hidden="true" /></button>}
-              <div className="seller-photo-actions">
-                <button type="button" className="seller-icon-button" aria-label={`${t("Move earlier")}: ${t("Product photo")} ${index + 1}`} title={t("Move earlier")} disabled={busy || index === 0} onClick={() => void moveExisting(index, -1)}><ArrowUp size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-                <button type="button" className="seller-icon-button" aria-label={`${t("Move later")}: ${t("Product photo")} ${index + 1}`} title={t("Move later")} disabled={busy || index === product.images.length - 1} onClick={() => void moveExisting(index, 1)}><ArrowDown size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-                <button type="button" className="seller-icon-button danger" aria-label={`${t("Remove")}: ${t("Product photo")} ${index + 1}`} title={t("Remove")} disabled={busy} onClick={() => void removeImage(image.id)}><Trash2 size={18} strokeWidth={1.8} aria-hidden="true" /></button>
-              </div>
-            </div>)}</div>
-          </section>}
 
           <section className="seller-card">
             {heading("Product information", Tag)}
@@ -373,10 +414,10 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
               {field("title", "Product title")}
               <div className="seller-price-row">
                 {field("unit_price", "Unit price", "number")}
-                <label className="seller-field">{t("Currency")}
-                  <SellerSelect value={fields.currency} onValueChange={value => set("currency", value as Fields["currency"])} placeholder={t("Currency")} options={["TRY", "EUR", "USD"].map(currency => ({ value: currency, label: currency }))} />
-                  {fieldErrors.currency && <small className="seller-field-error">{fieldErrors.currency}</small>}
-                </label>
+                <div className="seller-field seller-currency-field"><span>{t("Currency (required)")}</span>
+                  <SellerSelect ariaLabel={t("Currency")} aria-required aria-invalid={Boolean(fieldErrors.currency)} aria-describedby={fieldErrors.currency ? "seller-currency-error" : undefined} value={fields.currency} onValueChange={value => set("currency", value as Fields["currency"])} placeholder={t("Choose a currency")} options={["TRY", "EUR", "USD"].map(currency => ({ value: currency, label: currency }))} />
+                  {fieldErrors.currency && <small id="seller-currency-error" className="seller-field-error">{fieldErrors.currency}</small>}
+                </div>
               </div>
             </div>
           </section>
@@ -384,8 +425,11 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           <section className="seller-card">
             {heading("Product type", Layers, "orange")}
             <div className="seller-field seller-product-type-field">
-              <span>{t("Product type")}</span>
+              <span>{t("Product type (required)")}</span>
               <SellerSearchableSelect
+                aria-required
+                aria-invalid={Boolean(fieldErrors.product_type)}
+                aria-describedby={fieldErrors.product_type ? "seller-product-type-error" : undefined}
                 value={fields.product_type}
                 onValueChange={value => set("product_type", value)}
                 placeholder={t("Choose a product type")}
@@ -397,7 +441,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
                     : []),
                 ]}
               />
-              {fieldErrors.product_type && <small className="seller-field-error">{fieldErrors.product_type}</small>}
+              {fieldErrors.product_type && <small id="seller-product-type-error" className="seller-field-error">{fieldErrors.product_type}</small>}
             </div>
           </section>
 
@@ -406,7 +450,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             setFieldErrors(current => { const next = { ...current }; delete next.otto_attributes; return next; });
             setOtto(value);
           }} />
-          {fieldErrors.otto_attributes && <small className="seller-field-error">{fieldErrors.otto_attributes}</small>}
+          {fieldErrors.otto_attributes && <div role="alert" className="seller-field-error seller-otto-error"><Info size={20} aria-hidden="true" /><span>{fieldErrors.otto_attributes}</span></div>}
 
           <section className="seller-card">
             {heading("Color", Palette)}
@@ -430,7 +474,7 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             </fieldset>
             <div className="seller-size-parts" role="group" aria-labelledby="seller-size-parts-heading">
               <div className="seller-size-parts-summary">
-                <span><strong id="seller-size-parts-heading">{t("Set part sizes (optional)")}</strong><small>{t("Add dimensions for the separate pieces of a product set.")}</small></span>
+                <span><strong id="seller-size-parts-heading">{t("Set part sizes (optional)")}</strong><small>{t("Add up to 20 additional pieces with their own dimensions.")}</small></span>
                 <span className="seller-badge">{setParts.length}</span>
               </div>
               <div className="seller-size-parts-content">
@@ -485,27 +529,24 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
             {heading("Stock and warehouse", Warehouse, "orange")}
             <div className="seller-form-grid">
               {field("quantity", "Stock quantity", "number")}
-              <label className="seller-field">{t("Warehouse city")}
-                <SellerSelect value={fields.warehouse_city} onValueChange={value => set("warehouse_city", value)} placeholder={t("Warehouse city")} options={cities.map(([value, label]) => ({ value, label: t(label) }))} />
-                {fieldErrors.warehouse_city && <small className="seller-field-error">{fieldErrors.warehouse_city}</small>}
-              </label>
+              <div className="seller-field seller-warehouse-city-field"><span>{t("Warehouse city (required)")}</span>
+                <SellerSelect ariaLabel={t("Warehouse city")} aria-required aria-invalid={Boolean(fieldErrors.warehouse_city)} aria-describedby={fieldErrors.warehouse_city ? "seller-warehouse-city-error" : undefined} value={fields.warehouse_city} onValueChange={value => set("warehouse_city", value)} placeholder={t("Choose a warehouse city")} options={cities.map(([value, label]) => ({ value, label: t(label) }))} />
+                {fieldErrors.warehouse_city && <small id="seller-warehouse-city-error" className="seller-field-error">{fieldErrors.warehouse_city}</small>}
+              </div>
             </div>
           </section>
 
           <section className="seller-card seller-submission-note">
             <h2>{t(product ? "Review status" : "Review after submission")}</h2>
-            {product ? <><span className={`seller-badge ${product.status}`}>{t(product.status.replaceAll("_", " "))}</span><p>{t("Changes to a product may be sent for moderation according to its current status.")}</p></> : <p>{t("Submitting creates the product and sends it for review. You can follow its status from My products.")}</p>}
+            {product ? <><span className={`seller-badge ${product.status}`}>{t(product.status.replaceAll("_", " "))}</span>{product.status !== "deactivated" && <p>{t("Changes to a product may be sent for moderation according to its current status.")}</p>}</> : <p>{t("Submitting creates the product and sends it for review. You can follow its status from My products.")}</p>}
           </section>
 
-          {product && ["approved", "rejected", "withdrawn"].includes(product.status) && <section className="seller-card">
+          {product && ["approved", "rejected"].includes(product.status) && <section className="seller-card">
             <h2>{t("Review note")}</h2>
             <label className="seller-field">{t("Comment for reviewer")}
-              <textarea maxLength={2000} value={fields.comment} onChange={event => set("comment", event.target.value)} />
+              <textarea name="change_comment" maxLength={2000} value={fields.comment} aria-invalid={Boolean(fieldErrors.change_comment)} onChange={event => set("comment", event.target.value)} />
+              {fieldErrors.change_comment && <small className="seller-field-error">{fieldErrors.change_comment}</small>}
             </label>
-            {["rejected", "withdrawn"].includes(product.status) && <label className="seller-checkbox">
-              <input type="checkbox" checked={resubmit} onChange={event => { idempotencyKey.current = null; setResubmit(event.target.checked); }} />
-              {t("Resubmit for moderation")}
-            </label>}
           </section>}
 
           <div className="seller-form-actions">
@@ -516,6 +557,14 @@ export default function ProductEditor({ product }: { product?: SellerProduct }) 
           </div>
         </div>
       </div>
+      </fieldset>
     </form>
+    <Dialog open={viewingPhoto !== null} onOpenChange={open => { if (!open) setViewingPhoto(null); }}>
+      <DialogContent className="seller-photo-viewer" showCloseButton={false} aria-describedby={undefined} onClick={event => { if (event.target === event.currentTarget) setViewingPhoto(null); }}>
+        <DialogTitle className="sr-only">{t("Product photo")}</DialogTitle>
+        <DialogClose asChild><button type="button" className="seller-photo-viewer-close" aria-label={t("Close")}><X size={24} aria-hidden="true" /></button></DialogClose>
+        {viewingPhoto && <SellerProductImage key={viewingPhoto.key} className="seller-photo-viewer-image" src={viewingPhoto.kind === "saved" ? viewingPhoto.image.image || viewingPhoto.image.preview || viewingPhoto.image.thumbnail : viewingPhoto.preview} alt={t("Product photo")} />}
+      </DialogContent>
+    </Dialog>
   </SellerLocalized>;
 }

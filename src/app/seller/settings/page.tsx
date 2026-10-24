@@ -17,7 +17,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { SellerNotice, SellerPage } from "@/components/SellerShell";
-import { clearSellerSession, sellerRequest } from "@/lib/seller";
+import { clearSellerSession, SellerApiError, sellerRequest } from "@/lib/seller";
+import { sellerApiErrorDetails } from "@/lib/seller-error-messages";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { readSellerLocale, setSellerLocale, type SellerLocale } from "@/lib/seller-i18n";
 
@@ -35,6 +36,7 @@ export default function SellerSettingsPage() {
   const deletionInFlight = useRef(false);
   const [password, setPassword] = useState({ current_password: "", new_password: "", new_password_confirm: "" });
   const [error, setError] = useState("");
+  const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [contact, setContact] = useState("");
   const [busy, setBusy] = useState(false);
@@ -72,11 +74,13 @@ export default function SellerSettingsPage() {
     setBusy(true);
     setError("");
     setNotice("");
+    setPasswordErrors({});
     try {
       await sellerRequest("/api/v1/auth/password/change/", { method: "POST", body: JSON.stringify(password) });
       setPassword({ current_password: "", new_password: "", new_password_confirm: "" });
       setNotice("Password changed.");
     } catch (error) {
+      if (error instanceof SellerApiError) setPasswordErrors(sellerApiErrorDetails(error.data, error.status).fields);
       setError(error instanceof Error ? error.message : "Could not change password.");
     } finally {
       setBusy(false);
@@ -110,7 +114,11 @@ export default function SellerSettingsPage() {
         <div><h2>Change password</h2><p>Choose a password you do not use on other sites.</p></div>
         {([ ["current_password", "Current password"], ["new_password", "New password"], ["new_password_confirm", "Confirm new password"] ] as const).map(([key, label]) =>
           <label key={key} className="seller-field">{label}
-            <input type="password" required minLength={key === "current_password" ? 1 : 8} autoComplete={key === "current_password" ? "current-password" : "new-password"} value={password[key]} onChange={event => setPassword(value => ({ ...value, [key]: event.target.value }))} />
+            <input type="password" required minLength={key === "current_password" ? 1 : 8} aria-invalid={Boolean(passwordErrors[key])} autoComplete={key === "current_password" ? "current-password" : "new-password"} value={password[key]} onChange={event => {
+              setPasswordErrors(current => { const next = { ...current }; delete next[key]; return next; });
+              setPassword(value => ({ ...value, [key]: event.target.value }));
+            }} />
+            {passwordErrors[key] && <small className="seller-field-error">{passwordErrors[key]}</small>}
           </label>)}
         <Button variant="accent" className="seller-button primary seller-settings-password-submit" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Update password"}</Button>
       </form>
@@ -139,14 +147,14 @@ export default function SellerSettingsPage() {
       </section>
 
       <section className="seller-card seller-danger-zone">
-        <div><h2>Delete account</h2><p>Active marketplace listings may be removed before deletion completes. The account can be disabled while that work finishes.</p></div>
+        <div><h2>{t("Delete account")}</h2><p>{t("Marketplace listings may need processing before deletion can finish. Your account may be disabled during this time.")}</p></div>
         <AlertDialog open={deleteOpen} onOpenChange={open => { if (!deletionInFlight.current) { setDeleteOpen(open); setError(""); } }}>
           <AlertDialogTrigger asChild><Button variant="destructive" className="seller-button danger seller-delete-trigger" disabled={busy}>{t("Delete account")}</Button></AlertDialogTrigger>
           <AlertDialogContent className="seller-delete-dialog" size="sm">
             <AlertDialogHeader>
               <span className="seller-delete-icon"><TriangleAlert size={24} aria-hidden="true" /></span>
               <AlertDialogTitle>{t("Delete account?")}</AlertDialogTitle>
-              <AlertDialogDescription>{t("Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.")}<span className="seller-delete-pending-note">{t("Marketplace listings may need processing before deletion can finish. Your account may be disabled during this time.")}</span></AlertDialogDescription>
+              <AlertDialogDescription>{t("Are you sure you want to delete your account? You will lose access to your products and seller workspace. Deletion may be irreversible.")}</AlertDialogDescription>
             </AlertDialogHeader>
             {error && deleteOpen && <SellerNotice>{error}</SellerNotice>}
             <AlertDialogFooter>

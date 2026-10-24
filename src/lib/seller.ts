@@ -1,3 +1,5 @@
+import { sellerApiErrorDetails } from "./seller-error-messages.ts";
+
 export type SellerProfile = {
   id: number;
   username: string;
@@ -31,7 +33,7 @@ export type SellerProduct = {
   pending_changes?: Record<string, unknown> | null; pending_changes_submitted_at?: string | null;
 };
 export type PriceNegotiation = { id: number; manager_username: string; proposed_unit_price: string; current_unit_price: string; currency: string; message: string; status: string; seller_comment: string; created_at: string; responded_at: string | null };
-export type SellerNotification = { id: number; notification_type: string; product_id: number | null; product_title: string | null; is_read: boolean; created_at: string; title: string; body: string; proposed_unit_price: string | null; proposed_currency: string | null; price_negotiation_status: string | null; seller_comment?: string; price_accepted?: boolean | null; responded_at?: string | null; sender_name?: string | null; manager_name?: string | null; afterbuy_marketplace?: string | null; afterbuy_account?: string | null; afterbuy_qty_sold?: number | null; afterbuy_stock_synced?: boolean; afterbuy_seller_notified?: boolean };
+export type SellerNotification = { id: number; notification_type: string; product_id: number | null; product_title: string | null; is_read: boolean; created_at: string; title: string; body: string; proposed_unit_price: string | null; proposed_currency: string | null; price_negotiation_status: string | null; price_negotiation_id?: number | null; sender_id?: number | null; seller_comment?: string; price_accepted?: boolean | null; responded_at?: string | null; sender_name?: string | null; manager_name?: string | null; afterbuy_marketplace?: string | null; afterbuy_account?: string | null; afterbuy_qty_sold?: number | null; afterbuy_stock_synced?: boolean; afterbuy_seller_notified?: boolean };
 export type PageResult<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 
 const TOKEN_KEY = "benim_seller_access_token";
@@ -96,7 +98,7 @@ function sellerApiPath(path: string) {
 
 async function refreshSellerToken() {
   if (!refreshInFlight) {
-    refreshInFlight = fetch("/api/v1/auth/refresh/", {
+    refreshInFlight = fetch("/portal-auth/seller/refresh/", {
       method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: "{}",
     }).then(async (response) => {
       if (!response.ok) {
@@ -145,7 +147,7 @@ export async function sellerRequest<T = unknown>(path: string, init: RequestInit
   if (!response.ok) {
     let body: unknown;
     try { body = await response.json(); } catch { body = null; }
-    throw new SellerApiError(response.status, errorMessage(body, response.statusText || "Request failed"), body);
+    throw new SellerApiError(response.status, errorMessage(body, "Request failed", response.status), body);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -154,7 +156,7 @@ export async function sellerRequest<T = unknown>(path: string, init: RequestInit
 export function respondToPriceNegotiation(productId: number, accepted: boolean, comment = "") {
   return sellerRequest<SellerProduct>(`/api/v1/products/${productId}/price-negotiation/respond/`, {
     method: "POST",
-    body: JSON.stringify({ accepted, comment }),
+    body: JSON.stringify({ accepted, comment: comment.trim() }),
   });
 }
 
@@ -189,7 +191,7 @@ export async function sellerPublicRequest<T = unknown>(path: string, body: unkno
   } catch { throw new SellerApiError(0, "Unable to reach the server. Check your connection and try again."); }
   if (!response.ok) {
     let data: unknown; try { data = await response.json(); } catch { data = null; }
-    throw new SellerApiError(response.status, errorMessage(data, response.statusText || "Request failed"), data);
+    throw new SellerApiError(response.status, errorMessage(data, "Request failed", response.status), data);
   }
   if (response.status === 204) return undefined as T;
   if (response.status === 202 && response.headers.get("Content-Length") === "0") return undefined as T;
@@ -202,29 +204,18 @@ export class SellerApiError extends Error {
   constructor(status: number, message: string, data?: unknown) { super(message); this.status = status; this.data = data; this.name = "SellerApiError"; }
 }
 
-function flattenErrors(value: unknown, path = ""): string[] {
-  if (Array.isArray(value)) return value.flatMap((item, index) => flattenErrors(item, path ? `${path}[${index}]` : ""));
-  if (value && typeof value === "object") return Object.entries(value).flatMap(([key, item]) => flattenErrors(item, path ? `${path}.${key}` : key));
-  if (typeof value !== "string" && typeof value !== "number") return [];
-  const message = String(value);
-  return [path ? `${path}: ${message}` : message];
-}
-
-export function errorMessage(data: unknown, fallback = "Request failed") {
-  if (!data || typeof data !== "object") return fallback;
-  const object = data as Record<string, unknown>;
-  if (typeof object.detail === "string") return object.detail;
-  return Object.entries(object).flatMap(([field, value]) => flattenErrors(value, field)).join("; ") || fallback;
+export function errorMessage(data: unknown, fallback = "Request failed", status = 400) {
+  return sellerApiErrorDetails(data || (status >= 500 || status === 413 || status === 429 ? null : { detail: fallback }), status).message;
 }
 
 export async function sellerLogin(email: string, password: string) {
-  const response = await fetch("/api/v1/auth/login/", {
-    method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Refresh-Token-Cookie": "seller" },
+  const response = await fetch("/portal-auth/seller/login/", {
+    method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
   if (!response.ok) {
     let data: unknown; try { data = await response.json(); } catch { data = null; }
-    throw new SellerApiError(response.status, errorMessage(data, "Email or password is incorrect."), data);
+    throw new SellerApiError(response.status, errorMessage(data, "Email or password is incorrect.", response.status), data);
   }
   const token = (await response.json() as { access: string }).access;
   const profileResponse = await fetch("/api/v1/auth/me/", { credentials: "same-origin", headers: { Authorization: `Bearer ${token}` } });
@@ -239,5 +230,5 @@ export async function sellerLogin(email: string, password: string) {
 }
 
 export async function sellerLogout() {
-  try { await sellerRequest("/api/v1/auth/logout/", { method: "POST", body: "{}" }); } finally { clearSellerSession(); }
+  try { await fetch("/portal-auth/seller/logout/", { method: "POST", credentials: "same-origin" }); } finally { clearSellerSession(); }
 }

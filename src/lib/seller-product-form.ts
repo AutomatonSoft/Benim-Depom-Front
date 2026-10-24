@@ -10,6 +10,13 @@ export function sellerMaterialInputs(materials: string[] = []) {
   return { material1: materials[0] || "", material2: materials[1] || "" };
 }
 
+export function sellerProductReviewFields(status: string, comment: string, readyForReview: boolean) {
+  return {
+    ...(readyForReview && ["draft", "rejected", "withdrawn"].includes(status) ? { resubmit_for_moderation: true } : {}),
+    ...((status === "approved" && comment.trim().length > 0) || (status === "rejected" && readyForReview) ? { change_comment: comment.trim() } : {}),
+  };
+}
+
 export function sellerMaterials(first: string, second: string) {
   return [first.trim(), second.trim()].filter(Boolean);
 }

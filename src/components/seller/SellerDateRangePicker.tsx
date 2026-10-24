@@ -103,7 +103,7 @@ export default function SellerDateRangePicker({ from, to, onChange }: {
         <ChevronDown size={17} strokeWidth={1.8} aria-hidden="true" />
       </button>
     </PopoverTrigger>
-    <PopoverContent align="start" sideOffset={7} className="seller-date-range-popover">
+    <PopoverContent align="start" sideOffset={7} collisionPadding={14} className="seller-date-range-popover">
       <div className="seller-date-range-presets" aria-label={t("Date range presets")}>
         {presets.map(([id, title]) => <button type="button" key={id} onClick={() => commit(getSellerDatePreset(id, today))}>{t(title)}</button>)}
       </div>

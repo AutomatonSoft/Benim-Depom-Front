@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Bell, ChartNoAxesCombined, CircleAlert, CircleCheck, CircleUserRound, House, LogOut, Package, Plus, Settings } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { clearSellerSession, clearSellerToken, saveSellerProfileId, sellerAvatarInitial, sellerLogout, sellerRequest, type SellerProfile } from "@/lib/seller";
@@ -47,6 +47,27 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState("");
   const [retry, setRetry] = useState(0);
   const [unread, setUnread] = useState(0);
+  const profileMenuRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const menu = profileMenuRef.current;
+      if (menu && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      const menu = profileMenuRef.current;
+      if (event.key === "Escape" && menu?.open) {
+        menu.open = false;
+        menu.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   useEffect(() => {
     if (isPublic) return;
@@ -101,7 +122,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
         <Link href="/seller/products" className="seller-brand-mobile"><span className="seller-brand-inline"><span>BENIM</span><b>DEPOM</b></span></Link>
         <div className="seller-topbar-actions">
           <Link aria-label={`${t("Notifications")}${unread ? `, ${unread} ${t("unread")}` : ""}`} className="seller-bell" href="/seller/notifications"><span className="seller-bell-content"><Bell size={18} strokeWidth={1.8} aria-hidden="true" />{unread > 0 && <i>{unread > 99 ? "99+" : unread}</i>}</span></Link>
-          <details className="seller-profile-menu">
+          <details ref={profileMenuRef} className="seller-profile-menu">
             <summary className="seller-user"><span className="seller-user-name">{[profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.username}</span><span className="seller-avatar" aria-hidden="true">{avatarInitial || <CircleUserRound size={17} strokeWidth={1.8} />}</span></summary>
             <div className="seller-profile-menu-panel">
               <Link href="/seller/profile" onClick={e=>e.currentTarget.closest("details")?.removeAttribute("open")}><span className="seller-link-content"><CircleUserRound size={18} strokeWidth={1.8} aria-hidden="true" />{t("Profile")}</span></Link>

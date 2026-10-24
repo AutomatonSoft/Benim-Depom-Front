@@ -116,7 +116,8 @@ test("seller login verifies role and stores a separate access token", async (t) 
   assert.equal(values.get("benim_seller_access_token"), "seller-access");
   assert.equal(values.get("benim_access_token"), "manager-access");
   assert.equal(values.get("benim_seller_locale"), "de");
-  assert.equal(calls[0][1].headers["X-Refresh-Token-Cookie"], "seller");
+  assert.equal(calls[0][0], "/portal-auth/seller/login/");
+  assert.equal(calls[0][1].headers["X-Refresh-Token-Cookie"], undefined);
   assert.equal(calls[0][1].credentials, "same-origin");
   assert.equal(calls[0][1].body, JSON.stringify({ email: "seller@example.com", password: "password" }));
 });
@@ -208,7 +209,7 @@ test("seller API pagination never sends its bearer token to an external URL", as
 test("nested serializer errors remain readable", () => {
   assert.equal(
     errorMessage({ variants: [{ materials: ["Enter at least one material."] }] }),
-    "variants[0].materials[0]: Enter at least one material.",
+    `${translateSeller("Materials", readSellerLocale(values.get("benim_seller_locale")))}: ${translateSeller("Add at least one material.", readSellerLocale(values.get("benim_seller_locale")))}`,
   );
 });
 
@@ -432,10 +433,11 @@ test("product validation errors map to friendly field names without exposing API
     otto_attributes: { 415: ["Invalid value."] },
     unknown_field: ["Invalid value."],
   });
-  assert.equal(details.fields.materials, "Choose one or two materials.");
-  assert.equal(details.fields.width_cm, "Enter a valid number.");
-  assert.equal(details.fields.otto_attributes, "Invalid value.");
-  assert.equal(details.message, "Some product details need attention. Review the form and try again.");
+  const language = readSellerLocale(values.get("benim_seller_locale"));
+  assert.equal(details.fields.materials, translateSeller("Choose one or two materials.", language));
+  assert.equal(details.fields.width_cm, translateSeller("Enter a valid number.", language));
+  assert.equal(details.fields.otto_attributes, translateSeller("Enter a valid value for this field.", language));
+  assert.equal(details.message, translateSeller("Enter a valid value for this field.", language));
   assert.equal(JSON.stringify(details).includes("unknown_field"), false);
 });
 

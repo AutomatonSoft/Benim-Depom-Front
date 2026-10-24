@@ -41,12 +41,12 @@ function LoginForm() {
     <h1>{t("Welcome back")}</h1>
     <p>{t("Sign in to manage your products and sales.")}</p>
     {notice && <SellerNotice kind="success">{notice}</SellerNotice>}
-    <form onSubmit={submit}>
+    <form id="seller-login" name="seller-login" onSubmit={submit}>
       <label className="seller-field">{t("Email")}
-        <input type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} />
+        <input id="seller-login-email" name="seller-email" type="email" required autoComplete="section-seller username" value={email} onChange={event => setEmail(event.target.value)} />
       </label>
       <label className="seller-field">{t("Password")}
-        <SellerPasswordInput required autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} />
+        <SellerPasswordInput id="seller-login-password" name="seller-password" required autoComplete="section-seller current-password" value={password} onChange={event => setPassword(event.target.value)} />
       </label>
       {error && <SellerNotice>{error}</SellerNotice>}
       <button className="seller-button primary seller-login-submit" disabled={busy}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? t("Signing in…") : t("Sign in")}</button>

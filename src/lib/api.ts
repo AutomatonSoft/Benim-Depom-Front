@@ -33,19 +33,13 @@ export function clearLegacyRefreshToken() {
 }
 
 export async function logoutSession() {
-  const access = readToken(ACCESS_TOKEN_KEY);
-  if (access) {
-    try {
-      await authorizedFetch("/api/v1/auth/logout/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-    } catch {
-      // Tokens are still cleared locally so the panel cannot stay signed in.
-    }
+  try {
+    await fetch("/portal-auth/manager/logout/", { method: "POST", credentials: "same-origin" });
+  } catch {
+    // Still clear the local access token when the network is unavailable.
+  } finally {
+    clearTokens();
   }
-  clearTokens();
 }
 
 async function refreshAccessToken() {
@@ -59,7 +53,7 @@ async function refreshAccessToken() {
 }
 
 async function refreshAccessTokenRequest() {
-  const response = await fetch("/api/v1/auth/refresh/", {
+  const response = await fetch("/portal-auth/manager/refresh/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
@@ -71,7 +65,6 @@ async function refreshAccessTokenRequest() {
   }
 
   const tokens = (await response.json()) as RefreshResponse;
-  // Both portals share a refresh cookie, so its access token may belong to a seller.
   if (!tokens.access || await hasManagerRole(tokens.access) !== true) {
     clearTokens();
     return null;

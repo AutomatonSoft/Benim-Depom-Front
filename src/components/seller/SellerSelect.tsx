@@ -16,6 +16,9 @@ type SellerSelectProps = {
   onValueChange: (value: string) => void;
   placeholder: string;
   ariaLabel?: string;
+  "aria-required"?: boolean;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
   disabled?: boolean;
   searchable?: boolean;
   searchValue?: string;
@@ -28,6 +31,7 @@ type SellerSelectProps = {
 function SellerSelectBase({
   options, value, selectedLabel, onValueChange, placeholder, ariaLabel, disabled = false, searchable = false,
   searchValue, onSearchChange, loading = false, emptyMessage, className = "",
+  "aria-required": ariaRequired, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy,
 }: SellerSelectProps) {
   const { t } = useSellerI18n();
   const [open, setOpen] = useState(false);
@@ -51,6 +55,9 @@ function SellerSelectBase({
         aria-label={ariaLabel || placeholder}
         aria-expanded={open}
         aria-controls={listId}
+        aria-required={ariaRequired}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         disabled={disabled}
         className={`seller-select-trigger ${className}`.trim()}
       >

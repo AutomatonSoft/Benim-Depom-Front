@@ -126,7 +126,10 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
     onChange({ group, category: null, attributes: {} });
   }
 
-  const selectedAttributes = attributes.filter(attribute => selectedAttributeIds.includes(attribute.attribute_id) || hasValue(value.attributes[String(attribute.attribute_id)]));
+  const selectedIds = [...new Set([...selectedAttributeIds, ...Object.keys(value.attributes).filter(key => hasValue(value.attributes[key])).map(Number)])];
+  const selectedAttributes = selectedIds
+    .map(id => attributes.find(attribute => attribute.attribute_id === id))
+    .filter((attribute): attribute is Attribute => attribute !== undefined);
 
   function removeAttribute(id: number) {
     setSelectedAttributeIds(current => current.filter(currentId => currentId !== id));
