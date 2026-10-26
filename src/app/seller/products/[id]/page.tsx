@@ -146,7 +146,7 @@ export default function SellerProductEditorPage() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
-          <Button variant="destructive" className={`seller-button danger${confirmation === "archive" ? " seller-delete-confirm" : ""}`} disabled={busy} onClick={() => void confirmAction()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} aria-hidden="true" />{busy ? t("Please wait…") : t(confirmation === "archive" ? "Delete product" : "Confirm")}</Button>
+          <Button variant="destructive" className={`seller-button danger seller-product-confirm${confirmation === "archive" ? " seller-delete-confirm" : ""}`} disabled={busy} onClick={() => void confirmAction()}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} aria-hidden="true" />{busy ? t("Please wait…") : t(confirmation === "archive" ? "Delete product" : "Confirm")}</Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
