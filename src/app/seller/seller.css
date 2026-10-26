@@ -952,6 +952,9 @@
 .seller-camera-picker:focus-within { outline: 3px solid rgb(247 148 29 / 35%); outline-offset: 2px; }
 .seller-spinner { flex: 0 0 18px; animation: seller-spin 850ms linear infinite; }
 .seller-spinner-slot { width: 18px; height: 18px; flex: 0 0 18px; visibility: hidden; }
+.seller-product-confirm { position: relative; }
+.seller-product-confirm > .seller-spinner,
+.seller-product-confirm > .seller-spinner-slot { position: absolute; left: 12px; }
 .seller-notice { display: flex; align-items: flex-start; gap: 9px; }
 .seller-notice > svg { flex: 0 0 auto; margin-top: 1px; }
 .seller-notice > span { min-width: 0; }

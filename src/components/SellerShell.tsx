@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, ChartNoAxesCombined, CircleAlert, CircleCheck, CircleUserRound, House, LogOut, Package, Plus, Settings } from "lucide-react";
+import { Bell, ChartNoAxesCombined, CircleAlert, CircleCheck, CircleUserRound, Ellipsis, LogOut, Package, Plus, Settings } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { clearSellerSession, clearSellerToken, saveSellerProfileId, sellerAvatarInitial, sellerLogout, sellerRequest, type SellerProfile } from "@/lib/seller";
 import { readSellerLocale, setSellerLocale } from "@/lib/seller-i18n";
@@ -16,7 +16,7 @@ const links = [
   ["/seller/notifications", "Notifications", Bell], ["/seller/statistics", "Sales statistics", ChartNoAxesCombined],
   ["/seller/profile", "Profile", CircleUserRound], ["/seller/settings", "Settings", Settings],
 ] as const;
-const mobileLinks = [["/seller/products", "Products", Package], ["/seller/products/new", "Add", Plus], ["/seller/more", "More", House]] as const;
+const mobileLinks = [["/seller/products", "Products", Package], ["/seller/products/new", "Add", Plus], ["/seller/more", "More", Ellipsis]] as const;
 const publicRoutes = ["/seller/login", "/seller/register", "/seller/verify-email", "/seller/forgot-password"];
 
 export function SellerPage({ title, description, children, actions, dynamicTitle = false, dynamicDescription = false }: { title: string; description?: string; children: ReactNode; actions?: ReactNode; dynamicTitle?: boolean; dynamicDescription?: boolean }) {
