@@ -1473,3 +1473,57 @@
   .seller-stat-info { transition: none; }
   .seller-stat-tooltip { animation: none !important; }
 }
+
+@media (max-width: 800px) {
+  .seller-products-mobile .seller-product { position: relative; }
+  .seller-products-mobile .seller-product-summary h2 { padding-right: 40px; }
+  .seller-products-mobile .seller-product-actions { position: absolute; top: 10px; right: 10px; }
+  .seller-products-mobile .seller-product-menu { touch-action: pan-y; }
+  .seller-photo-upload .seller-camera-picker { margin-top: 16px; }
+  .seller-size-parts-content > .seller-button { width: 100%; min-width: 0; height: auto; min-height: 44px; padding: 12px; white-space: normal; line-height: 1.4; text-align: center; justify-self: center; }
+  .seller-size-parts-content > .seller-button > svg { flex-shrink: 0; }
+  .seller-profile-content .seller-button.primary,
+  .seller-settings-password-submit { position: relative; justify-content: center; padding-inline: 36px; text-align: center; }
+  .seller-profile-content .seller-button.primary > svg,
+  .seller-settings-password-submit > svg { position: absolute; left: 12px; }
+  .seller-notification-heading { row-gap: 6px; }
+  .seller-notification-heading .seller-notification-states { margin-top: -3px; }
+
+  /* Keep searchable overlays inside the area above the mobile keyboard. */
+  [data-radix-popper-content-wrapper]:has(> .seller-select-popover) {
+    position: fixed !important;
+    top: calc(var(--seller-viewport-top, 0px) + 12px) !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    transform: none !important;
+    z-index: 60 !important;
+  }
+  .seller-select-popover {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(var(--seller-viewport-height, 100dvh) - 24px) !important;
+    overflow: hidden;
+    animation: none !important;
+  }
+  .seller-select-command { height: auto; max-height: calc(var(--seller-viewport-height, 100dvh) - 46px); }
+  .seller-select-list { min-height: 0; max-height: min(292px, calc(var(--seller-viewport-height, 100dvh) - 110px)) !important; }
+  .seller-select-search-input,
+  .seller-otto-picker [data-slot="command-input"] { font-size: 16px !important; }
+  .seller-otto-picker {
+    top: calc(var(--seller-viewport-top, 0px) + 12px) !important;
+    bottom: auto !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: calc(100% - 24px) !important;
+    max-width: none !important;
+    max-height: calc(var(--seller-viewport-height, 100dvh) - 24px) !important;
+    translate: 0 0 !important;
+    transform: none !important;
+    animation: none !important;
+    border-radius: 16px !important;
+  }
+  .seller-otto-picker [data-slot="command"] { height: auto; max-height: calc(var(--seller-viewport-height, 100dvh) - 40px); }
+  .seller-otto-picker [data-slot="command-list"] { max-height: min(560px, calc(var(--seller-viewport-height, 100dvh) - 120px)); }
+}
