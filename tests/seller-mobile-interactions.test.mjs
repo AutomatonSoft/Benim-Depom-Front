@@ -3,6 +3,57 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
+import postcss from "postcss";
+
+test("OTTO dialog is positioned by its viewport frame without translation offsets", () => {
+  const css = postcss.parse(readFileSync(new URL("../src/app/seller/seller.css", import.meta.url), "utf8"));
+  const frames = [];
+  css.walkRules(rule => {
+    if (rule.selector === ".seller-otto-picker") {
+      rule.walkDecls(declaration => assert.equal(["transform", "translate", "top", "left", "right", "bottom"].includes(declaration.prop), false));
+    }
+    if (rule.selector === ".seller-otto-picker-frame") frames.push(rule);
+  });
+  assert.equal(frames.length, 2);
+  const declarations = Object.fromEntries(frames[0].nodes.map(node => [node.prop, node.value]));
+  assert.equal(declarations.display, "grid");
+  assert.equal(declarations["place-items"], "center");
+  const mobile = Object.fromEntries(frames[1].nodes.map(node => [node.prop, node.value]));
+  assert.equal(mobile.width, "var(--seller-viewport-width, 100vw)");
+  assert.equal(mobile.height, "var(--seller-viewport-height, 100dvh)");
+});
+
+test("large category selectors render incrementally and search the entire catalogue", () => {
+  const source = readFileSync(new URL("../src/components/seller/SellerSelect.tsx", import.meta.url), "utf8");
+  const ast = ts.createSourceFile("SellerSelect.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const component = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "SellerSelectBase");
+  const state = [false, "", 80];
+  let cursor = 0;
+  const context = {
+    useState: () => { const index = cursor++; return [state[index], next => { state[index] = typeof next === "function" ? next(state[index]) : next; }]; },
+    useId: () => "options", useSellerI18n: () => ({ t: value => value }),
+    React: { createElement: (type, props, ...children) => ({ type, props, children }) },
+  };
+  for (const name of ["Popover", "PopoverTrigger", "SellerSelectPopover", "Command", "CommandInput", "CommandList", "CommandEmpty", "CommandGroup", "CommandItem", "ChevronDown", "Check"]) context[name] = name;
+  vm.createContext(context);
+  vm.runInContext(ts.transpile(component.getText(ast), { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020 }), context);
+  const props = { options: Array.from({ length: 1000 }, (_, index) => ({ value: String(index), label: index === 999 ? "Needle" : `Group ${index}` })), value: "", onValueChange() {}, placeholder: "Group", searchable: true, optionPageSize: 80 };
+  const render = () => { cursor = 0; return context.SellerSelectBase(props); };
+  function find(node, type) {
+    if (node?.type === type) return node;
+    for (const child of node?.children?.flat(Infinity) ?? []) { const result = find(child, type); if (result) return result; }
+  }
+  let tree = render();
+  assert.equal(find(tree, "CommandGroup").children[0].length, 80);
+  find(tree, "CommandList").props.onScroll({ currentTarget: { scrollHeight: 1000, scrollTop: 900, clientHeight: 100 } });
+  tree = render();
+  assert.equal(find(tree, "CommandGroup").children[0].length, 160);
+  find(tree, "CommandInput").props.onValueChange("Needle");
+  tree = render();
+  const results = find(tree, "CommandGroup").children[0];
+  assert.equal(results.length, 1);
+  assert.equal(results[0].props.value, "999 Needle");
+});
 
 test("selects stay anchored below the field until mobile search is focused; desktop stays native", () => {
   const source = readFileSync(new URL("../src/components/seller/SellerSelect.tsx", import.meta.url), "utf8");

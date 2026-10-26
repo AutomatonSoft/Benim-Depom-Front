@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadSellerOttoCategories, prefetchSellerOttoCatalog } from "../src/lib/seller-otto-catalog.ts";
+import { loadOttoCatalogPages } from "../src/lib/otto-catalog.ts";
 
 test("seller OTTO cache shares requests, separates languages, retries failures and survives reload", async t => {
   const originals = { window: globalThis.window, localStorage: globalThis.localStorage, sessionStorage: globalThis.sessionStorage, fetch: globalThis.fetch };
   t.after(() => Object.assign(globalThis, originals));
   const saved = new Map();
   globalThis.window = { location: { origin: "https://seller.example" } };
-  globalThis.localStorage = { getItem: key => key === "benim_seller_access_token" ? "seller-access" : null };
+  globalThis.localStorage = { getItem: key => key === "benim_seller_access_token" ? "seller-access" : saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
   globalThis.sessionStorage = { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) };
   let requests = 0;
   globalThis.fetch = async () => { requests++; return Response.json({ results: [{ category_id: 1, name: "Chair" }], next: null }); };
@@ -51,6 +52,24 @@ test("seller OTTO cache shares requests, separates languages, retries failures a
 
   saved.set("seller-otto-v1:/api/v1/catalog/otto/category-groups/612/categories/en/", JSON.stringify({ expires: 0, values: [{ category_id: 99, name: "Outdated" }] }));
   assert.deepEqual(await loadSellerOttoCategories("en", 612), []);
-  globalThis.sessionStorage = { getItem() { throw new Error("Storage disabled"); }, setItem() { throw new Error("Storage disabled"); } };
+  globalThis.localStorage = { getItem(key) { if (key === "benim_seller_access_token") return "seller-access"; throw new Error("Storage disabled"); }, setItem() { throw new Error("Storage disabled"); } };
   assert.deepEqual(await loadSellerOttoCategories("en", 613), []);
+});
+
+test("catalog page preloading is bounded and preserves page order", async () => {
+  let active = 0;
+  let peak = 0;
+  const pages = [];
+  const values = await loadOttoCatalogPages("/groups/", async url => {
+    const page = Number(new URL(url, "https://example.test").searchParams.get("page"));
+    pages.push(page);
+    active++;
+    peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, page === 2 ? 15 : 1));
+    active--;
+    return { results: [page], count: 1200, next: page < 6 ? page + 1 : null };
+  }, 3);
+  assert.equal(peak, 3);
+  assert.deepEqual(values, [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual([...pages].sort(), [1, 2, 3, 4, 5, 6]);
 });
