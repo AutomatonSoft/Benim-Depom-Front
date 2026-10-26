@@ -50,6 +50,24 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   const profileMenuRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      document.documentElement.style.setProperty("--seller-viewport-height", `${viewport.height}px`);
+      document.documentElement.style.setProperty("--seller-viewport-top", `${viewport.offsetTop}px`);
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      document.documentElement.style.removeProperty("--seller-viewport-height");
+      document.documentElement.style.removeProperty("--seller-viewport-top");
+    };
+  }, []);
+
+  useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const menu = profileMenuRef.current;
       if (menu && event.target instanceof Node && !menu.contains(event.target)) menu.open = false;

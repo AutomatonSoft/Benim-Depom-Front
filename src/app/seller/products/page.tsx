@@ -87,10 +87,18 @@ function SortSelect({ t, value, onChange }: { t: Translate; value: string; onCha
 }
 
 function ProductActions({ product, t, onHistory, onAction }: { product: SellerProduct; t: Translate; onHistory: (id: number) => void; onAction: (action: ProductAction) => void }) {
+  const [open, setOpen] = useState(false);
+  const touchPress = useRef(false);
   const canEdit = ["draft", "rejected", "withdrawn", "approved"].includes(product.status);
-  return <DropdownMenu>
+  return <DropdownMenu open={open} onOpenChange={setOpen}>
     <DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="icon" className="seller-product-menu" aria-label={t("Product actions for {title}", { title: product.title })}>
+      <Button variant="ghost" size="icon" className="seller-product-menu" aria-label={t("Product actions for {title}", { title: product.title })}
+        onPointerDown={event => {
+          touchPress.current = event.pointerType === "touch";
+          if (touchPress.current) event.preventDefault();
+        }}
+        onPointerCancel={() => { touchPress.current = false; }}
+        onClick={event => { if (touchPress.current && event.detail > 0) setOpen(current => !current); touchPress.current = false; }}>
         <Ellipsis size={18} strokeWidth={1.8} aria-hidden="true" />
       </Button>
     </DropdownMenuTrigger>
@@ -306,14 +314,12 @@ export default function SellerProductsPage() {
           </Table>
         </div>
         <div className="seller-products-mobile">{page.results.map(product => {
-          const variant = product.variants?.[0];
           return <article className="seller-product" key={product.id}>
             <ProductPhoto product={product} t={t} />
             <div className="seller-product-summary">
               <h2><button type="button" className="seller-link seller-link-button seller-product-title-button" data-seller-translate="skip" onClick={() => router.push(`/seller/products/${product.id}`)}>{product.title}</button></h2>
               <p>{t(sellerProductTypeLabel(product.product_type))}</p>
               <p><strong data-seller-translate="skip">{product.unit_price} {product.currency}</strong> · <span data-seller-translate="skip">{quantityFormat.format(product.total_quantity)}</span> {t("units")}</p>
-              <p>{t("Dimensions")}: {variant ? <span data-seller-translate="skip">{variant.width_cm} × {variant.height_cm} × {variant.length_cm} cm</span> : t("Dimensions not provided")}</p>
               <div className="seller-product-state-grid">
                 <div><span>{t("Status")}</span><ProductStatus product={product} t={t} /></div>
                 <div><span>{t("Stock availability")}</span><ProductAvailability product={product} t={t} /></div>
