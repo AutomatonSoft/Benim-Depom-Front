@@ -29,18 +29,17 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const loginResponse = await fetch("/api/v1/auth/login/", {
+      const loginResponse = await fetch("/portal-auth/manager/login/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Refresh-Token-Cookie": "manager",
         },
         credentials: "same-origin",
         body: JSON.stringify({ email, password }),
       });
 
       if (!loginResponse.ok) {
-        setError(t("login.badCredentials"));
+        setError(t(loginResponse.status === 401 ? "login.badCredentials" : loginResponse.status === 403 ? "login.verifyFailed" : "common.apiUnreachable"));
         return;
       }
 
@@ -97,31 +96,33 @@ export default function LoginPage() {
       </section>
 
       <section className="flex items-center justify-center bg-background px-6 py-10">
-        <form className="w-full max-w-[420px]" onSubmit={submit}>
+        <form id="manager-login" name="manager-login" className="w-full max-w-[420px]" onSubmit={submit}>
           <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--brand-accent)]">{t("login.welcome")}</p>
           <h2 className="text-3xl font-extrabold tracking-tight text-primary">{t("login.title")}</h2>
           <p className="mt-2 mb-6 text-sm font-medium text-muted-foreground">{t("login.formIntro")}</p>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="login-email">{t("login.email")}</Label>
+              <Label htmlFor="manager-login-email">{t("login.email")}</Label>
               <Input
-                id="login-email"
+                id="manager-login-email"
+                name="manager-email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
+                autoComplete="section-manager username"
                 required
               />
             </div>
             <div>
-              <Label htmlFor="login-password">{t("login.password")}</Label>
+              <Label htmlFor="manager-login-password">{t("login.password")}</Label>
               <Input
-                id="login-password"
+                id="manager-login-password"
+                name="manager-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
+                autoComplete="section-manager current-password"
                 required
               />
             </div>

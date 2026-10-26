@@ -9,7 +9,7 @@ import Image from "next/image";
 import { landingFontVars } from "@/components/landing/fonts";
 import { Ic } from "@/components/landing/icons";
 import { useLandingLang } from "@/components/landing/use-landing-lang";
-import { APP_DOWNLOAD_URL, IOS_APP_DOWNLOAD_URL, CONTACT, LANDING_I18N, MARKETPLACES, type LandingLang } from "@/lib/landing-content";
+import { APP_DOWNLOAD_URL, IOS_APP_DOWNLOAD_URL, CONTACT, LANDING_I18N, MARKETPLACES, SELLER_LOGIN_PATH, type LandingLang } from "@/lib/landing-content";
 
 import "./landing.css";
 
@@ -49,6 +49,7 @@ export default function LandingPage() {
           </nav>
           <div className="header-right">
             <LangSwitch lang={lang} onChange={setLang} />
+            <Link className="btn btn-outline seller-login-nav-btn" href={SELLER_LOGIN_PATH}>{t.nav.sellerLogin}</Link>
             <a className="btn btn-primary" href="#download"><Ic name="download" />{t.nav.cta}</a>
             <a aria-label="WhatsApp" className="wa-nav-btn" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" /></a>
             <Link aria-label={t.privacyAria} className="privacy-nav-btn" href="/privacy_policy">
@@ -68,9 +69,10 @@ export default function LandingPage() {
           {t.navItems.map((item) => <a href={item.href} key={item.href} onClick={closeMenu}>{item.label}</a>)}
         </nav>
         <div className="mn-actions">
+          <Link className="btn btn-outline btn-block" href={SELLER_LOGIN_PATH} onClick={closeMenu}>{t.nav.sellerLogin}</Link>
           <a className="btn btn-primary btn-block" href="#download" onClick={closeMenu}><Ic name="download" />{t.nav.cta}</a>
           <Link className="btn btn-outline btn-block" href="/privacy_policy" onClick={closeMenu}>
-            <Ic name="shield" />{t.finalcta.privacyBtn}
+            <span><Ic name="shield" />{t.finalcta.privacyBtn}</span>
           </Link>
         </div>
       </div>
@@ -626,7 +628,7 @@ export default function LandingPage() {
               <div className="fc-actions">
                 <a className="btn btn-primary" href="#download"><Ic name="download" />{t.finalcta.btn1}</a>
                 <a className="btn btn-ghost-light" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" />{t.finalcta.btn2}</a>
-                <Link className="btn btn-privacy" href="/privacy_policy"><Ic name="shield" />{t.finalcta.privacyBtn}</Link>
+                <Link className="btn btn-privacy" href="/privacy_policy"><span><Ic name="shield" />{t.finalcta.privacyBtn}</span></Link>
               </div>
             </div>
           </div>

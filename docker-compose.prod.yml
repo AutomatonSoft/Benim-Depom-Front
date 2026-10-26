@@ -10,6 +10,7 @@ services:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
+      BACKEND_URL: ${BACKEND_URL:?Set BACKEND_URL in .deploy.env}
 
     ports:
       - "127.0.0.1:${APP_BIND_PORT:-18083}:3000"

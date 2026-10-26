@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:seller": "node --experimental-strip-types --test tests/seller-api.test.mjs tests/seller-statistics.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.3.3",

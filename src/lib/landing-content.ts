@@ -43,7 +43,7 @@ type IconCard = { icon: IconName; title: string; text: string };
 
 export type LandingDict = {
   navItems: { href: string; label: string }[];
-  nav: { cta: string };
+  nav: { cta: string; sellerLogin: string };
   heroTags: string[];
   hero: {
     titlePre: string;
@@ -178,6 +178,7 @@ export const CONTACT = {
 
 export const APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.benimdepom";
 export const IOS_APP_DOWNLOAD_URL = "https://apps.apple.com/app/benimdepom/id6815613593?l=ru";
+export const SELLER_LOGIN_PATH = "/seller/login";
 
 export const MARKETPLACES = ["OTTO", "Kaufland", "Hood.de"];
 
@@ -193,7 +194,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       { href: "#faq", label: "FAQ" },
       { href: "#contact", label: "Kontakt" },
     ],
-    nav: { cta: "App herunterladen" },
+    nav: { cta: "App herunterladen", sellerLogin: "Anmelden" },
     heroTags: ["Mobile Produkterfassung", "AI-Bilder & Produkttexte", "Europäische Marktplätze", "Export & Logistik"],
     hero: {
       titlePre: "Ihr Lager. ",
@@ -493,7 +494,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       { href: "#faq", label: "FAQ" },
       { href: "#contact", label: "Contact" },
     ],
-    nav: { cta: "Get the App" },
+    nav: { cta: "Get the App", sellerLogin: "Sign in" },
     heroTags: ["Mobile product capture", "AI images & product texts", "European marketplaces", "Export & logistics"],
     hero: {
       titlePre: "Your Warehouse. ",
@@ -791,7 +792,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       { href: "#faq", label: "SSS" },
       { href: "#contact", label: "İletişim" },
     ],
-    nav: { cta: "Uygulamayı İndir" },
+    nav: { cta: "Uygulamayı İndir", sellerLogin: "Giriş Yap" },
     heroTags: ["Mobil ürün girişi", "AI görselleri ve ürün metinleri", "Avrupa pazaryerleri", "İhracat ve lojistik"],
     hero: {
       titlePre: "Deponuz. ",
