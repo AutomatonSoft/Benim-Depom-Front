@@ -6,6 +6,7 @@ import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState
 
 import { RefreshCw, Trash2, Upload, X } from "lucide-react";
 import { WhatsAppLink } from "@/components/manager/whatsapp-link";
+import ProductPhotoViewer from "@/components/ProductPhotoViewer";
 import {
   EmptyState,
   Feedback,
@@ -851,6 +852,7 @@ export default function ProductWorkspacePage() {
   const [negotiateMessage, setNegotiateMessage] = useState("");
   const [negotiateOpen, setNegotiateOpen] = useState(false);
   const [selectedImageKey, setSelectedImageKey] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<GalleryItem | null>(null);
   const [draftForm, setDraftForm] = useState<DraftForm | null>(null);
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
@@ -2158,8 +2160,10 @@ export default function ProductWorkspacePage() {
               <div className="relative grid min-h-[280px] place-items-center overflow-hidden rounded-2xl border border-border bg-[#f3f6fa]">
                 {selectedGalleryItem ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={selectedGalleryItem.previewUrl} alt={selectedGalleryItem.label} fetchPriority="high" decoding="async" className="max-h-[420px] w-full object-contain" />
+                    <button type="button" className="w-full cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label={selectedGalleryItem.label} onClick={() => setViewingImage(selectedGalleryItem)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={selectedGalleryItem.previewUrl} alt={selectedGalleryItem.label} fetchPriority="high" decoding="async" className="max-h-[420px] w-full object-contain" />
+                    </button>
                     {selectedGalleryItem.generated ? (
                       <span className="absolute left-3 top-3 rounded-lg bg-[var(--brand-accent)] px-2 py-1 text-[11px] font-extrabold text-white">
                         {t("product.aiGenerated")}
@@ -2194,9 +2198,6 @@ export default function ProductWorkspacePage() {
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <strong className="font-extrabold text-primary">{selectedGalleryItem.label}</strong>
                   <span className="text-muted-foreground">{selectedImageIndex + 1} / {galleryItems.length}</span>
-                  <a className="font-bold text-[var(--brand-accent)] hover:underline" href={selectedGalleryItem.url} target="_blank" rel="noreferrer">
-                    {t("product.openTab")}
-                  </a>
                   <label aria-disabled={saving} className={cn("inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-xs font-bold text-primary hover:bg-secondary", saving ? "cursor-not-allowed opacity-50" : "cursor-pointer")}>
                     {replacingPhotoKey === selectedGalleryItem.key ? <RefreshCw className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
                     {replacingPhotoKey === selectedGalleryItem.key ? t("product.replacePending") : t("product.replaceImage")}
@@ -2965,6 +2966,7 @@ export default function ProductWorkspacePage() {
         </div>
       ) : null}
 
+      <ProductPhotoViewer src={viewingImage?.url ?? null} title={viewingImage?.label || t("product.images")} closeLabel={t("common.close")} onClose={() => setViewingImage(null)} />
       <Dialog open={negotiateOpen} onOpenChange={setNegotiateOpen}>
         <DialogContent className="sm:max-w-lg" showCloseButton>
           <DialogHeader className="min-w-0">

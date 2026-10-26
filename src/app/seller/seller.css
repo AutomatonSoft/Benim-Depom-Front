@@ -1047,11 +1047,6 @@
 .seller-gallery-preview > img,
 .seller-gallery-preview > .seller-image-placeholder { display: block; width: 100%; height: 100%; object-fit: cover; }
 .seller-gallery-preview:focus-visible { outline: 3px solid #f7b85f; outline-offset: -4px; }
-.seller-photo-viewer[data-slot="dialog-content"] { display: flex; width: calc(100vw - 32px); max-width: 1500px; height: 92dvh; max-height: calc(100dvh - 32px); align-items: center; justify-content: center; padding: 48px 20px 20px; border: 1px solid #ffffff20; border-radius: 16px; background: #080b10; color: #fff; box-shadow: 0 24px 100px #0009; }
-.seller-photo-viewer .seller-photo-viewer-image { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
-.seller-photo-viewer-close { position: absolute; top: 10px; right: 12px; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid #ffffff30; border-radius: 50%; background: #ffffff15; color: #fff; cursor: pointer; }
-.seller-photo-viewer-close:hover { background: #ffffff30; }
-.seller-photo-viewer-close:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .seller-gallery-star,
 .seller-gallery-remove { position: absolute; top: 8px; display: grid; width: 32px; height: 32px; place-items: center; padding: 0; border: 1px solid rgb(255 255 255 / 80%); border-radius: 50%; background: rgb(255 255 255 / 94%); color: #294563; box-shadow: 0 2px 8px rgb(20 47 85 / 10%); cursor: pointer; }
 .seller-gallery-star { left: 8px; }

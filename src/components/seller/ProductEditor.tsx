@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
-import { Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Save, Star, Tag, Trash2, Warehouse, X, type LucideIcon } from "lucide-react";
+import { Camera, Info, Layers, LoaderCircle, Palette, Plus, Ruler, Save, Star, Tag, Trash2, Warehouse, type LucideIcon } from "lucide-react";
+import ProductPhotoViewer from "@/components/ProductPhotoViewer";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import OttoFields, { type OttoValue } from "@/components/seller/OttoFields";
@@ -12,7 +13,6 @@ import { SellerApiError, sellerRequest, type SellerImage, type SellerProduct, ty
 import { sellerProductErrorDetails } from "@/lib/seller-product-errors";
 import { makeSellerPhotoPrimary, reorderSellerPhoto } from "@/lib/seller-product-photos";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerProductReviewFields, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
 
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
@@ -559,12 +559,6 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
       </div>
       </fieldset>
     </form>
-    <Dialog open={viewingPhoto !== null} onOpenChange={open => { if (!open) setViewingPhoto(null); }}>
-      <DialogContent className="seller-photo-viewer" showCloseButton={false} aria-describedby={undefined} onClick={event => { if (event.target === event.currentTarget) setViewingPhoto(null); }}>
-        <DialogTitle className="sr-only">{t("Product photo")}</DialogTitle>
-        <DialogClose asChild><button type="button" className="seller-photo-viewer-close" aria-label={t("Close")}><X size={24} aria-hidden="true" /></button></DialogClose>
-        {viewingPhoto && <SellerProductImage key={viewingPhoto.key} className="seller-photo-viewer-image" src={viewingPhoto.kind === "saved" ? viewingPhoto.image.image || viewingPhoto.image.preview || viewingPhoto.image.thumbnail : viewingPhoto.preview} alt={t("Product photo")} />}
-      </DialogContent>
-    </Dialog>
+    <ProductPhotoViewer src={viewingPhoto ? viewingPhoto.kind === "saved" ? viewingPhoto.image.image || viewingPhoto.image.preview || viewingPhoto.image.thumbnail : viewingPhoto.preview : null} title={t("Product photo")} closeLabel={t("Close")} onClose={() => setViewingPhoto(null)} />
   </SellerLocalized>;
 }

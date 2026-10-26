@@ -1,0 +1,5 @@
+.viewer[data-slot="dialog-content"] { display: flex; width: calc(100vw - 32px); max-width: 1500px; height: 92dvh; max-height: calc(100dvh - 32px); align-items: center; justify-content: center; padding: 48px 20px 20px; border: 1px solid #ffffff20; border-radius: 16px; background: #080b10; color: #fff; box-shadow: 0 24px 100px #0009; }
+.viewer .image { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+.close { position: absolute; top: 10px; right: 12px; display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid #ffffff30; border-radius: 50%; background: #ffffff15; color: #fff; cursor: pointer; }
+.close:hover { background: #ffffff30; }
+.close:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
