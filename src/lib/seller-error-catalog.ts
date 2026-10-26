@@ -1,5 +1,7 @@
 // Messages returned by the seller-facing Django serializers and services.
 export const sellerErrorCatalog: Record<string, [string, string, string, string]> = {
+  "Photo storage is temporarily full. Please try again later.": ["Photo storage is temporarily full. Please try again later.", "Хранилище фотографий временно заполнено. Попробуйте позже.", "Fotoğraf depolama alanı geçici olarak dolu. Lütfen daha sonra tekrar deneyin.", "Der Fotospeicher ist vorübergehend voll. Bitte versuchen Sie es später erneut."],
+  "This photo upload cannot be retried right now.": ["This photo upload cannot be retried right now.", "Сейчас нельзя повторить эту загрузку фотографий.", "Bu fotoğraf yüklemesi şu anda tekrar denenemez.", "Dieser Foto-Upload kann derzeit nicht wiederholt werden."],
   "Enter a colour name.": ["Enter a colour name.", "Укажите цвет товара.", "Ürünün rengini girin.", "Geben Sie die Produktfarbe an."],
   "Material names must not be empty.": ["Enter a name for each material.", "Укажите название каждого материала.", "Her malzemenin adını girin.", "Geben Sie für jedes Material einen Namen an."],
   "Material names must be unique within one variant.": ["Choose different materials. The same material is listed twice.", "Выберите разные материалы. Один материал указан дважды.", "Farklı malzemeler seçin. Aynı malzeme iki kez yazılmış.", "Wählen Sie unterschiedliche Materialien. Ein Material ist doppelt angegeben."],
