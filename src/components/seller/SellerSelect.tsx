@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -8,6 +8,35 @@ import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { toggleSellerMultiValue } from "@/lib/seller-select";
 
 export type SellerSelectOption = { value: string; label: string; disabled?: boolean };
+
+const mobileQuery = "(max-width: 800px)";
+function subscribeMobile(onChange: () => void) {
+  const media = window.matchMedia(mobileQuery);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
+function SellerSelectPopover({ children }: { children: ReactNode }) {
+  const mobile = useSyncExternalStore(subscribeMobile, () => window.matchMedia(mobileQuery).matches, () => false);
+  const [searchActive, setSearchActive] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  return <PopoverContent ref={contentRef} align="start" sideOffset={5} side="bottom" avoidCollisions={!mobile}
+    collisionPadding={mobile ? { top: 12, bottom: 92 } : undefined}
+    className="seller-select-popover" data-search-active={mobile && searchActive ? "true" : undefined}
+    onOpenAutoFocus={event => {
+      setSearchActive(false);
+      if (!mobile) return;
+      event.preventDefault();
+      const trigger = document.activeElement;
+      if (trigger instanceof HTMLElement && (window.visualViewport?.height ?? window.innerHeight) - trigger.getBoundingClientRect().bottom < 280) {
+        trigger.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      contentRef.current?.focus({ preventScroll: true });
+    }}
+    onFocusCapture={event => { if (mobile && event.target instanceof HTMLInputElement) setSearchActive(true); }}>
+    {children}
+  </PopoverContent>;
+}
 
 type SellerSelectProps = {
   options: SellerSelectOption[];
@@ -67,7 +96,7 @@ function SellerSelectBase({
         <ChevronDown size={17} strokeWidth={1.8} aria-hidden="true" />
       </button>
     </PopoverTrigger>
-    <PopoverContent align="start" sideOffset={5} className="seller-select-popover">
+    <SellerSelectPopover>
       <Command shouldFilter={!onSearchChange} className="seller-select-command">
         {searchable && <CommandInput
           value={query}
@@ -96,7 +125,7 @@ function SellerSelectBase({
           </CommandGroup>
         </CommandList>
       </Command>
-    </PopoverContent>
+    </SellerSelectPopover>
   </Popover>;
 }
 
@@ -138,7 +167,7 @@ export function SellerMultiSelect({
         <ChevronDown size={17} strokeWidth={1.8} aria-hidden="true" />
       </button>
     </PopoverTrigger>
-    <PopoverContent align="start" sideOffset={5} className="seller-select-popover">
+    <SellerSelectPopover>
       <Command shouldFilter={!onSearchChange} className="seller-select-command">
         {searchable && <CommandInput value={query} onValueChange={setQuery} placeholder={t("Search options")} aria-label={t("Search options")} className="seller-select-search-input" />}
         <CommandList id={listId} className="seller-select-list">
@@ -157,6 +186,6 @@ export function SellerMultiSelect({
           </CommandGroup>
         </CommandList>
       </Command>
-    </PopoverContent>
+    </SellerSelectPopover>
   </Popover>;
 }
