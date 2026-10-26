@@ -55,26 +55,35 @@ type SellerSelectProps = {
   loading?: boolean;
   emptyMessage?: string;
   className?: string;
+  optionPageSize?: number;
 };
 
 function SellerSelectBase({
   options, value, selectedLabel, onValueChange, placeholder, ariaLabel, disabled = false, searchable = false,
   searchValue, onSearchChange, loading = false, emptyMessage, className = "",
+  optionPageSize,
   "aria-required": ariaRequired, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy,
 }: SellerSelectProps) {
   const { t } = useSellerI18n();
   const [open, setOpen] = useState(false);
   const [internalSearch, setInternalSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(optionPageSize ?? Infinity);
   const listId = useId();
   const selected = options.find(option => option.value === value);
   const query = searchValue ?? internalSearch;
   const setQuery = (next: string) => {
+    setVisibleCount(optionPageSize ?? Infinity);
     setInternalSearch(next);
     onSearchChange?.(next);
   };
+  const matchingOptions = optionPageSize && query.trim() && !onSearchChange
+    ? options.filter(option => option.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    : options;
+  const visibleOptions = optionPageSize ? matchingOptions.slice(0, visibleCount) : matchingOptions;
 
   return <Popover open={open} onOpenChange={next => {
     setOpen(next);
+    if (next) setVisibleCount(optionPageSize ?? Infinity);
     if (!next) setQuery("");
   }}>
     <PopoverTrigger asChild>
@@ -97,7 +106,7 @@ function SellerSelectBase({
       </button>
     </PopoverTrigger>
     <SellerSelectPopover>
-      <Command shouldFilter={!onSearchChange} className="seller-select-command">
+      <Command shouldFilter={!onSearchChange && !optionPageSize} className="seller-select-command">
         {searchable && <CommandInput
           value={query}
           onValueChange={setQuery}
@@ -105,10 +114,13 @@ function SellerSelectBase({
           aria-label={t("Search options")}
           className="seller-select-search-input"
         />}
-        <CommandList id={listId} className="seller-select-list">
+        <CommandList id={listId} className="seller-select-list" onScroll={event => {
+          const list = event.currentTarget;
+          if (optionPageSize && list.scrollHeight - list.scrollTop - list.clientHeight < 80) setVisibleCount(current => current + optionPageSize);
+        }}>
           <CommandEmpty>{loading ? t("Loading…") : t(emptyMessage || "No options available.")}</CommandEmpty>
           <CommandGroup>
-            {options.map(option => <CommandItem
+            {visibleOptions.map(option => <CommandItem
               key={option.value}
               value={`${option.value} ${option.label}`}
               disabled={option.disabled}

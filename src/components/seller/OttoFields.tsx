@@ -9,7 +9,8 @@ import { sellerRequest } from "@/lib/seller";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import { SellerMultiSelect, SellerSearchableSelect } from "@/components/seller/SellerSelect";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -225,6 +226,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
             <SellerSearchableSelect
               value={value.group == null ? "" : String(value.group)}
               disabled={loadingGroups}
+              optionPageSize={80}
               placeholder={loadingGroups ? t("Loading…") : t("No category group")}
               options={[{ value: "", label: loadingGroups ? t("Loading…") : t("No category group") }, ...groups.map(group => ({ value: String(group.category_group_id), label: group.category_group }))]}
               onValueChange={selected => changeGroup(Number(selected) || null)}
@@ -256,10 +258,13 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
             open={pickerOpen}
             onOpenChange={open => { setPickerOpen(open); if (!open) setSearch(""); }}
           >
-            <DialogContent ref={pickerRef} className="seller-otto-picker" showCloseButton={false} onOpenAutoFocus={event => {
+            <DialogPrimitive.Portal>
+            <DialogPrimitive.Overlay className="seller-otto-picker-overlay" />
+            <div className="seller-otto-picker-frame">
+            <DialogPrimitive.Content ref={pickerRef} className="seller-otto-picker" onOpenAutoFocus={event => {
               if (window.matchMedia("(max-width: 800px)").matches) {
                 event.preventDefault();
-                pickerRef.current?.focus();
+                pickerRef.current?.focus({ preventScroll: true });
               }
             }}>
             <DialogTitle className="sr-only">{t("Add attribute")}</DialogTitle>
@@ -284,7 +289,9 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
                 </CommandGroup>
               </CommandList>
             </Command>
-            </DialogContent>
+            </DialogPrimitive.Content>
+            </div>
+            </DialogPrimitive.Portal>
           </Dialog>
         </div>}
         {error && <p className="seller-notice seller-notice-error" data-seller-translate="skip">{error}</p>}

@@ -13,7 +13,7 @@ function loadCatalog<T>(path: string): Promise<T[]> {
   const existing = cache.get(key);
   if (existing && existing.expires > Date.now()) return existing.promise as Promise<T[]>;
   try {
-    const saved = JSON.parse(sessionStorage.getItem(key) || "null");
+    const saved = JSON.parse(localStorage.getItem(key) || "null");
     if (saved?.expires > Date.now() && Array.isArray(saved.values)) {
       const promise = Promise.resolve(saved.values as T[]);
       cache.set(key, { expires: saved.expires, promise });
@@ -22,9 +22,9 @@ function loadCatalog<T>(path: string): Promise<T[]> {
   } catch { /* Storage may be unavailable; keep the in-memory cache. */ }
 
   const expires = Date.now() + lifetime;
-  const promise = loadOttoCatalogPages<T>(path, url => sellerRequest<OttoCatalogPage<T>>(url))
+  const promise = loadOttoCatalogPages<T>(path, url => sellerRequest<OttoCatalogPage<T>>(url), 3)
     .then(values => {
-      try { sessionStorage.setItem(key, JSON.stringify({ expires, values })); } catch { /* The tab's storage may be full. */ }
+      try { localStorage.setItem(key, JSON.stringify({ expires, values })); } catch { /* Browser storage may be full. */ }
       return values;
     }).catch(error => { cache.delete(key); throw error; });
   cache.set(key, { expires, promise });
