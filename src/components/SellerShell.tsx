@@ -9,6 +9,7 @@ import { clearSellerSession, clearSellerToken, saveSellerProfileId, sellerAvatar
 import { readSellerLocale, setSellerLocale } from "@/lib/seller-i18n";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import SellerAuthFrame from "@/components/seller/SellerAuthFrame";
+import { prefetchSellerOttoCatalog } from "@/lib/seller-otto-catalog";
 
 const links = [
   ["/seller/products", "My products", Package], ["/seller/products/new", "Add product", Plus],
@@ -39,7 +40,7 @@ export function SellerLoadingState({ label, rows = 3 }: { label: string; rows?: 
 }
 
 export default function SellerShell({ children }: { children: ReactNode }) {
-  const { t } = useSellerI18n();
+  const { t, locale } = useSellerI18n();
   const pathname = usePathname();
   const router = useRouter();
   const isPublic = publicRoutes.includes(pathname);
@@ -48,6 +49,14 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   const [retry, setRetry] = useState(0);
   const [unread, setUnread] = useState(0);
   const profileMenuRef = useRef<HTMLDetailsElement>(null);
+  const sellerId = profile?.id;
+
+  useEffect(() => {
+    if (isPublic || !sellerId) return;
+    const controller = new AbortController();
+    void prefetchSellerOttoCatalog(locale, controller.signal).catch(() => controller.abort());
+    return () => controller.abort();
+  }, [isPublic, sellerId, locale]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -55,6 +64,8 @@ export default function SellerShell({ children }: { children: ReactNode }) {
     const update = () => {
       document.documentElement.style.setProperty("--seller-viewport-height", `${viewport.height}px`);
       document.documentElement.style.setProperty("--seller-viewport-top", `${viewport.offsetTop}px`);
+      document.documentElement.style.setProperty("--seller-viewport-left", `${viewport.offsetLeft}px`);
+      document.documentElement.style.setProperty("--seller-viewport-width", `${viewport.width}px`);
     };
     update();
     viewport.addEventListener("resize", update);
@@ -64,6 +75,8 @@ export default function SellerShell({ children }: { children: ReactNode }) {
       viewport.removeEventListener("scroll", update);
       document.documentElement.style.removeProperty("--seller-viewport-height");
       document.documentElement.style.removeProperty("--seller-viewport-top");
+      document.documentElement.style.removeProperty("--seller-viewport-left");
+      document.documentElement.style.removeProperty("--seller-viewport-width");
     };
   }, []);
 

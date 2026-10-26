@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, RotateCcw, Shapes, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, RotateCcw, Shapes, Trash2, X } from "lucide-react";
 import { ottoCatalogPath, type OttoCatalogLanguage } from "@/lib/listings";
-import { loadOttoCatalogPages, parseOttoAttributeValue, type OttoCatalogPage, updateOttoAttribute } from "@/lib/otto-catalog";
+import { parseOttoAttributeValue, updateOttoAttribute } from "@/lib/otto-catalog";
+import { loadSellerOttoGroups, loadSellerOttoCategories, type SellerOttoGroup as Group, type SellerOttoCategory as Category } from "@/lib/seller-otto-catalog";
 import { sellerRequest } from "@/lib/seller";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import { SellerMultiSelect, SellerSearchableSelect } from "@/components/seller/SellerSelect";
-import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-type Group = { category_group_id: number; category_group: string };
-type Category = { category_id: number; name: string };
 type Attribute = {
   attribute_id: number;
   name: string;
@@ -47,9 +47,11 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
   const [search, setSearch] = useState("");
   const [selectedAttributeIds, setSelectedAttributeIds] = useState<number[]>(() => Object.keys(value.attributes).map(Number).filter(Number.isSafeInteger));
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -58,7 +60,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
       setLoadingGroups(true);
       setError("");
       try {
-        const result = await loadOttoCatalogPages<Group>(ottoCatalogPath("category-groups", language), url => sellerRequest<OttoCatalogPage<Group>>(url, { signal: controller.signal }));
+        const result = await loadSellerOttoGroups(language);
         if (!controller.signal.aborted) setGroups(result);
       } catch (e) {
         if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Could not load OTTO categories.");
@@ -70,20 +72,34 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
   }, [language]);
 
   useEffect(() => {
+    let active = true;
+    void Promise.resolve().then(async () => {
+      if (!active) return;
+      setCategories([]);
+      setLoadingCategories(Boolean(value.group));
+      if (!value.group) return;
+      try {
+        const result = await loadSellerOttoCategories(language, value.group);
+        if (active) setCategories(result);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Could not load category data.");
+      } finally {
+        if (active) setLoadingCategories(false);
+      }
+    });
+    return () => { active = false; };
+  }, [value.group, language]);
+
+  useEffect(() => {
     const controller = new AbortController();
     void Promise.resolve().then(async () => {
       if (!value.group || controller.signal.aborted) return;
-      setCategories([]);
       setAttributes([]);
       setError("");
       setLoadingDetails(true);
       try {
-        const [categoryResponse, attributeResponse] = await Promise.all([
-          loadOttoCatalogPages<Category>(ottoCatalogPath(`category-groups/${value.group}/categories`, language), url => sellerRequest<OttoCatalogPage<Category>>(url, { signal: controller.signal })),
-          sellerRequest<Attribute[]>(ottoCatalogPath(`category-groups/${value.group}/attributes`, language), { signal: controller.signal }),
-        ]);
+        const attributeResponse = await sellerRequest<Attribute[]>(ottoCatalogPath(`category-groups/${value.group}/attributes`, language), { signal: controller.signal });
         if (!controller.signal.aborted) {
-          setCategories(categoryResponse);
           setAttributes(attributeResponse || []);
         }
       } catch (e) {
@@ -197,7 +213,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
     </label>;
   }
 
-  const categoryPlaceholder = !value.group ? t("Select a category group first") : loadingDetails ? t("Loading…") : t("No category");
+  const categoryPlaceholder = !value.group ? t("Select a category group first") : loadingCategories ? t("Loading…") : t("No category");
 
   return <SellerLocalized>
     <section className="seller-card seller-otto-card">
@@ -217,7 +233,7 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
           <label className="seller-field">{t("Category")}
             <SellerSearchableSelect
               value={value.category == null ? "" : String(value.category)}
-              disabled={!value.group || loadingDetails}
+              disabled={!value.group || loadingCategories}
               placeholder={categoryPlaceholder}
               options={[{ value: "", label: categoryPlaceholder }, ...categories.map(category => ({ value: String(category.category_id), label: category.name }))]}
               onValueChange={selected => onChange({ ...value, category: Number(selected) || null })}
@@ -236,13 +252,19 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
             {renderAttribute(attribute)}
             <button type="button" className="seller-icon-button danger" aria-label={`${t("Remove attribute")}: ${attribute.name}`} title={t("Remove attribute")} onClick={() => removeAttribute(attribute.attribute_id)}><Trash2 size={17} aria-hidden="true" /></button>
           </div>) : <p className="seller-field-hint">{t("No attributes selected yet.")}</p>}
-          <CommandDialog
+          <Dialog
             open={pickerOpen}
             onOpenChange={open => { setPickerOpen(open); if (!open) setSearch(""); }}
-            title={t("Add attribute")}
-            description={t("Search the OTTO catalog and choose an attribute.")}
-            className="seller-otto-picker"
           >
+            <DialogContent ref={pickerRef} className="seller-otto-picker" showCloseButton={false} onOpenAutoFocus={event => {
+              if (window.matchMedia("(max-width: 800px)").matches) {
+                event.preventDefault();
+                pickerRef.current?.focus();
+              }
+            }}>
+            <DialogTitle className="sr-only">{t("Add attribute")}</DialogTitle>
+            <DialogDescription className="sr-only">{t("Search the OTTO catalog and choose an attribute.")}</DialogDescription>
+            <div className="seller-otto-picker-mobile-heading"><strong>{t("Add attribute")}</strong><DialogClose asChild><button type="button" className="seller-icon-button" aria-label={t("Close")}><X size={20} aria-hidden="true" /></button></DialogClose></div>
             <Command>
               <CommandInput value={search} onValueChange={setSearch} placeholder={t("Search OTTO attributes")} />
               <CommandList>
@@ -262,7 +284,8 @@ export default function OttoFields({ value, onChange }: { value: OttoValue; onCh
                 </CommandGroup>
               </CommandList>
             </Command>
-          </CommandDialog>
+            </DialogContent>
+          </Dialog>
         </div>}
         {error && <p className="seller-notice seller-notice-error" data-seller-translate="skip">{error}</p>}
       </div>
