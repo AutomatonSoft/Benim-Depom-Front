@@ -30,5 +30,5 @@ export function sellerSalesStatsUrl(range: SellerDateRange, productId: string) {
   if (range.from) query.set("from", range.from);
   if (range.to) query.set("to", range.to);
   if (productId) query.set("product_id", productId);
-  return `/api/v1/products/sales-stats/${query.size ? `?${query}` : ""}`;
+  return `/api/v2/products/sales-stats/${query.size ? `?${query}` : ""}`;
 }

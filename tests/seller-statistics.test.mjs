@@ -26,9 +26,9 @@ test("preserves zero and null revenue values", () => {
 test("keeps the date range and selected product in the existing API query", () => {
   assert.equal(
     sellerSalesStatsUrl({ from: "2026-09-24", to: "2026-10-23" }, "20"),
-    "/api/v1/products/sales-stats/?from=2026-09-24&to=2026-10-23&product_id=20",
+    "/api/v2/products/sales-stats/?from=2026-09-24&to=2026-10-23&product_id=20",
   );
-  assert.equal(sellerSalesStatsUrl({ from: "2026-09-24", to: "2026-10-23" }, ""), "/api/v1/products/sales-stats/?from=2026-09-24&to=2026-10-23");
-  assert.equal(sellerSalesStatsUrl({ from: "", to: "" }, "20"), "/api/v1/products/sales-stats/?product_id=20");
-  assert.equal(sellerSalesStatsUrl({ from: "", to: "" }, ""), "/api/v1/products/sales-stats/");
+  assert.equal(sellerSalesStatsUrl({ from: "2026-09-24", to: "2026-10-23" }, ""), "/api/v2/products/sales-stats/?from=2026-09-24&to=2026-10-23");
+  assert.equal(sellerSalesStatsUrl({ from: "", to: "" }, "20"), "/api/v2/products/sales-stats/?product_id=20");
+  assert.equal(sellerSalesStatsUrl({ from: "", to: "" }, ""), "/api/v2/products/sales-stats/");
 });

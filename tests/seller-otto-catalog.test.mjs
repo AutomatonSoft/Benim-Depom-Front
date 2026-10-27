@@ -50,7 +50,7 @@ test("seller OTTO cache shares requests, separates languages, retries failures a
   assert.equal(urls.length, 9);
   assert.equal(urls.at(-1).includes("/categories/"), false);
 
-  saved.set("seller-otto-v1:/api/v1/catalog/otto/category-groups/612/categories/en/", JSON.stringify({ expires: 0, values: [{ category_id: 99, name: "Outdated" }] }));
+  saved.set("seller-otto-v1:/api/v2/catalog/otto/category-groups/612/categories/en/", JSON.stringify({ expires: 0, values: [{ category_id: 99, name: "Outdated" }] }));
   assert.deepEqual(await loadSellerOttoCategories("en", 612), []);
   globalThis.localStorage = { getItem(key) { if (key === "benim_seller_access_token") return "seller-access"; throw new Error("Storage disabled"); }, setItem() { throw new Error("Storage disabled"); } };
   assert.deepEqual(await loadSellerOttoCategories("en", 613), []);

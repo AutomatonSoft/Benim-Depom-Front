@@ -121,7 +121,7 @@ test("availability cards update immediately and storage sync cannot unlock dupli
           rememberAvailabilityAnswer: (_, id, value) => { saved[id] = value; },
           SELLER_PROFILE_CHANGED_EVENT: "seller-profile-updated",
           sellerRequest: (path, init) => {
-            assert.equal(path, "/api/v1/products/20/availability/");
+            assert.equal(path, "/api/v2/products/20/availability/");
             assert.deepEqual(JSON.parse(init.body), { is_available: answer });
             posts++;
             return new Promise(resolve => { finishPost = resolve; });

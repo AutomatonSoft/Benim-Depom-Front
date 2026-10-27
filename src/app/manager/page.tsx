@@ -91,8 +91,8 @@ function isSameLocalDay(value: string) {
 
 async function loadFallbackDashboard(): Promise<Dashboard> {
   const [submittedResponse, sellersResponse] = await Promise.all([
-    authorizedFetch("/api/v1/manager/products/?status=submitted&page=1"),
-    authorizedFetch("/api/v1/manager/users/sellers/?is_active=true&page=1"),
+    authorizedFetch("/api/v2/manager/products/?status=submitted&page=1"),
+    authorizedFetch("/api/v2/manager/users/sellers/?is_active=true&page=1"),
   ]);
 
   if (!submittedResponse.ok) throw new Error(`Products HTTP ${submittedResponse.status}`);
@@ -137,8 +137,8 @@ export default function Home() {
       setError("");
       try {
         const [dashboardResponse, meResponse] = await Promise.all([
-          authorizedFetch("/api/v1/manager/dashboard/"),
-          authorizedFetch("/api/v1/auth/me/"),
+          authorizedFetch("/api/v2/manager/dashboard/"),
+          authorizedFetch("/api/v2/auth/me/"),
         ]);
 
         if (dashboardResponse.status === 401 || meResponse.status === 401) {

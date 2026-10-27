@@ -1038,7 +1038,7 @@ export default function ProductWorkspacePage() {
         color: draftForm.color.trim(),
         material_composition: draftForm.materialComposition.trim(),
       };
-      const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${generation.id}/`, {
+      const response = await authorizedFetch(`/api/v2/orchestrator/ai-content/generations/${generation.id}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
@@ -1068,7 +1068,7 @@ export default function ProductWorkspacePage() {
         : listingTargets;
       const applyTargets = targets.length ? targets : allowed;
       const response = await authorizedFetch(
-        `/api/v1/orchestrator/products/${productId}/ai-content/generations/${generation.id}/apply/`,
+        `/api/v2/orchestrator/products/${productId}/ai-content/generations/${generation.id}/apply/`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1093,7 +1093,7 @@ export default function ProductWorkspacePage() {
       setError("");
     }
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/`);
+      const response = await authorizedFetch(`/api/v2/products/${productId}/`);
       if (response.status === 401) {
         router.replace("/manager/login");
         return null;
@@ -1117,7 +1117,7 @@ export default function ProductWorkspacePage() {
     setHistoryError("");
     setHistoryLoading(true);
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/moderation-history/?page=${page}`);
+      const response = await authorizedFetch(`/api/v2/products/${productId}/moderation-history/?page=${page}`);
       if (!response.ok) throw new Error();
       const data = await response.json();
       const results = Array.isArray(data) ? data : data.results ?? [];
@@ -1138,7 +1138,7 @@ export default function ProductWorkspacePage() {
     setPriceHistoryError("");
     setPriceHistoryLoading(true);
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/price-negotiations/?page=${page}`);
+      const response = await authorizedFetch(`/api/v2/products/${productId}/price-negotiations/?page=${page}`);
       if (!response.ok) throw new Error();
       const data = await response.json();
       const results = Array.isArray(data) ? data : data.results ?? [];
@@ -1159,7 +1159,7 @@ export default function ProductWorkspacePage() {
 
     async function loadInitialProduct() {
       try {
-        const response = await authorizedFetch(`/api/v1/products/${productId}/`);
+        const response = await authorizedFetch(`/api/v2/products/${productId}/`);
         if (response.status === 401) return void router.replace("/manager/login");
         if (response.status === 404) throw new Error(t("product.notFound"));
         if (!response.ok) throw new Error(t("product.loadError"));
@@ -1190,7 +1190,7 @@ export default function ProductWorkspacePage() {
 
     async function restoreGeneration() {
       try {
-        const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${savedGenerationId}/`);
+        const response = await authorizedFetch(`/api/v2/orchestrator/ai-content/generations/${savedGenerationId}/`);
         if (!response.ok) {
           window.localStorage.removeItem(generationStorageKey(productId));
           return;
@@ -1259,7 +1259,7 @@ export default function ProductWorkspacePage() {
       if (form.listing_price_eur && form.listing_price_eur !== (product?.listing_price_eur ?? "")) {
         payload.listing_price_eur_override = form.listing_price_eur;
       }
-      const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
+      const response = await authorizedFetch(`/api/v2/products/${productId}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
       const data = await response.json().catch(() => ({}));
@@ -1272,7 +1272,7 @@ export default function ProductWorkspacePage() {
   async function saveProductFormula(overrides: Record<string, unknown>) {
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
+      const response = await authorizedFetch(`/api/v2/products/${productId}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pricing_overrides: overrides }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1286,7 +1286,7 @@ export default function ProductWorkspacePage() {
   async function resetProductFormula() {
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
+      const response = await authorizedFetch(`/api/v2/products/${productId}/`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pricing_overrides: {} }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1301,7 +1301,7 @@ export default function ProductWorkspacePage() {
     if (action === "reject" && !rejectComment.trim()) { setError("Enter a reason before rejecting the product."); return; }
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/${action}/`, {
+      const response = await authorizedFetch(`/api/v2/manager/products/${productId}/${action}/`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(action === "reject" ? { comment: rejectComment.trim() } : {}),
@@ -1327,7 +1327,7 @@ export default function ProductWorkspacePage() {
     }
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/status/`, {
+      const response = await authorizedFetch(`/api/v2/manager/products/${productId}/status/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -1363,7 +1363,7 @@ export default function ProductWorkspacePage() {
     const hadPending = Object.keys(product.pending_changes ?? {}).length > 0;
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/seller-changes/approve/`, {
+      const response = await authorizedFetch(`/api/v2/manager/products/${productId}/seller-changes/approve/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ expected_catalog_revision: product.catalog_revision }),
@@ -1401,7 +1401,7 @@ export default function ProductWorkspacePage() {
     const hadPending = Object.keys(product.pending_changes ?? {}).length > 0;
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/seller-changes/reject/`, {
+      const response = await authorizedFetch(`/api/v2/manager/products/${productId}/seller-changes/reject/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1436,7 +1436,7 @@ export default function ProductWorkspacePage() {
   async function requestAvailability() {
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/availability-request/`, { method: "POST" });
+      const response = await authorizedFetch(`/api/v2/manager/products/${productId}/availability-request/`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(apiErrorMessage(data, t("product.availabilityFailed")));
       setProduct(data as Product);
@@ -1464,7 +1464,7 @@ export default function ProductWorkspacePage() {
     setError("");
     setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/products/${productId}/price-negotiation/`, {
+      const response = await authorizedFetch(`/api/v2/manager/products/${productId}/price-negotiation/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1524,7 +1524,7 @@ export default function ProductWorkspacePage() {
     setSaving(true); setError(""); setFeedback("");
     try {
       const body = new FormData(); body.set("image", image); body.set("is_primary", String(!product?.images.length));
-      const response = await authorizedFetch(`/api/v1/products/${productId}/images/`, { method: "POST", body });
+      const response = await authorizedFetch(`/api/v2/products/${productId}/images/`, { method: "POST", body });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || "Image upload failed.");
       setFeedback("Image uploaded."); await loadProduct();
@@ -1572,7 +1572,7 @@ export default function ProductWorkspacePage() {
       body.set("image", file);
       body.set("mode", mode);
       const response = await authorizedFetch(
-        `/api/v1/products/${productId}/images/${coverImage.id}/generated/`,
+        `/api/v2/products/${productId}/images/${coverImage.id}/generated/`,
         { method: "POST", body },
       );
       const data = await response.json().catch(() => ({}));
@@ -1592,7 +1592,7 @@ export default function ProductWorkspacePage() {
     setSaving(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(
-        `/api/v1/products/${productId}/images/${imageId}/generated/${generatedId}/`,
+        `/api/v2/products/${productId}/images/${imageId}/generated/${generatedId}/`,
         { method: "DELETE" },
       );
       if (!response.ok) {
@@ -1615,7 +1615,7 @@ export default function ProductWorkspacePage() {
   async function deleteImage(imageId: number) {
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/images/${imageId}/`, { method: "DELETE" });
+      const response = await authorizedFetch(`/api/v2/products/${productId}/images/${imageId}/`, { method: "DELETE" });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.detail || "Image could not be deleted.");
@@ -1639,7 +1639,7 @@ export default function ProductWorkspacePage() {
     setProduct((current) => current ? { ...current, images: ordered } : current);
     setSaving(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/images/reorder/`, {
+      const response = await authorizedFetch(`/api/v2/products/${productId}/images/reorder/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image_ids: ordered.map((image) => image.id) }),
@@ -1713,8 +1713,8 @@ export default function ProductWorkspacePage() {
     setSaving(true); setError(""); setFeedback("");
     try {
       const path = mode === "xl_cover"
-        ? `/api/v1/products/${productId}/images/${imageId}/xl-cover/`
-        : `/api/v1/products/${productId}/images/${imageId}/process/`;
+        ? `/api/v2/products/${productId}/images/${imageId}/xl-cover/`
+        : `/api/v2/products/${productId}/images/${imageId}/process/`;
       const response = await authorizedFetch(path, {
         method: "POST",
         ...(mode === "external" ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) } : {}),
@@ -1730,7 +1730,7 @@ export default function ProductWorkspacePage() {
     if (descriptionGenerationInProgress) return;
     setGenerating(true); setError(""); setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/ai-content/generate/`, {
+      const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/ai-content/generate/`, {
         method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: listingTargets }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1747,7 +1747,7 @@ export default function ProductWorkspacePage() {
     if (!generation) return;
     setGenerating(true); setError("");
     try {
-      const response = await authorizedFetch(`/api/v1/orchestrator/ai-content/generations/${generation.id}/`);
+      const response = await authorizedFetch(`/api/v2/orchestrator/ai-content/generations/${generation.id}/`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || "Unable to check generation status.");
       const updatedGeneration = data as Generation;
@@ -2208,9 +2208,9 @@ export default function ProductWorkspacePage() {
                       disabled={saving}
                       onChange={(event) => {
                         if (selectedGalleryItem.generated && selectedGalleryItem.generatedId && selectedGalleryItem.sourceImageId) {
-                          void replacePhoto(`/api/v1/products/${productId}/images/${selectedGalleryItem.sourceImageId}/generated/${selectedGalleryItem.generatedId}/replace/`, event, selectedGalleryItem.key);
+                          void replacePhoto(`/api/v2/products/${productId}/images/${selectedGalleryItem.sourceImageId}/generated/${selectedGalleryItem.generatedId}/replace/`, event, selectedGalleryItem.key);
                         } else if (selectedGalleryItem.sourceImageId) {
-                          void replacePhoto(`/api/v1/products/${productId}/images/${selectedGalleryItem.sourceImageId}/replace/`, event, selectedGalleryItem.key);
+                          void replacePhoto(`/api/v2/products/${productId}/images/${selectedGalleryItem.sourceImageId}/replace/`, event, selectedGalleryItem.key);
                         }
                       }}
                     />
@@ -2479,7 +2479,7 @@ export default function ProductWorkspacePage() {
                       onOpen={() => openGeneratedImage("white")}
                       onAdd={(event) => void addGeneratedPhoto("white", event)}
                       adding={replacingPhotoKey === "add-white"}
-                      onReplace={(event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("white")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("white")?.id}`)}
+                      onReplace={(event) => void replacePhoto(`/api/v2/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("white")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("white")?.id}`)}
                       replacing={replacingPhotoKey === `generated-${generatedCoverByMode.get("white")?.id}`}
                       onDelete={() => {
                         const generated = generatedCoverByMode.get("white");
@@ -2501,7 +2501,7 @@ export default function ProductWorkspacePage() {
                       onOpen={() => xlCoverCandidate && setSelectedImageKey(`generated-${xlCoverCandidate.id}`)}
                       onAdd={(event) => void addGeneratedPhoto("xl_cover", event)}
                       adding={replacingPhotoKey === "add-xl_cover"}
-                      onReplace={xlCoverCandidate ? (event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${xlCoverCandidate.id}/replace/`, event, `generated-${xlCoverCandidate.id}`) : undefined}
+                      onReplace={xlCoverCandidate ? (event) => void replacePhoto(`/api/v2/products/${productId}/images/${coverImage.id}/generated/${xlCoverCandidate.id}/replace/`, event, `generated-${xlCoverCandidate.id}`) : undefined}
                       replacing={replacingPhotoKey === `generated-${xlCoverCandidate?.id}`}
                       onDelete={xlCoverCandidate ? () => setPendingDeleteGenerated({ imageId: coverImage.id, generatedId: xlCoverCandidate.id }) : undefined}
                       onRegenerate={generatedCoverByMode.has("white") ? () => void generateImage(coverImage.id, "xl_cover") : undefined}
@@ -2525,7 +2525,7 @@ export default function ProductWorkspacePage() {
                         onOpen={() => openGeneratedImage("interior")}
                         onAdd={(event) => void addGeneratedPhoto("interior", event)}
                         adding={replacingPhotoKey === "add-interior"}
-                        onReplace={generatedCoverByMode.get("interior") ? (event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("interior")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("interior")?.id}`) : undefined}
+                        onReplace={generatedCoverByMode.get("interior") ? (event) => void replacePhoto(`/api/v2/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("interior")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("interior")?.id}`) : undefined}
                         replacing={replacingPhotoKey === `generated-${generatedCoverByMode.get("interior")?.id}`}
                         onDelete={generatedCoverByMode.get("interior") ? () => setPendingDeleteGenerated({ imageId: coverImage.id, generatedId: generatedCoverByMode.get("interior")!.id }) : undefined}
                         disabled={saving || imageGenerationInProgress}
@@ -2544,7 +2544,7 @@ export default function ProductWorkspacePage() {
                         onOpen={() => openGeneratedImage("human")}
                         onAdd={(event) => void addGeneratedPhoto("human", event)}
                         adding={replacingPhotoKey === "add-human"}
-                        onReplace={generatedCoverByMode.get("human") ? (event) => void replacePhoto(`/api/v1/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("human")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("human")?.id}`) : undefined}
+                        onReplace={generatedCoverByMode.get("human") ? (event) => void replacePhoto(`/api/v2/products/${productId}/images/${coverImage.id}/generated/${generatedCoverByMode.get("human")?.id}/replace/`, event, `generated-${generatedCoverByMode.get("human")?.id}`) : undefined}
                         replacing={replacingPhotoKey === `generated-${generatedCoverByMode.get("human")?.id}`}
                         onDelete={generatedCoverByMode.get("human") ? () => setPendingDeleteGenerated({ imageId: coverImage.id, generatedId: generatedCoverByMode.get("human")!.id }) : undefined}
                         disabled={saving || imageGenerationInProgress}
@@ -2652,7 +2652,7 @@ export default function ProductWorkspacePage() {
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
                             disabled={saving || isImageGenerationInProgress(image)}
-                            onChange={(event) => void replacePhoto(`/api/v1/products/${productId}/images/${image.id}/replace/`, event, `source-${image.id}`)}
+                            onChange={(event) => void replacePhoto(`/api/v2/products/${productId}/images/${image.id}/replace/`, event, `source-${image.id}`)}
                           />
                         </label>
                         {hasSetParts ? (

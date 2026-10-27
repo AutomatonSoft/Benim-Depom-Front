@@ -15,7 +15,7 @@ type Copy = {
   eyebrow: string;
   title: string;
   intro: string;
-  email: string;
+  phone: string;
   password: string;
   login: string;
   loggingIn: string;
@@ -44,11 +44,11 @@ const COPY: Record<LandingLang, Copy> = {
     eyebrow: "KONTO",
     title: "Konto löschen",
     intro: "Melde dich mit deinem Verkäuferkonto an, um die Löschung zu beantragen.",
-    email: "E-Mail-Adresse",
+    phone: "Telefonnummer",
     password: "Passwort",
     login: "Weiter",
     loggingIn: "Wird geprüft …",
-    loginError: "E-Mail-Adresse oder Passwort ist falsch.",
+    loginError: "Telefonnummer oder Passwort ist falsch.",
     sellerOnly: "Die Kontolöschung ist nur für Verkäuferkonten verfügbar.",
     verifyError: "Dein Konto konnte nicht überprüft werden. Bitte versuche es erneut.",
     apiError: "Der Dienst ist gerade nicht erreichbar. Bitte versuche es später erneut.",
@@ -71,11 +71,11 @@ const COPY: Record<LandingLang, Copy> = {
     eyebrow: "ACCOUNT",
     title: "Delete account",
     intro: "Sign in to your seller account to request its deletion.",
-    email: "Email address",
+    phone: "Phone number",
     password: "Password",
     login: "Continue",
     loggingIn: "Checking…",
-    loginError: "The email address or password is incorrect.",
+    loginError: "The phone number or password is incorrect.",
     sellerOnly: "Account deletion is available for seller accounts only.",
     verifyError: "We couldn't verify your account. Please try again.",
     apiError: "The service is unavailable right now. Please try again later.",
@@ -98,11 +98,11 @@ const COPY: Record<LandingLang, Copy> = {
     eyebrow: "HESAP",
     title: "Hesabı sil",
     intro: "Hesabınızı silme talebi oluşturmak için satıcı hesabınızla giriş yapın.",
-    email: "E-posta adresi",
+    phone: "Telefon numarası",
     password: "Şifre",
     login: "Devam et",
     loggingIn: "Kontrol ediliyor…",
-    loginError: "E-posta adresi veya şifre hatalı.",
+    loginError: "Telefon numarası veya şifre hatalı.",
     sellerOnly: "Hesap silme yalnızca satıcı hesapları için kullanılabilir.",
     verifyError: "Hesabınız doğrulanamadı. Lütfen tekrar deneyin.",
     apiError: "Hizmete şu anda ulaşılamıyor. Lütfen daha sonra tekrar deneyin.",
@@ -129,7 +129,7 @@ type ProfileResponse = { role: string; email?: string };
 export default function DeleteAccountPage() {
   const [lang] = useLandingLang();
   const copy = COPY[lang];
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [accountEmail, setAccountEmail] = useState("");
   const [accessToken, setAccessToken] = useState("");
@@ -150,7 +150,7 @@ export default function DeleteAccountPage() {
           "Content-Type": "application/json",
         },
         credentials: "same-origin",
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ phone: phone.trim(), password }),
       });
 
       if (!loginResponse.ok) {
@@ -160,7 +160,7 @@ export default function DeleteAccountPage() {
 
       const tokens = (await loginResponse.json()) as LoginResponse;
       setPassword("");
-      const profileResponse = await fetch("/api/v1/auth/me/", {
+      const profileResponse = await fetch("/api/v2/auth/me/", {
         headers: { Authorization: `Bearer ${tokens.access}` },
       });
 
@@ -176,7 +176,7 @@ export default function DeleteAccountPage() {
       }
 
       setAccessToken(tokens.access);
-      setAccountEmail(profile.email || email.trim());
+      setAccountEmail(profile.email || phone.trim());
       setStep("confirm");
     } catch {
       setError(copy.apiError);
@@ -191,7 +191,7 @@ export default function DeleteAccountPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/v1/auth/me/", {
+      const response = await fetch("/api/v2/auth/me/", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -246,14 +246,14 @@ export default function DeleteAccountPage() {
 
           {step === "login" ? (
             <form className="delete-account-form" onSubmit={signIn}>
-              <label htmlFor="delete-email">{copy.email}</label>
+              <label htmlFor="delete-phone">{copy.phone}</label>
               <input
                 autoComplete="username"
-                id="delete-email"
-                onChange={(event) => setEmail(event.target.value)}
+                id="delete-phone"
+                onChange={(event) => setPhone(event.target.value)}
                 required
-                type="email"
-                value={email}
+                type="tel"
+                value={phone}
               />
               <label htmlFor="delete-password">{copy.password}</label>
               <input

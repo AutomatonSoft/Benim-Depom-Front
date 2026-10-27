@@ -62,8 +62,8 @@ export default function EansPage() {
       setError("");
       try {
         const [listResponse, summaryResponse] = await Promise.all([
-          authorizedFetch(`/api/v1/manager/eans/?${params}`),
-          authorizedFetch("/api/v1/manager/eans/summary/"),
+          authorizedFetch(`/api/v2/manager/eans/?${params}`),
+          authorizedFetch("/api/v2/manager/eans/summary/"),
         ]);
         if (listResponse.status === 401 || summaryResponse.status === 401) return void window.location.replace("/manager/login");
         if (!listResponse.ok || !summaryResponse.ok) throw new Error();
@@ -89,7 +89,7 @@ export default function EansPage() {
     setResult(null);
     setError("");
     try {
-      const response = await authorizedFetch("/api/v1/manager/eans/import/", {
+      const response = await authorizedFetch("/api/v2/manager/eans/import/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ account: importAccount, codes }),

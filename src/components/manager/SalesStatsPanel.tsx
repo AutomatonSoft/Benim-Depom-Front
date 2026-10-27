@@ -100,7 +100,7 @@ export function SalesStatsPanel() {
       if (query.sellerEmail.trim()) params.set("seller_email", query.sellerEmail.trim());
       const suffix = params.toString() ? `?${params}` : "";
       try {
-        const response = await authorizedFetch(`/api/v1/manager/sales-stats/${suffix}`);
+        const response = await authorizedFetch(`/api/v2/manager/sales-stats/${suffix}`);
         const data = await response.json().catch(() => null);
         if (!response.ok) {
           setStats(null);

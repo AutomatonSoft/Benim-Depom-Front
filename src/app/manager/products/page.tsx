@@ -76,7 +76,7 @@ export default function ProductsPage() {
       setError("");
 
       try {
-        const response = await authorizedFetch(`/api/v1/manager/products/?${params}`);
+        const response = await authorizedFetch(`/api/v2/manager/products/?${params}`);
 
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");

@@ -94,7 +94,7 @@ export default function SellerProductsPage() {
       setError("");
 
       try {
-        const response = await authorizedFetch(`/api/v1/manager/products/?${query}`);
+        const response = await authorizedFetch(`/api/v2/manager/products/?${query}`);
         if (cancelled) return;
 
         if (response.status === 401) {

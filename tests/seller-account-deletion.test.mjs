@@ -39,7 +39,9 @@ function loadPage(requestSeller) {
     "@/components/seller/SellerSelect": { SellerSelect: "SellerSelect" },
     "@/components/ui/alert-dialog": dialog,
     "@/components/SellerShell": { SellerNotice: "SellerNotice", SellerPage: "SellerPage" },
-    "@/lib/seller": { clearSellerSession: () => { router.cleared = true; }, sellerRequest: requestSeller },
+    "@/lib/seller": { SellerApiError: class extends Error {}, clearSellerSession: () => { router.cleared = true; }, sellerRequest: requestSeller },
+    "@/lib/seller-error-messages": { sellerApiErrorDetails: () => ({ fields: {} }) },
+    "@/components/seller/SellerPasswordInput": { default: "SellerPasswordInput" },
     "@/components/seller/SellerI18n": { useSellerI18n: () => ({ t: value => value }) },
     "@/lib/seller-i18n": { readSellerLocale: value => value, setSellerLocale() {} },
   };
@@ -78,7 +80,7 @@ test("account deletion requires final confirmation, prevents double submit and h
     let calls = 0;
     const render = loadPage((path, init) => {
       calls++;
-      assert.equal(path, "/api/v1/auth/me/");
+      assert.equal(path, "/api/v2/auth/me/");
       assert.equal(init.method, "DELETE");
       return new Promise(resolve => { resolveRequest = resolve; });
     });
