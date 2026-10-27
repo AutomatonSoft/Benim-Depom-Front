@@ -99,7 +99,7 @@ export default function SellerNotificationsPage() {
   else if (filter === "outgoing" || filter === "availability" || filter === "afterbuy") query.set("category", filter);
   else if (filter === "price-offers") query.set("notification_type", "price_negotiation_offer");
   const queryString = query.toString();
-  const firstPage = `/api/v1/notifications/${queryString ? `?${queryString}` : ""}`;
+  const firstPage = `/api/v2/notifications/${queryString ? `?${queryString}` : ""}`;
 
   const load = useCallback(async (url = firstPage, signal?: AbortSignal) => {
     setLoading(true);
@@ -143,7 +143,7 @@ export default function SellerNotificationsPage() {
     setError("");
     setNotice("");
     try {
-      await sellerRequest(`/api/v1/notifications/${item.id}/read/`, { method: "POST", body: "{}" });
+      await sellerRequest(`/api/v2/notifications/${item.id}/read/`, { method: "POST", body: "{}" });
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not mark as read.");
@@ -157,7 +157,7 @@ export default function SellerNotificationsPage() {
     setError("");
     setNotice("");
     try {
-      await sellerRequest("/api/v1/notifications/read-all/", { method: "POST", body: "{}" });
+      await sellerRequest("/api/v2/notifications/read-all/", { method: "POST", body: "{}" });
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not mark notifications as read.");
@@ -220,9 +220,9 @@ export default function SellerNotificationsPage() {
         guard,
         productId,
         notificationId: item.id,
-        send: () => sellerRequest(`/api/v1/products/${productId}/availability/`, { method: "POST", body: JSON.stringify({ is_available: isAvailable }) }),
+        send: () => sellerRequest(`/api/v2/products/${productId}/availability/`, { method: "POST", body: JSON.stringify({ is_available: isAvailable }) }),
         markRead: async () => {
-          await sellerRequest(`/api/v1/notifications/${item.id}/read/`, { method: "POST", body: "{}" });
+          await sellerRequest(`/api/v2/notifications/${item.id}/read/`, { method: "POST", body: "{}" });
           if (availabilityGuard.current === guard) setItems(current => current.map(notification => notification.id === item.id ? { ...notification, is_read: true } : notification));
         },
         onAnswered: () => {

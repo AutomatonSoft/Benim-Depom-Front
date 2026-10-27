@@ -454,7 +454,9 @@
 .seller-auth-card .seller-login-submit > .seller-spinner-slot { position: absolute; left: 14px; }
 .seller-auth-card .seller-login-submit:hover:not(:disabled) { border-color: #ed8d12; background: #ed8d12; color: #fff; }
 .seller-auth-card .seller-reset-submit,
-.seller-auth-card .seller-reset-submit:hover:not(:disabled) { color: #fff; }
+.seller-auth-card .seller-reset-submit:hover:not(:disabled),
+.seller-auth-card .seller-verify-submit,
+.seller-auth-card .seller-verify-submit:hover:not(:disabled) { color: #fff; }
 .seller-auth-card .seller-register-submit,
 .seller-auth-card .seller-register-submit:hover:not(:disabled) { color: #fff; }
 .seller-auth-card .seller-register-submit { position: relative; }
@@ -1158,6 +1160,20 @@
 .seller-select-option-label { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seller-select-check { flex: 0 0 auto; opacity: 0; color: #a55d09; }
 .seller-select-check.selected { opacity: 1; }
+.seller-select-icon { display: inline-flex; width: 24px; height: 16px; flex: 0 0 24px; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px rgb(20 47 85 / 10%); }
+.seller-select-icon svg { width: 100%; height: 100%; }
+.seller-select-option-label:has(.seller-select-icon) { display: flex; align-items: center; gap: 10px; }
+.seller-phone-input { display: flex; min-width: 0; align-items: stretch; gap: 8px; }
+.seller-phone-input > .seller-phone-country { width: 122px; min-width: 122px; min-height: 46px; padding-inline: 10px; }
+.seller-phone-input .seller-select-label { gap: 8px; }
+.seller-field .seller-phone-input > input { width: 0; min-width: 0; flex: 1 1 auto; }
+.seller-phone-input > input[readonly] { background: #f6f8fb; }
+.seller-select-popover.seller-phone-country-popover { --seller-navy: #173968; --seller-ink: #142f55; width: min(320px, calc(100vw - 24px)) !important; }
+@media (max-width: 600px) {
+  .seller-phone-input { gap: 7px; }
+  .seller-phone-input > .seller-phone-country { width: 112px; min-width: 112px; padding-inline: 8px; }
+  .seller-field .seller-phone-input > input { font-size: 16px; }
+}
 .seller-multi-trigger { min-height: 48px; }
 .seller-multi-label { flex-wrap: nowrap; }
 .seller-multi-chip { display: inline-flex; min-width: 0; align-items: center; padding: 3px 7px; border: 1px solid #f1d7b5; border-radius: 999px; background: #fff8ee; color: #70430f; font-size: 12px; line-height: 1.4; }

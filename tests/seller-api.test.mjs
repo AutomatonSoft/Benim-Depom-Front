@@ -80,7 +80,7 @@ test("OTTO attribute values follow the supported catalog types", () => {
 
 test("OTTO catalog selectors follow the API's numbered pagination", async () => {
   const urls = [];
-  const values = await loadOttoCatalogPages("/api/v1/catalog/otto/groups/en/", async url => {
+  const values = await loadOttoCatalogPages("/api/v2/catalog/otto/groups/en/", async url => {
     urls.push(url);
     return url.includes("page=1")
       ? { results: ["first"], next: 2 }
@@ -88,8 +88,8 @@ test("OTTO catalog selectors follow the API's numbered pagination", async () => 
   });
   assert.deepEqual(values, ["first", "second"]);
   assert.deepEqual(urls, [
-    "/api/v1/catalog/otto/groups/en/?page=1&limit=200",
-    "/api/v1/catalog/otto/groups/en/?page=2&limit=200",
+    "/api/v2/catalog/otto/groups/en/?page=1&limit=200",
+    "/api/v2/catalog/otto/groups/en/?page=2&limit=200",
   ]);
 });
 
@@ -111,7 +111,7 @@ test("seller login verifies role and stores a separate access token", async (t) 
     return Response.json({ role: "seller", preferred_language: "de" });
   };
 
-  const profile = await sellerLogin("seller@example.com", "password");
+  const profile = await sellerLogin("+905551234567", "password");
   assert.equal(profile.role, "seller");
   assert.equal(values.get("benim_seller_access_token"), "seller-access");
   assert.equal(values.get("benim_access_token"), "manager-access");
@@ -119,7 +119,7 @@ test("seller login verifies role and stores a separate access token", async (t) 
   assert.equal(calls[0][0], "/portal-auth/seller/login/");
   assert.equal(calls[0][1].headers["X-Refresh-Token-Cookie"], undefined);
   assert.equal(calls[0][1].credentials, "same-origin");
-  assert.equal(calls[0][1].body, JSON.stringify({ email: "seller@example.com", password: "password" }));
+  assert.equal(calls[0][1].body, JSON.stringify({ phone: "+905551234567", password: "password" }));
 });
 
 test("seller price offer responses reuse the existing negotiation endpoint", async (t) => {
@@ -138,8 +138,8 @@ test("seller price offer responses reuse the existing negotiation endpoint", asy
   await respondToPriceNegotiation(21, false);
 
   assert.deepEqual(calls.map(([url, init]) => [url, init.method, init.body]), [
-    ["/api/v1/products/20/price-negotiation/respond/", "POST", JSON.stringify({ accepted: true, comment: "Looks good" })],
-    ["/api/v1/products/21/price-negotiation/respond/", "POST", JSON.stringify({ accepted: false, comment: "" })],
+    ["/api/v2/products/20/price-negotiation/respond/", "POST", JSON.stringify({ accepted: true, comment: "Looks good" })],
+    ["/api/v2/products/21/price-negotiation/respond/", "POST", JSON.stringify({ accepted: false, comment: "" })],
   ]);
 });
 
@@ -155,20 +155,20 @@ test("public seller forms preserve registration and password reset API payloads"
     username: "seller", email: "seller@example.com", password: "password", password_confirm: "password",
     first_name: "A", last_name: "Seller", phone: "+905551234567", preferred_language: "tr",
   };
-  await sellerPublicRequest("/api/v1/auth/register/", registration);
-  const resetRequest = { email: "seller@example.com" };
-  const resetVerification = { email: "seller@example.com", code: "123456" };
+  await sellerPublicRequest("/api/v2/auth/register/", registration);
+  const resetRequest = { phone: "+905551234567", email: "seller@example.com" };
+  const resetVerification = { phone: "+905551234567", email: "seller@example.com", code: "123456" };
   const resetCompletion = { reset_token: "reset-token", new_password: "new-password", new_password_confirm: "new-password" };
-  await sellerPublicRequest("/api/v1/auth/password/reset/request/", resetRequest);
-  await sellerPublicRequest("/api/v1/auth/password/reset/verify/", resetVerification);
-  await sellerPublicRequest("/api/v1/auth/password/reset/complete/", resetCompletion);
-  assert.equal(calls[0][0], "/api/v1/auth/register/");
+  await sellerPublicRequest("/api/v2/auth/password/reset/request/", resetRequest);
+  await sellerPublicRequest("/api/v2/auth/password/reset/verify/", resetVerification);
+  await sellerPublicRequest("/api/v2/auth/password/reset/complete/", resetCompletion);
+  assert.equal(calls[0][0], "/api/v2/auth/register/");
   assert.equal(calls[0][1].body, JSON.stringify(registration));
-  assert.equal(calls[1][0], "/api/v1/auth/password/reset/request/");
+  assert.equal(calls[1][0], "/api/v2/auth/password/reset/request/");
   assert.equal(calls[1][1].body, JSON.stringify(resetRequest));
-  assert.equal(calls[2][0], "/api/v1/auth/password/reset/verify/");
+  assert.equal(calls[2][0], "/api/v2/auth/password/reset/verify/");
   assert.equal(calls[2][1].body, JSON.stringify(resetVerification));
-  assert.equal(calls[3][0], "/api/v1/auth/password/reset/complete/");
+  assert.equal(calls[3][0], "/api/v2/auth/password/reset/complete/");
   assert.equal(calls[3][1].body, JSON.stringify(resetCompletion));
 });
 
@@ -179,7 +179,7 @@ test("seller login rejects manager role without saving its token", async (t) => 
     ? Response.json({ access: "manager-as-seller" })
     : Response.json({ role: "manager" });
 
-  await assert.rejects(sellerLogin("manager@example.com", "password"), { status: 403 });
+  await assert.rejects(sellerLogin("+905551234567", "password"), { status: 403 });
   assert.equal(values.has("benim_seller_access_token"), false);
 });
 
@@ -187,7 +187,7 @@ test("invalid credentials remain an authentication error", async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; clearSellerToken(); });
   globalThis.fetch = async () => Response.json({ detail: "No active account found." }, { status: 401 });
-  await assert.rejects(sellerLogin("bad@example.com", "wrong"), { status: 401 });
+  await assert.rejects(sellerLogin("+905551234567", "wrong"), { status: 401 });
   assert.equal(values.has("benim_seller_access_token"), false);
 });
 
@@ -201,8 +201,8 @@ test("seller API pagination never sends its bearer token to an external URL", as
     return Response.json({ ok: true });
   };
 
-  await sellerRequest("https://untrusted.example/api/v1/notifications/?page=2");
-  assert.equal(calls[0][0], "/api/v1/notifications/?page=2");
+  await sellerRequest("https://untrusted.example/api/v2/notifications/?page=2");
+  assert.equal(calls[0][0], "/api/v2/notifications/?page=2");
   assert.equal(calls[0][1].headers.get("Authorization"), "Bearer seller-access");
 });
 
@@ -250,7 +250,7 @@ test("temporary refresh and profile verification failures preserve the existing 
       if (url.endsWith("/auth/me/")) return new Response(null, { status: 503 });
       return new Response(null, { status: 401 });
     };
-    await assert.rejects(sellerRequest("/api/v1/products/"), { status: 503 });
+    await assert.rejects(sellerRequest("/api/v2/products/"), { status: 503 });
     assert.equal(values.get("benim_seller_access_token"), "expired-access");
   }
 });
@@ -273,8 +273,8 @@ test("parallel expired requests share one refresh request", async (t) => {
   };
 
   const [first, second] = await Promise.all([
-    sellerRequest("/api/v1/first/"),
-    sellerRequest("/api/v1/second/"),
+    sellerRequest("/api/v2/first/"),
+    sellerRequest("/api/v2/second/"),
   ]);
   assert.deepEqual(first, { ok: true });
   assert.deepEqual(second, { ok: true });
@@ -299,7 +299,7 @@ test("expired refresh clears the seller session", async (t) => {
   globalThis.fetch = async (input) => String(input).endsWith("/refresh/")
     ? Response.json({ detail: "Token is invalid or expired" }, { status: 401 })
     : new Response(null, { status: 401 });
-  await assert.rejects(sellerRequest("/api/v1/private/"), { status: 401 });
+  await assert.rejects(sellerRequest("/api/v2/private/"), { status: 401 });
   assert.equal(values.has("benim_seller_access_token"), false);
 });
 
@@ -442,8 +442,8 @@ test("product validation errors map to friendly field names without exposing API
 });
 
 test("statistics product search requests one ten-item page and uses backend search", () => {
-  assert.equal(sellerProductSearchUrl(), "/api/v1/products/?page_size=10");
-  assert.equal(sellerProductSearchUrl("  sofa bed  "), "/api/v1/products/?page_size=10&search=sofa+bed");
+  assert.equal(sellerProductSearchUrl(), "/api/v2/products/?page_size=10");
+  assert.equal(sellerProductSearchUrl("  sofa bed  "), "/api/v2/products/?page_size=10&search=sofa+bed");
   assert.deepEqual(firstSellerProductOptions(Array.from({ length: 100 }, (_, index) => index)), Array.from({ length: 10 }, (_, index) => index));
 });
 

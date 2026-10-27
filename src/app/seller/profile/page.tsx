@@ -6,6 +6,7 @@ import { SellerLoadingState, SellerNotice, SellerPage } from "@/components/Selle
 import { SellerApiError, sellerAvatarInitial, sellerRequest, type SellerProfile } from "@/lib/seller";
 import { sellerApiErrorDetails } from "@/lib/seller-error-messages";
 import { useSellerI18n } from "@/components/seller/SellerI18n";
+import SellerPhoneInput from "@/components/seller/SellerPhoneInput";
 import { isValidSellerPhone } from "@/lib/seller-phone";
 import { isValidSellerName } from "@/lib/seller-name";
 
@@ -26,7 +27,7 @@ export default function SellerProfilePage() {
   const hasChanges = Object.keys(changedFields).length > 0;
 
   useEffect(() => {
-    sellerRequest<SellerProfile>("/api/v1/auth/me/").then(value => {
+    sellerRequest<SellerProfile>("/api/v2/auth/me/").then(value => {
       setProfile(value);
       setForm({
         first_name: value.first_name || "", last_name: value.last_name || "", email: value.email || "",
@@ -51,13 +52,13 @@ export default function SellerProfilePage() {
       return;
     }
     if (!isValidSellerPhone(form.phone)) {
-      setFieldErrors({ phone: t("Enter a phone number with a country code and 8–15 digits, or leave the field empty.") });
+      setFieldErrors({ phone: t("Enter a phone number with a country code and 8–15 digits.") });
       document.getElementById("seller-profile-phone")?.focus();
       return;
     }
     setBusy(true);
     try {
-      const saved = await sellerRequest<SellerProfile>("/api/v1/auth/me/", { method: "PATCH", body: JSON.stringify(changedFields) });
+      const saved = await sellerRequest<SellerProfile>("/api/v2/auth/me/", { method: "PATCH", body: JSON.stringify(changedFields) });
       setProfile(saved);
       setForm(current => ({ ...current, ...Object.fromEntries(
         (Object.keys(form) as Array<keyof typeof form>)
@@ -95,7 +96,14 @@ export default function SellerProfilePage() {
             <label className="seller-field">Last name<input id="seller-profile-last_name" autoComplete="family-name" aria-invalid={Boolean(fieldErrors.last_name)} value={form.last_name} onChange={event => { setNotice(""); setForm(value => ({ ...value, last_name: event.target.value })); }} />{fieldErrors.last_name && <small className="seller-field-error">{fieldErrors.last_name}</small>}</label>
           </div>
           <label className="seller-field">Email<input type="email" required aria-invalid={Boolean(fieldErrors.email)} value={form.email} onChange={event => setForm(value => ({ ...value, email: event.target.value }))} />{fieldErrors.email && <small className="seller-field-error">{fieldErrors.email}</small>}</label>
-          <label className="seller-field">Phone (optional)<input id="seller-profile-phone" type="tel" autoComplete="tel" aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? "seller-profile-phone-error" : undefined} value={form.phone} onChange={event => { setNotice(""); setForm(value => ({ ...value, phone: event.target.value })); }} />{fieldErrors.phone && <small id="seller-profile-phone-error" className="seller-field-error">{fieldErrors.phone}</small>}</label>
+          <div className="seller-field"><label htmlFor="seller-profile-phone">Phone</label>
+            <SellerPhoneInput id="seller-profile-phone" required autoComplete="tel" aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? "seller-profile-phone-error" : undefined} value={form.phone} onValueChange={phone => {
+              setNotice("");
+              setFieldErrors(current => { const next = { ...current }; delete next.phone; return next; });
+              setForm(value => ({ ...value, phone }));
+            }} />
+            {fieldErrors.phone && <small id="seller-profile-phone-error" className="seller-field-error">{fieldErrors.phone}</small>}
+          </div>
           <button className="seller-button primary" disabled={busy || !hasChanges}><LoaderCircle className={busy ? "seller-spinner" : "seller-spinner-slot"} size={18} strokeWidth={1.8} aria-hidden="true" />{busy ? "Saving…" : "Save profile"}</button>
         </form>
       </>}

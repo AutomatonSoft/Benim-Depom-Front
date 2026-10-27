@@ -34,7 +34,7 @@ function ProductRejectionReason({ productId }: { productId: number }) {
     const timer = window.setTimeout(async () => {
       setError("");
       try {
-        const history = await sellerRequest<PageResult<{ decision: string; comment: string }>>(`/api/v1/products/${productId}/moderation-history/?page=1`, { signal: controller.signal });
+        const history = await sellerRequest<PageResult<{ decision: string; comment: string }>>(`/api/v2/products/${productId}/moderation-history/?page=1`, { signal: controller.signal });
         if (!controller.signal.aborted) {
           const latest = history.results[0];
           setReason(latest?.decision === "rejected" ? latest.comment.trim() : "");
@@ -70,7 +70,7 @@ export default function SellerProductEditorPage() {
   const load = useCallback(async (signal?: AbortSignal) => {
     setError("");
     try {
-      const current = await sellerRequest<SellerProduct>(`/api/v1/products/${id}/`, { signal });
+      const current = await sellerRequest<SellerProduct>(`/api/v2/products/${id}/`, { signal });
       if (!signal?.aborted) { setProduct(current); setEditorVersion(value => value + 1); }
     } catch (e) {
       if (!signal?.aborted) setError(e instanceof Error ? e.message : "Could not load product.");
@@ -97,10 +97,10 @@ export default function SellerProductEditorPage() {
     setError("");
     try {
       if (confirmation === "archive") {
-        await sellerRequest(`/api/v1/products/${id}/`, { method: "DELETE" });
+        await sellerRequest(`/api/v2/products/${id}/`, { method: "DELETE" });
         router.push("/seller/products");
       } else {
-        await sellerRequest(`/api/v1/products/${id}/${confirmation}/`, { method: "POST", body: "{}" });
+        await sellerRequest(`/api/v2/products/${id}/${confirmation}/`, { method: "POST", body: "{}" });
         await load();
       }
       setConfirmation(null);

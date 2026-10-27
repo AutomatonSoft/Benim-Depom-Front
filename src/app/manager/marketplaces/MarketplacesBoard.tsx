@@ -227,11 +227,11 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
           activeResponse,
           failedResponse,
         ] = await Promise.all([
-          authorizedFetch(`/api/v1/orchestrator/publications/?${publicationParams}`),
-          authorizedFetch(`/api/v1/orchestrator/jobs/?${jobParams}`),
-          authorizedFetch("/api/v1/orchestrator/jobs/?in_progress=true&page=1&page_size=100"),
-          authorizedFetch("/api/v1/orchestrator/publications/?status=active&page=1&page_size=1"),
-          authorizedFetch("/api/v1/orchestrator/publications/?status=failed&page=1&page_size=1"),
+          authorizedFetch(`/api/v2/orchestrator/publications/?${publicationParams}`),
+          authorizedFetch(`/api/v2/orchestrator/jobs/?${jobParams}`),
+          authorizedFetch("/api/v2/orchestrator/jobs/?in_progress=true&page=1&page_size=100"),
+          authorizedFetch("/api/v2/orchestrator/publications/?status=active&page=1&page_size=1"),
+          authorizedFetch("/api/v2/orchestrator/publications/?status=failed&page=1&page_size=1"),
         ]);
         const responses = [publicationResponse, jobsResponse, inProgressResponse, activeResponse, failedResponse];
         if (responses.some((response) => redirectIfUnauthorized(response.status))) return;
@@ -295,7 +295,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
     setError("");
     setNotice("");
     try {
-      const job = await postJob(`/api/v1/orchestrator/publications/${publication.id}/reconcile/`, {
+      const job = await postJob(`/api/v2/orchestrator/publications/${publication.id}/reconcile/`, {
         action,
         ...(action === "set_manual" ? { status: manualStatus } : {}),
       }) as Job | null;
@@ -356,7 +356,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
     try {
       let data: unknown = null;
       if (action === "deactivate" || action === "activate") {
-        data = await postJob(`/api/v1/orchestrator/products/${publication.product_id}/listing-state/`, {
+        data = await postJob(`/api/v2/orchestrator/products/${publication.product_id}/listing-state/`, {
           action,
           targets: [pair],
         });
@@ -365,7 +365,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
           if (jobsCreated[0]) setNotice(queuedNotice(jobsCreated[0]));
         }
       } else {
-        data = await postJob(`/api/v1/orchestrator/products/${publication.product_id}/${action}/`, {
+        data = await postJob(`/api/v2/orchestrator/products/${publication.product_id}/${action}/`, {
           targets: [pair],
         });
         if (data) setNotice(queuedNotice(data as Job));

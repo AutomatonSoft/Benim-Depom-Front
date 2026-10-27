@@ -230,21 +230,21 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
         const removedIds = baseline.images.filter(image => !keptIds.has(image.id)).map(image => image.id);
         const photosChanged = files.length > 0 || removedIds.length > 0 || existingImages.some((image, index) => image.id !== baseline.images[index]?.id || image.is_primary !== baseline.images[index]?.is_primary);
         const payload = { ...body, ...sellerProductReviewFields(product.status, fields.comment, !photosChanged) };
-        let saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`, { method: "PATCH", body: JSON.stringify(payload) });
+        let saved = await sellerRequest<SellerProduct>(`/api/v2/products/${product.id}/`, { method: "PATCH", body: JSON.stringify(payload) });
         savedProduct.current = saved;
         partiallySaved = true;
         if (photosChanged) {
           let desiredPhotos = [...photos];
           for (const imageId of removedIds) {
             if (!saved.images.some(image => image.id === imageId)) continue;
-            await sellerRequest(`/api/v1/products/${product.id}/images/${imageId}/`, { method: "DELETE" });
+            await sellerRequest(`/api/v2/products/${product.id}/images/${imageId}/`, { method: "DELETE" });
             saved.images = saved.images.filter(image => image.id !== imageId);
           }
           const uploads = desiredPhotos.filter(photo => photo.kind === "new");
           for (const photo of uploads) {
             const form = new FormData();
             form.append("image", photo.file);
-            const image = await sellerRequest<SellerImage>(`/api/v1/products/${product.id}/images/`, { method: "POST", body: form });
+            const image = await sellerRequest<SellerImage>(`/api/v2/products/${product.id}/images/`, { method: "POST", body: form });
             saved.images = [...saved.images, image];
             desiredPhotos = desiredPhotos.map(item => item.key === photo.key ? { key: photo.key, kind: "saved", image } : item);
             setPhotos([...desiredPhotos]);
@@ -254,17 +254,17 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
           const imageIds = desiredPhotos.flatMap(photo => photo.kind === "saved" ? [photo.image.id] : []);
           const primaryId = imageIds[0];
           if (imageIds.some((imageId, index) => imageId !== saved.images[index]?.id)) {
-            await sellerRequest(`/api/v1/products/${product.id}/images/reorder/`, { method: "POST", body: JSON.stringify({ image_ids: imageIds }) });
+            await sellerRequest(`/api/v2/products/${product.id}/images/reorder/`, { method: "POST", body: JSON.stringify({ image_ids: imageIds }) });
             saved.images = imageIds.map((id, index) => ({ ...saved.images.find(image => image.id === id)!, is_primary: index === 0 }));
           }
           if (primaryId && saved.images.find(image => image.is_primary)?.id !== primaryId) {
-            await sellerRequest(`/api/v1/products/${product.id}/images/${primaryId}/make-primary/`, { method: "POST", body: "{}" });
+            await sellerRequest(`/api/v2/products/${product.id}/images/${primaryId}/make-primary/`, { method: "POST", body: "{}" });
             saved.images = saved.images.map(image => ({ ...image, is_primary: image.id === primaryId }));
           }
           if (["draft", "rejected", "withdrawn"].includes(product.status)) {
-            saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`, { method: "PATCH", body: JSON.stringify(sellerProductReviewFields(product.status, fields.comment, true)) });
+            saved = await sellerRequest<SellerProduct>(`/api/v2/products/${product.id}/`, { method: "PATCH", body: JSON.stringify(sellerProductReviewFields(product.status, fields.comment, true)) });
           } else {
-            saved = await sellerRequest<SellerProduct>(`/api/v1/products/${product.id}/`);
+            saved = await sellerRequest<SellerProduct>(`/api/v2/products/${product.id}/`);
           }
           savedProduct.current = saved;
         }
@@ -275,7 +275,7 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
         const form = sellerProductFormData(body);
         files.forEach(file => form.append("images", file));
         idempotencyKey.current ??= crypto.randomUUID();
-        const created = await sellerRequest<SellerProduct>("/api/v1/products/", {
+        const created = await sellerRequest<SellerProduct>("/api/v2/products/", {
           method: "POST",
           headers: { "Idempotency-Key": idempotencyKey.current },
           body: form,

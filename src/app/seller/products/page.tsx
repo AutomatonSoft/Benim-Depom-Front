@@ -192,7 +192,7 @@ export default function SellerProductsPage() {
     if (status) query.set("status", status);
     if (available) query.set("is_available", available);
     try {
-      setPage(await sellerRequest<PageResult<SellerProduct>>(`/api/v1/products/?${query}`, { signal }));
+      setPage(await sellerRequest<PageResult<SellerProduct>>(`/api/v2/products/?${query}`, { signal }));
     } catch (e) {
       if (!signal?.aborted) setError(e instanceof Error ? e.message : "Unable to load products.");
     } finally {
@@ -222,8 +222,8 @@ export default function SellerProductsPage() {
     setActionBusy(true);
     setActionError("");
     try {
-      if (action.type === "delete") await sellerRequest(`/api/v1/products/${action.id}/`, { method: "DELETE" });
-      else await sellerRequest(`/api/v1/products/${action.id}/${action.type}/`, { method: "POST", body: "{}" });
+      if (action.type === "delete") await sellerRequest(`/api/v2/products/${action.id}/`, { method: "DELETE" });
+      else await sellerRequest(`/api/v2/products/${action.id}/${action.type}/`, { method: "POST", body: "{}" });
       setAction(null);
       const leavesFilter = action.type === "delete" || (action.type === "withdraw" && status === "submitted") || (action.type === "deactivate" && status === "approved");
       if (leavesFilter && page?.results.length === 1 && pageNumber > 1) setPageNumber(value => value - 1);

@@ -2,6 +2,13 @@ export const sellerLocales = ["en", "ru", "tr", "de"] as const;
 export type SellerLocale = (typeof sellerLocales)[number];
 export const SELLER_LOCALE_KEY = "benim_seller_locale";
 const messages = Object.fromEntries([
+  ["Enter your account phone number and email. We will send a reset code to that email.", ["Введите номер телефона и почту вашего аккаунта. Мы отправим код для сброса пароля на эту почту.", "Hesabınızın telefon numarasını ve e-posta adresini girin. Sıfırlama kodunu bu adrese göndereceğiz.", "Geben Sie Telefonnummer und E-Mail-Adresse Ihres Kontos ein. Wir senden den Code an diese E-Mail-Adresse."]],
+  ["If an account matches this phone number and email, a reset code has been sent to that email.", ["Если номер телефона и почта совпадают с данными аккаунта, код для сброса отправлен на эту почту.", "Telefon numarası ve e-posta bir hesapla eşleşiyorsa sıfırlama kodu bu adrese gönderildi.", "Wenn Telefonnummer und E-Mail-Adresse zu einem Konto gehören, wurde ein Code an diese Adresse gesendet."]],
+  ["Country", ["Страна", "Ülke", "Land"]],
+  ["Phone or password is incorrect.", ["Неверный номер телефона или пароль.", "Telefon numarası veya şifre yanlış.", "Telefonnummer oder Passwort ist falsch."]],
+  ["Enter your phone number and password.", ["Введите номер телефона и пароль.", "Telefon numaranızı ve şifrenizi girin.", "Geben Sie Ihre Telefonnummer und Ihr Passwort ein."]],
+  ["An account with this phone number already exists.", ["Аккаунт с этим номером телефона уже существует.", "Bu telefon numarasıyla bir hesap zaten var.", "Ein Konto mit dieser Telefonnummer existiert bereits."]],
+  ["Enter a phone number with a country code and 8–15 digits.", ["Введите номер с кодом страны — от 8 до 15 цифр.", "Ülke koduyla birlikte 8–15 rakamdan oluşan telefon numarası girin.", "Geben Sie eine Telefonnummer mit Ländervorwahl und 8–15 Ziffern ein."]],
   ["Currency (required)",["Валюта (обязательно)","Para birimi (zorunlu)","Währung (erforderlich)"]],
   ["Choose a currency",["Выберите валюту","Para birimini seçin","Währung auswählen"]],
   ["Warehouse city (required)",["Город склада (обязательно)","Depo şehri (zorunlu)","Lagerstadt (erforderlich)"]],

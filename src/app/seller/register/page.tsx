@@ -10,6 +10,7 @@ import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import { SellerSelect } from "@/components/seller/SellerSelect";
 import SellerPasswordInput from "@/components/seller/SellerPasswordInput";
+import SellerPhoneInput from "@/components/seller/SellerPhoneInput";
 import { isValidSellerPhone } from "@/lib/seller-phone";
 import { isValidSellerName } from "@/lib/seller-name";
 
@@ -34,14 +35,14 @@ export default function SellerRegisterPage() {
       return;
     }
     if (!isValidSellerPhone(form.phone)) {
-      setFieldErrors({ phone: t("Enter a phone number with a country code and 8–15 digits, or leave the field empty.") });
+      setFieldErrors({ phone: t("Enter a phone number with a country code and 8–15 digits.") });
       document.getElementById("seller-register-phone")?.focus();
       return;
     }
     setBusy(true);
     try {
-      await sellerPublicRequest("/api/v1/auth/register/", form);
-      router.push(`/seller/verify-email?email=${encodeURIComponent(form.email)}`);
+      await sellerPublicRequest("/api/v2/auth/register/", form);
+      router.push(`/seller/verify-email?email=${encodeURIComponent(form.email)}&phone=${encodeURIComponent(form.phone)}`);
     } catch (error) {
       if (error instanceof SellerApiError) setFieldErrors(sellerApiErrorDetails(error.data, error.status).fields);
       setError(error instanceof Error ? error.message : t("Registration failed."));
@@ -51,7 +52,7 @@ export default function SellerRegisterPage() {
   }
 
   const text = (key: keyof typeof form, label: string, type = "text", autocomplete: string = key) => {
-    const props = { id: `seller-register-${key}`, name: key, required: key !== "phone", autoComplete: autocomplete, "aria-invalid": Boolean(fieldErrors[key]), value: form[key], onChange: (event: ChangeEvent<HTMLInputElement>) => {
+    const props = { id: `seller-register-${key}`, name: key, required: true, autoComplete: autocomplete, "aria-invalid": Boolean(fieldErrors[key]), value: form[key], onChange: (event: ChangeEvent<HTMLInputElement>) => {
       setFieldErrors(current => { const next = { ...current }; delete next[key]; return next; });
       setForm(current => ({ ...current, [key]: event.target.value }));
     } };
@@ -65,7 +66,13 @@ export default function SellerRegisterPage() {
       {text("username", "Username", "text", "username")}
       {text("email", "Email", "email", "email")}
       <div className="seller-field-row">{text("first_name", "First name", "text", "given-name")}{text("last_name", "Last name", "text", "family-name")}</div>
-      {text("phone", "Phone (optional)", "tel", "tel")}
+      <div className="seller-field"><label htmlFor="seller-register-phone">{t("Phone")}</label>
+        <SellerPhoneInput id="seller-register-phone" name="phone" required autoComplete="tel" value={form.phone} aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? "seller-register-phone-error" : undefined} onValueChange={phone => {
+          setFieldErrors(current => { const next = { ...current }; delete next.phone; return next; });
+          setForm(current => ({ ...current, phone }));
+        }} />
+        {fieldErrors.phone && <small id="seller-register-phone-error" className="seller-field-error">{fieldErrors.phone}</small>}
+      </div>
       {text("password", "Password", "password", "new-password")}
       {text("password_confirm", "Confirm password", "password", "new-password")}
       <label className="seller-field">{t("Preferred language")}

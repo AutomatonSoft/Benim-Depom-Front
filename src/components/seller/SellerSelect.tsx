@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useSellerI18n } from "@/components/seller/SellerI18n";
 import { toggleSellerMultiValue } from "@/lib/seller-select";
 
-export type SellerSelectOption = { value: string; label: string; disabled?: boolean };
+export type SellerSelectOption = { value: string; label: string; disabled?: boolean; icon?: ReactNode };
 
 const mobileQuery = "(max-width: 800px)";
 function subscribeMobile(onChange: () => void) {
@@ -16,13 +16,13 @@ function subscribeMobile(onChange: () => void) {
   return () => media.removeEventListener("change", onChange);
 }
 
-function SellerSelectPopover({ children }: { children: ReactNode }) {
+function SellerSelectPopover({ children, className = "" }: { children: ReactNode; className?: string }) {
   const mobile = useSyncExternalStore(subscribeMobile, () => window.matchMedia(mobileQuery).matches, () => false);
   const [searchActive, setSearchActive] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   return <PopoverContent ref={contentRef} align="start" sideOffset={5} side="bottom" avoidCollisions={!mobile}
     collisionPadding={mobile ? { top: 12, bottom: 92 } : undefined}
-    className="seller-select-popover" data-search-active={mobile && searchActive ? "true" : undefined}
+    className={`seller-select-popover ${className}`.trim()} data-search-active={mobile && searchActive ? "true" : undefined}
     onOpenAutoFocus={event => {
       setSearchActive(false);
       if (!mobile) return;
@@ -55,13 +55,14 @@ type SellerSelectProps = {
   loading?: boolean;
   emptyMessage?: string;
   className?: string;
+  popoverClassName?: string;
   optionPageSize?: number;
 };
 
 function SellerSelectBase({
   options, value, selectedLabel, onValueChange, placeholder, ariaLabel, disabled = false, searchable = false,
   searchValue, onSearchChange, loading = false, emptyMessage, className = "",
-  optionPageSize,
+  optionPageSize, popoverClassName,
   "aria-required": ariaRequired, "aria-invalid": ariaInvalid, "aria-describedby": ariaDescribedBy,
 }: SellerSelectProps) {
   const { t } = useSellerI18n();
@@ -100,12 +101,13 @@ function SellerSelectBase({
         className={`seller-select-trigger ${className}`.trim()}
       >
         <span className={`seller-select-label${selected || selectedLabel ? "" : " placeholder"}`} title={selectedLabel || selected?.label || placeholder}>
+          {selected?.icon && <span className="seller-select-icon" aria-hidden="true">{selected.icon}</span>}
           {selectedLabel || selected?.label || placeholder}
         </span>
         <ChevronDown size={17} strokeWidth={1.8} aria-hidden="true" />
       </button>
     </PopoverTrigger>
-    <SellerSelectPopover>
+    <SellerSelectPopover className={popoverClassName}>
       <Command shouldFilter={!onSearchChange && !optionPageSize} className="seller-select-command">
         {searchable && <CommandInput
           value={query}
@@ -131,7 +133,7 @@ function SellerSelectBase({
               }}
               className="seller-select-option"
             >
-              <span className="seller-select-option-label" title={option.label}>{option.label}</span>
+              <span className="seller-select-option-label" title={option.label}>{option.icon && <span className="seller-select-icon" aria-hidden="true">{option.icon}</span>}{option.label}</span>
               <Check className={`seller-select-check${option.value === value ? " selected" : ""}`} size={16} aria-hidden="true" />
             </CommandItem>)}
           </CommandGroup>

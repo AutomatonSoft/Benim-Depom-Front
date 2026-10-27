@@ -46,10 +46,10 @@ export default function SellerSettingsPage() {
   const [languageError, setLanguageError] = useState("");
 
   useEffect(() => {
-    sellerRequest<{ phone?: string; whatsapp_url?: string | null }>("/api/v1/contact/whatsapp/")
+    sellerRequest<{ phone?: string; whatsapp_url?: string | null }>("/api/v2/contact/whatsapp/")
       .then(value => setContact(value.whatsapp_url || ""))
       .catch(() => undefined);
-    sellerRequest<{ preferred_language?: string }>("/api/v1/auth/me/")
+    sellerRequest<{ preferred_language?: string }>("/api/v2/auth/me/")
       .then(value => { if (value.preferred_language) setSellerLocale(readSellerLocale(value.preferred_language)); })
       .catch(() => undefined)
       .finally(() => setLanguageLoading(false));
@@ -60,7 +60,7 @@ export default function SellerSettingsPage() {
     setLanguageBusy(true);
     setLanguageError("");
     try {
-      await sellerRequest("/api/v1/auth/me/language/", { method: "PATCH", body: JSON.stringify({ language }) });
+      await sellerRequest("/api/v2/auth/me/language/", { method: "PATCH", body: JSON.stringify({ language }) });
       setSellerLocale(language);
     } catch {
       setLanguageError("Could not update interface language.");
@@ -76,7 +76,7 @@ export default function SellerSettingsPage() {
     setNotice("");
     setPasswordErrors({});
     try {
-      await sellerRequest("/api/v1/auth/password/change/", { method: "POST", body: JSON.stringify(password) });
+      await sellerRequest("/api/v2/auth/password/change/", { method: "POST", body: JSON.stringify(password) });
       setPassword({ current_password: "", new_password: "", new_password_confirm: "" });
       setNotice("Password changed.");
     } catch (error) {
@@ -94,7 +94,7 @@ export default function SellerSettingsPage() {
     setError("");
     setNotice("");
     try {
-      const result = await sellerRequest<AccountDeletionResult>("/api/v1/auth/me/", { method: "DELETE" });
+      const result = await sellerRequest<AccountDeletionResult>("/api/v2/auth/me/", { method: "DELETE" });
       clearSellerSession();
       setDeleteOpen(false);
       router.replace(`/seller/login${result?.deleted === false ? "?deletion=pending" : "?deletion=complete"}`);

@@ -33,7 +33,7 @@ function respondWith(...responses) {
 
 test("manager refresh rejects a seller token from the shared cookie", async () => {
   respondWith([401, {}], [200, { access: "seller-access" }], [200, { role: "seller" }]);
-  const response = await authorizedFetch("/api/v1/manager/dashboard/");
+  const response = await authorizedFetch("/api/v2/manager/dashboard/");
   assert.equal(response.status, 401);
   assert.equal(values.has("benim_access_token"), false);
   assert.equal(values.get("benim_seller_access_token"), "seller-session");
@@ -42,20 +42,20 @@ test("manager refresh rejects a seller token from the shared cookie", async () =
 
 test("a stored seller token sends the manager back through sign-in", async () => {
   respondWith([403, {}], [200, { role: "seller" }]);
-  assert.equal((await authorizedFetch("/api/v1/manager/dashboard/")).status, 401);
+  assert.equal((await authorizedFetch("/api/v2/manager/dashboard/")).status, 401);
   assert.equal(values.has("benim_access_token"), false);
 });
 
 test("a genuine manager permission denial stays forbidden", async () => {
   respondWith([403, { detail: "Denied" }], [200, { role: "manager" }]);
-  assert.equal((await authorizedFetch("/api/v1/manager/dashboard/")).status, 403);
+  assert.equal((await authorizedFetch("/api/v2/manager/dashboard/")).status, 403);
   assert.equal(values.get("benim_access_token"), "old-access");
 });
 
 for (const role of ["manager", "admin"]) {
   test(`${role} refresh saves and retries with the verified token`, async () => {
     respondWith([401, {}], [200, { access: "new-access" }], [200, { role }], [200, { count: 1 }]);
-    assert.equal((await authorizedFetch("/api/v1/manager/dashboard/")).status, 200);
+    assert.equal((await authorizedFetch("/api/v2/manager/dashboard/")).status, 200);
     assert.equal(values.get("benim_access_token"), "new-access");
     assert.equal(calls[3].headers.get("Authorization"), "Bearer new-access");
   });

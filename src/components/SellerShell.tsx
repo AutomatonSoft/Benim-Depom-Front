@@ -103,13 +103,13 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isPublic) return;
     let active = true;
-    sellerRequest<SellerProfile>("/api/v1/auth/me/").then((data) => {
+    sellerRequest<SellerProfile>("/api/v2/auth/me/").then((data) => {
       if (!active) return;
       if (data.role !== "seller") { clearSellerToken(); router.replace("/seller/login?denied=1"); return; }
       saveSellerProfileId(data.id);
       if (data.preferred_language) setSellerLocale(readSellerLocale(data.preferred_language));
       setProfile(data); setSessionError("");
-      sellerRequest<{ unread_total?: number }>("/api/v1/notifications/summary/").then((summary) => active && setUnread(summary.unread_total ?? 0)).catch(() => undefined);
+      sellerRequest<{ unread_total?: number }>("/api/v2/notifications/summary/").then((summary) => active && setUnread(summary.unread_total ?? 0)).catch(() => undefined);
     }).catch((error: unknown) => {
       if (!active) return;
       const status = error && typeof error === "object" && "status" in error ? (error as { status: number }).status : 0;
@@ -123,7 +123,7 @@ export default function SellerShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isPublic || !profile) return;
     const refresh = () => {
-      sellerRequest<{ unread_total?: number }>("/api/v1/notifications/summary/").then((summary) => setUnread(summary.unread_total ?? 0)).catch(() => undefined);
+      sellerRequest<{ unread_total?: number }>("/api/v2/notifications/summary/").then((summary) => setUnread(summary.unread_total ?? 0)).catch(() => undefined);
     };
     const timer = window.setInterval(refresh, 60_000);
     window.addEventListener("seller-notifications-updated", refresh);

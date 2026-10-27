@@ -74,7 +74,7 @@ async function refreshAccessTokenRequest() {
 }
 
 async function hasManagerRole(access: string): Promise<boolean | null> {
-  const response = await fetch("/api/v1/auth/me/", {
+  const response = await fetch("/api/v2/auth/me/", {
     credentials: "same-origin",
     headers: { Authorization: `Bearer ${access}` },
   });

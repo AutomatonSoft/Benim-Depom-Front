@@ -352,8 +352,8 @@ export default function MessagesPage() {
 
       try {
         const [listResponse, summaryResponse] = await Promise.all([
-          authorizedFetch(`/api/v1/notifications/?${params}`),
-          authorizedFetch("/api/v1/notifications/summary/"),
+          authorizedFetch(`/api/v2/notifications/?${params}`),
+          authorizedFetch("/api/v2/notifications/summary/"),
         ]);
         if (listResponse.status === 401 || summaryResponse.status === 401) {
           return void window.location.replace("/manager/login");
@@ -398,7 +398,7 @@ export default function MessagesPage() {
       return;
     }
     if (!isOutgoing && !message.is_read) {
-      const response = await authorizedFetch(`/api/v1/notifications/${message.id}/read/`, { method: "POST" });
+      const response = await authorizedFetch(`/api/v2/notifications/${message.id}/read/`, { method: "POST" });
       if (response.ok) {
         setMessages((items) => items.map((item) => (item.id === message.id ? { ...item, is_read: true } : item)));
         setSummary((current) => ({
@@ -425,7 +425,7 @@ export default function MessagesPage() {
   async function readAll() {
     const token = localStorage.getItem("benim_access_token");
     if (!token) return;
-    const response = await authorizedFetch("/api/v1/notifications/read-all/", { method: "POST" });
+    const response = await authorizedFetch("/api/v2/notifications/read-all/", { method: "POST" });
     if (!response.ok) return;
     setMessages((items) => items.map((item) => ({ ...item, is_read: true })));
     setMockFlags((current) => ({ ...current, read: true }));
@@ -450,7 +450,7 @@ export default function MessagesPage() {
       return;
     }
     try {
-      const response = await authorizedFetch(`/api/v1/notifications/${message.id}/afterbuy-sync-stock/`, {
+      const response = await authorizedFetch(`/api/v2/notifications/${message.id}/afterbuy-sync-stock/`, {
         method: "POST",
       });
       const data = (await response.json().catch(() => ({}))) as {
@@ -484,7 +484,7 @@ export default function MessagesPage() {
       return;
     }
     try {
-      const response = await authorizedFetch(`/api/v1/notifications/${message.id}/afterbuy-notify-seller/`, {
+      const response = await authorizedFetch(`/api/v2/notifications/${message.id}/afterbuy-notify-seller/`, {
         method: "POST",
       });
       const data = await response.json().catch(() => ({}));

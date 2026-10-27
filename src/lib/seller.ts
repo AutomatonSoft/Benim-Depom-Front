@@ -92,7 +92,7 @@ export function clearSellerSession() {
 
 function sellerApiPath(path: string) {
   const url = new URL(path, window.location.origin);
-  if (!url.pathname.startsWith("/api/v1/")) throw new SellerApiError(0, "Invalid seller API URL.");
+  if (!url.pathname.startsWith("/api/v2/")) throw new SellerApiError(0, "Invalid seller API URL.");
   return `${url.pathname}${url.search}`;
 }
 
@@ -107,7 +107,7 @@ async function refreshSellerToken() {
       }
       const data = await response.json() as { access?: string };
       if (!data.access) { clearSellerToken(); return null; }
-      const profileResponse = await fetch("/api/v1/auth/me/", { credentials: "same-origin", headers: { Authorization: `Bearer ${data.access}` } });
+      const profileResponse = await fetch("/api/v2/auth/me/", { credentials: "same-origin", headers: { Authorization: `Bearer ${data.access}` } });
       if (!profileResponse.ok) {
         if (profileResponse.status === 401 || profileResponse.status === 403) { clearSellerToken(); return null; }
         throw new SellerApiError(profileResponse.status, "Could not verify your account role.");
@@ -154,7 +154,7 @@ export async function sellerRequest<T = unknown>(path: string, init: RequestInit
 }
 
 export function respondToPriceNegotiation(productId: number, accepted: boolean, comment = "") {
-  return sellerRequest<SellerProduct>(`/api/v1/products/${productId}/price-negotiation/respond/`, {
+  return sellerRequest<SellerProduct>(`/api/v2/products/${productId}/price-negotiation/respond/`, {
     method: "POST",
     body: JSON.stringify({ accepted, comment: comment.trim() }),
   });
@@ -178,7 +178,7 @@ export async function sellerReviewNotifications(search: string, signal?: AbortSi
   const pages = await Promise.all(["product_approved", "product_rejected"].map(notification_type => {
     const query = new URLSearchParams({ notification_type, page_size: "100" });
     if (search.trim()) query.set("search", search.trim());
-    return sellerAllPages<SellerNotification>(`/api/v1/notifications/?${query}`, { signal });
+    return sellerAllPages<SellerNotification>(`/api/v2/notifications/?${query}`, { signal });
   }));
   const results = pages.flat().sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   return { count: results.length, results, next: null, previous: null };
@@ -208,17 +208,17 @@ export function errorMessage(data: unknown, fallback = "Request failed", status 
   return sellerApiErrorDetails(data || (status >= 500 || status === 413 || status === 429 ? null : { detail: fallback }), status).message;
 }
 
-export async function sellerLogin(email: string, password: string) {
+export async function sellerLogin(phone: string, password: string) {
   const response = await fetch("/portal-auth/seller/login/", {
     method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ phone, password }),
   });
   if (!response.ok) {
     let data: unknown; try { data = await response.json(); } catch { data = null; }
-    throw new SellerApiError(response.status, errorMessage(data, "Email or password is incorrect.", response.status), data);
+    throw new SellerApiError(response.status, errorMessage(data, "Phone or password is incorrect.", response.status), data);
   }
   const token = (await response.json() as { access: string }).access;
-  const profileResponse = await fetch("/api/v1/auth/me/", { credentials: "same-origin", headers: { Authorization: `Bearer ${token}` } });
+  const profileResponse = await fetch("/api/v2/auth/me/", { credentials: "same-origin", headers: { Authorization: `Bearer ${token}` } });
   if (!profileResponse.ok) throw new SellerApiError(profileResponse.status, "Could not verify your account role.");
   const profile = await profileResponse.json() as SellerProfile;
   if (profile.role !== "seller") { clearSellerToken(); throw new SellerApiError(403, "This portal is available to seller accounts only."); }

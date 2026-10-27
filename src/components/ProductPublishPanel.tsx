@@ -63,7 +63,7 @@ export function ProductPublishPanel({
   const status = productStatus || fetchedStatus;
 
   async function loadPublications() {
-    const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+    const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`);
     if (redirectIfUnauthorized(response.status) || !response.ok) return [] as Publication[];
     const body = await response.json();
     const rows: Publication[] = Array.isArray(body) ? body : body.results ?? [];
@@ -75,7 +75,7 @@ export function ProductPublishPanel({
     if (productStatus) return;
     let cancelled = false;
     async function loadStatus() {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/`);
+      const response = await authorizedFetch(`/api/v2/products/${productId}/`);
       if (cancelled || redirectIfUnauthorized(response.status) || !response.ok) return;
       const data = (await response.json()) as { status?: string };
       if (!cancelled && data.status) setFetchedStatus(data.status);
@@ -92,7 +92,7 @@ export function ProductPublishPanel({
       // Defer state updates past the effect body (react-hooks/set-state-in-effect).
       await Promise.resolve();
       if (cancelled) return;
-      const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+      const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`);
       if (cancelled || redirectIfUnauthorized(response.status) || !response.ok) return;
       const body = await response.json();
       if (cancelled) return;
@@ -140,7 +140,7 @@ export function ProductPublishPanel({
   }
 
   async function queueJob(operation: "publish" | "update", targets: Target[]) {
-    const response = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/${operation}/`, {
+    const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/${operation}/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify({ targets }),
@@ -217,7 +217,7 @@ export function ProductPublishPanel({
     setNotice("");
     try {
       await ensureOttoListingDefaults(productId, authorizedFetch);
-      const publicationResponse = await authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`);
+      const publicationResponse = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`);
       const publicationBody = publicationResponse.ok ? await publicationResponse.json() : [];
       const productPublications: Publication[] = Array.isArray(publicationBody)
         ? publicationBody
