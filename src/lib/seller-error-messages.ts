@@ -2,6 +2,7 @@ import { readSellerLocale, SELLER_LOCALE_KEY, translateSeller, type SellerLocale
 import { sellerErrorCatalog } from "./seller-error-catalog.ts";
 
 const knownErrors: Record<string, string> = {
+  "Phone number and email do not match an active account.": "Phone number and email do not match an active account.",
   "An account with this phone number already exists.": "An account with this phone number already exists.",
   "Enter a phone number with a country code and 8–15 digits.": "Enter a phone number with a country code and 8–15 digits.",
   "Phone or password is incorrect.": "Phone or password is incorrect.",
