@@ -3,7 +3,8 @@ export type SellerLocale = (typeof sellerLocales)[number];
 export const SELLER_LOCALE_KEY = "benim_seller_locale";
 const messages = Object.fromEntries([
   ["Enter your account phone number and email. We will send a reset code to that email.", ["Введите номер телефона и почту вашего аккаунта. Мы отправим код для сброса пароля на эту почту.", "Hesabınızın telefon numarasını ve e-posta adresini girin. Sıfırlama kodunu bu adrese göndereceğiz.", "Geben Sie Telefonnummer und E-Mail-Adresse Ihres Kontos ein. Wir senden den Code an diese E-Mail-Adresse."]],
-  ["If an account matches this phone number and email, a reset code has been sent to that email.", ["Если номер телефона и почта совпадают с данными аккаунта, код для сброса отправлен на эту почту.", "Telefon numarası ve e-posta bir hesapla eşleşiyorsa sıfırlama kodu bu adrese gönderildi.", "Wenn Telefonnummer und E-Mail-Adresse zu einem Konto gehören, wurde ein Code an diese Adresse gesendet."]],
+  ["Phone number and email do not match an active account.", ["Номер телефона и почта не совпадают с данными активного аккаунта. Проверьте их.", "Telefon numarası ve e-posta etkin bir hesapla eşleşmiyor. Bilgilerinizi kontrol edin.", "Telefonnummer und E-Mail-Adresse passen zu keinem aktiven Konto. Prüfen Sie Ihre Angaben."]],
+  ["A reset code has been sent to your email.", ["Код для сброса пароля отправлен на вашу почту.", "Şifre sıfırlama kodu e-posta adresinize gönderildi.", "Ein Code zum Zurücksetzen des Passworts wurde an Ihre E-Mail-Adresse gesendet."]],
   ["Country", ["Страна", "Ülke", "Land"]],
   ["Phone or password is incorrect.", ["Неверный номер телефона или пароль.", "Telefon numarası veya şifre yanlış.", "Telefonnummer oder Passwort ist falsch."]],
   ["Enter your phone number and password.", ["Введите номер телефона и пароль.", "Telefon numaranızı ve şifrenizi girin.", "Geben Sie Ihre Telefonnummer und Ihr Passwort ein."]],

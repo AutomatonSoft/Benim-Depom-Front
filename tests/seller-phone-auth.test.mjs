@@ -23,6 +23,7 @@ test("password reset keeps the same required email and phone for requesting and 
   const compiled = ts.transpileModule(readFileSync(filename, "utf8"), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const states = [];
   const calls = [];
+  let requestError = new Error("Phone number and email do not match an active account.");
   let cursor = 0;
   const mocks = {
     react: { useState(initial) {
@@ -31,7 +32,7 @@ test("password reset keeps the same required email and phone for requesting and 
       return [states[index], next => { states[index] = typeof next === "function" ? next(states[index]) : next; }];
     } },
     "next/link": { default: "Link" },
-    "@/lib/seller": { sellerPublicRequest: async (path, body) => { calls.push([path, body]); return { reset_token: "verified-reset-token" }; } },
+    "@/lib/seller": { sellerPublicRequest: async (path, body) => { calls.push([path, body]); if (requestError) throw requestError; return { reset_token: "verified-reset-token" }; } },
     "@/components/SellerShell": { SellerNotice: "SellerNotice" },
     "@/components/seller/SellerPasswordInput": { default: "SellerPasswordInput" },
     "@/components/seller/SellerPhoneInput": { default: "SellerPhoneInput" },
@@ -59,18 +60,27 @@ test("password reset keeps the same required email and phone for requesting and 
   await tree.find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
   assert.deepEqual(calls[0], ["/api/v2/auth/password/reset/request/", { phone: "+905551234567", email: "seller@example.com" }]);
   tree = render();
+  assert.equal(tree.find(node => node.props.id === "seller-reset-email").props.readOnly, false);
+  assert.ok(!tree.some(node => node.type === "input" && node.props.inputMode === "numeric"));
+  const errorNotice = tree.find(node => node.type === "SellerNotice");
+  assert.equal(errorNotice.props.children, requestError.message);
+  assert.notEqual(errorNotice.props.kind, "success");
+  requestError = null;
+  await tree.find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
+  assert.deepEqual(calls[1], calls[0]);
+  tree = render();
   assert.equal(tree.find(node => node.props.id === "seller-reset-email").props.readOnly, true);
   assert.equal(tree.find(node => node.props.id === "seller-reset-phone").props.readOnly, true);
   tree.find(node => node.type === "input" && node.props.inputMode === "numeric").props.onChange({ target: { value: "123456" } });
   tree = render();
   await tree.find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
-  assert.deepEqual(calls[1], ["/api/v2/auth/password/reset/verify/", { phone: "+905551234567", email: "seller@example.com", code: "123456" }]);
+  assert.deepEqual(calls[2], ["/api/v2/auth/password/reset/verify/", { phone: "+905551234567", email: "seller@example.com", code: "123456" }]);
 });
 
 test("phone and email reset instructions are translated in every seller language", () => {
   for (const message of [
     "Enter your account phone number and email. We will send a reset code to that email.",
-    "If an account matches this phone number and email, a reset code has been sent to that email.",
+    "A reset code has been sent to your email.",
   ]) {
     for (const locale of ["ru", "tr", "de"]) assert.notEqual(translateSeller(message, locale), message);
   }
@@ -81,6 +91,7 @@ test("phone authentication errors are localized in every seller language", () =>
     "An account with this phone number already exists.",
     "Enter a phone number with a country code and 8–15 digits.",
     "No active account found with the given credentials",
+    "Phone number and email do not match an active account.",
   ];
   for (const message of messages) {
     const english = sellerApiErrorDetails({ phone: [message] }, 400, "en");

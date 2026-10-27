@@ -29,7 +29,7 @@ export default function SellerForgotPasswordPage() {
       if (stage === "request") {
         await sellerPublicRequest("/api/v2/auth/password/reset/request/", { phone, email: email.trim() });
         setStage("verify");
-        setNotice("If an account matches this phone number and email, a reset code has been sent to that email.");
+        setNotice("A reset code has been sent to your email.");
       } else if (stage === "verify") {
         const result = await sellerPublicRequest<{ reset_token: string }>("/api/v2/auth/password/reset/verify/", { phone, email: email.trim(), code });
         setResetToken(result.reset_token);
