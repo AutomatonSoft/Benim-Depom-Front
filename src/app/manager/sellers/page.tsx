@@ -90,7 +90,7 @@ export default function SellersPage() {
       setError("");
 
       try {
-        const path = isManagers ? "/api/v1/manager/users/managers/" : "/api/v1/manager/users/sellers/";
+        const path = isManagers ? "/api/v2/manager/users/managers/" : "/api/v2/manager/users/sellers/";
         const response = await authorizedFetch(`${path}?${params}`);
 
         if (response.status === 401) {
@@ -137,7 +137,7 @@ export default function SellersPage() {
     setActionError("");
     setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/users/sellers/${seller.id}/confirm-email/`, {
+      const response = await authorizedFetch(`/api/v2/manager/users/sellers/${seller.id}/confirm-email/`, {
         method: "POST",
       });
       if (response.status === 401) return void window.location.replace("/manager/login");
@@ -162,7 +162,7 @@ export default function SellersPage() {
     setActionError("");
     setFeedback("");
     try {
-      const response = await authorizedFetch(`/api/v1/manager/users/sellers/${pendingSeller.id}/`, { method: "DELETE" });
+      const response = await authorizedFetch(`/api/v2/manager/users/sellers/${pendingSeller.id}/`, { method: "DELETE" });
       if (response.status === 401) return void window.location.replace("/manager/login");
       if (response.status === 204) {
         setSellers((items) => items.filter((item) => item.id !== pendingSeller.id));

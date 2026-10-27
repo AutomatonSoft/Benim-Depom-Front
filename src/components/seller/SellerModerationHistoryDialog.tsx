@@ -35,7 +35,7 @@ function HistoryContent({ productId }: { productId: number }) {
       setLoading(true);
       setError("");
       try {
-        const data = await sellerRequest<PageResult<HistoryRow>>(`/api/v1/products/${productId}/moderation-history/?page=${page}`, { signal: controller.signal });
+        const data = await sellerRequest<PageResult<HistoryRow>>(`/api/v2/products/${productId}/moderation-history/?page=${page}`, { signal: controller.signal });
         if (!controller.signal.aborted) setResult(data);
       } catch (e) {
         if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Could not load history.");

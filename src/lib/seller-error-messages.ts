@@ -2,6 +2,11 @@ import { readSellerLocale, SELLER_LOCALE_KEY, translateSeller, type SellerLocale
 import { sellerErrorCatalog } from "./seller-error-catalog.ts";
 
 const knownErrors: Record<string, string> = {
+  "Phone number and email do not match an active account.": "Phone number and email do not match an active account.",
+  "An account with this phone number already exists.": "An account with this phone number already exists.",
+  "Enter a phone number with a country code and 8–15 digits.": "Enter a phone number with a country code and 8–15 digits.",
+  "Phone or password is incorrect.": "Phone or password is incorrect.",
+  "Phone and password are required.": "Enter your phone number and password.",
   "Names must contain letters only.": "Names must contain 2–40 letters only, without spaces or symbols.",
   "Invalid value.": "Enter a valid value for this field.",
   "Choose one or two materials.": "Choose one or two materials.",
@@ -36,8 +41,8 @@ const knownErrors: Record<string, string> = {
   "This password is entirely numeric.": "Your password cannot contain only numbers.",
   "A user with this email already exists.": "An account with this email already exists. Sign in or reset your password.",
   "A user with that username already exists.": "This username is already taken. Choose another one.",
-  "No active account found with the given credentials": "Email or password is incorrect.",
-  "No active account found with the given credentials.": "Email or password is incorrect.",
+  "No active account found with the given credentials": "Phone or password is incorrect.",
+  "No active account found with the given credentials.": "Phone or password is incorrect.",
   "Invalid or expired reset code.": "The code is incorrect or has expired. Request a new code.",
   "Invalid or expired verification code.": "The code is incorrect or has expired. Request a new code.",
   "Invalid or expired reset token.": "Your password reset session has expired. Request a new code.",

@@ -7,13 +7,14 @@ import { LoaderCircle } from "lucide-react";
 import { SellerNotice } from "@/components/SellerShell";
 import { SellerLocalized, useSellerI18n } from "@/components/seller/SellerI18n";
 import SellerPasswordInput from "@/components/seller/SellerPasswordInput";
+import SellerPhoneInput from "@/components/seller/SellerPhoneInput";
 import { sellerLogin } from "@/lib/seller";
 
 function LoginForm() {
   const { t } = useSellerI18n();
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(params.get("denied") ? "This portal is available to seller accounts only." : "");
   const [notice] = useState(
@@ -28,7 +29,7 @@ function LoginForm() {
     setBusy(true);
     setError("");
     try {
-      await sellerLogin(email, password);
+      await sellerLogin(phone, password);
       router.replace("/seller/products");
     } catch (error) {
       setError(error instanceof Error ? error.message : t("Sign in failed."));
@@ -42,9 +43,9 @@ function LoginForm() {
     <p>{t("Sign in to manage your products and sales.")}</p>
     {notice && <SellerNotice kind="success">{notice}</SellerNotice>}
     <form id="seller-login" name="seller-login" onSubmit={submit}>
-      <label className="seller-field">{t("Email")}
-        <input id="seller-login-email" name="seller-email" type="email" required autoComplete="section-seller username" value={email} onChange={event => setEmail(event.target.value)} />
-      </label>
+      <div className="seller-field"><label htmlFor="seller-login-phone">{t("Phone")}</label>
+        <SellerPhoneInput id="seller-login-phone" name="seller-phone" required autoComplete="section-seller username" value={phone} onValueChange={setPhone} />
+      </div>
       <label className="seller-field">{t("Password")}
         <SellerPasswordInput id="seller-login-password" name="seller-password" required autoComplete="section-seller current-password" value={password} onChange={event => setPassword(event.target.value)} />
       </label>

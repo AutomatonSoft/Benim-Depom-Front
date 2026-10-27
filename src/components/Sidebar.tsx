@@ -96,7 +96,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
   useEffect(() => {
     async function loadProfile() {
-      const response = await authorizedFetch("/api/v1/auth/me/");
+      const response = await authorizedFetch("/api/v2/auth/me/");
       if (!response.ok) return;
       setProfile((await response.json()) as { username: string; first_name: string; role: string });
     }

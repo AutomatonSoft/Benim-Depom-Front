@@ -44,7 +44,7 @@ export default function LoginPage() {
       }
 
       const tokens = (await loginResponse.json()) as LoginResponse;
-      const profileResponse = await fetch("/api/v1/auth/me/", {
+      const profileResponse = await fetch("/api/v2/auth/me/", {
         headers: { Authorization: `Bearer ${tokens.access}` },
       });
 

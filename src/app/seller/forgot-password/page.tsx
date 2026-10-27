@@ -5,10 +5,12 @@ import { useState, type FormEvent } from "react";
 import { sellerPublicRequest } from "@/lib/seller";
 import { SellerNotice } from "@/components/SellerShell";
 import SellerPasswordInput from "@/components/seller/SellerPasswordInput";
+import SellerPhoneInput from "@/components/seller/SellerPhoneInput";
 import { SellerLocalized } from "@/components/seller/SellerI18n";
 
 export default function SellerForgotPasswordPage() {
   const [stage, setStage] = useState<"request" | "verify" | "complete">("request");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -25,15 +27,15 @@ export default function SellerForgotPasswordPage() {
     setNotice("");
     try {
       if (stage === "request") {
-        await sellerPublicRequest("/api/v1/auth/password/reset/request/", { email });
+        await sellerPublicRequest("/api/v2/auth/password/reset/request/", { phone, email: email.trim() });
         setStage("verify");
-        setNotice("If the account exists, a reset code has been sent.");
+        setNotice("A reset code has been sent to your email.");
       } else if (stage === "verify") {
-        const result = await sellerPublicRequest<{ reset_token: string }>("/api/v1/auth/password/reset/verify/", { email, code });
+        const result = await sellerPublicRequest<{ reset_token: string }>("/api/v2/auth/password/reset/verify/", { phone, email: email.trim(), code });
         setResetToken(result.reset_token);
         setStage("complete");
       } else {
-        await sellerPublicRequest("/api/v1/auth/password/reset/complete/", {
+        await sellerPublicRequest("/api/v2/auth/password/reset/complete/", {
           reset_token: resetToken,
           new_password: password,
           new_password_confirm: confirm,
@@ -50,10 +52,13 @@ export default function SellerForgotPasswordPage() {
   return <SellerLocalized>
     <main className="seller-auth-card">
       <h1>Reset password</h1>
-      <p>{stage === "request" ? "Request a password reset code." : stage === "verify" ? "Enter the six-digit code sent to your email." : "Choose a new password."}</p>
+      <p>{stage === "request" ? "Enter your account phone number and email. We will send a reset code to that email." : stage === "verify" ? "Enter the six-digit code sent to your email." : "Choose a new password."}</p>
       <form onSubmit={submit}>
-        <label className="seller-field">Email
-          <input type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} />
+        <div className="seller-field"><label htmlFor="seller-reset-phone">Phone</label>
+          <SellerPhoneInput id="seller-reset-phone" autoComplete="tel" required readOnly={stage !== "request"} value={phone} onValueChange={setPhone} />
+        </div>
+        <label className="seller-field" htmlFor="seller-reset-email">Email
+          <input id="seller-reset-email" type="email" autoComplete="email" required readOnly={stage !== "request"} value={email} onChange={event => setEmail(event.target.value)} />
         </label>
         {stage === "verify" && <label className="seller-field">Reset code
           <input inputMode="numeric" minLength={6} maxLength={6} required value={code} onChange={event => setCode(event.target.value)} />

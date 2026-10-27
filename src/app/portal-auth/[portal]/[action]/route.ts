@@ -28,19 +28,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   };
 
   if (action !== "login" && !refresh) return reply({ detail: "Please sign in again." }, action === "logout" ? 204 : 401, "");
-  let credentials: { email: string; password: string } | undefined;
+  let credentials: { phone?: string; email?: string; password: string } | undefined;
   if (action === "login") {
     try {
       const body = await request.json();
-      if (typeof body?.email !== "string" || typeof body?.password !== "string") throw new Error("Invalid credentials");
-      credentials = { email: body.email, password: body.password };
-    } catch { return reply({ detail: "Email and password are required." }, 400); }
+      const field = portal === "seller" ? "phone" : "email";
+      if (typeof body?.[field] !== "string" || !body[field].trim() || typeof body?.password !== "string") throw new Error("Invalid credentials");
+      credentials = { [field]: body[field], password: body.password };
+    } catch { return reply({ detail: portal === "seller" ? "Phone and password are required." : "Email and password are required." }, 400); }
   }
 
   // Keep this outside /api: production nginx sends /api directly to Django.
   const backend = process.env.BACKEND_URL || (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "");
   if (!backend) return reply({ detail: "Authentication service is not configured." }, 503);
-  const base = `${backend.replace(/\/$/, "")}/api/v1/auth/`;
+  const base = `${backend.replace(/\/$/, "")}/api/v2/auth/`;
   const backendHeaders = (access?: string) => {
     const headers = new Headers({ "Content-Type": "application/json", Host: origin.host, "X-Forwarded-Proto": origin.protocol.slice(0, -1) });
     if (access) headers.set("Authorization", `Bearer ${access}`);
