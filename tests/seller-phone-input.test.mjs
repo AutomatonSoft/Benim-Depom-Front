@@ -33,9 +33,9 @@ function renderPhone({ value = "", locale = "en", readOnly = false } = {}) {
       },
     },
   };
-  const module = { exports: {} };
-  new Function("require", "module", "exports", compiled)(id => mocks[id] || require(id), module, module.exports);
-  captured.html = renderToStaticMarkup(React.createElement(module.exports.default, {
+  const loadedModule = { exports: {} };
+  new Function("require", "module", "exports", compiled)(id => mocks[id] || require(id), loadedModule, loadedModule.exports);
+  captured.html = renderToStaticMarkup(React.createElement(loadedModule.exports.default, {
     id: "phone", name: "phone", required: true, value, readOnly,
     onValueChange: phone => captured.values.push(phone),
   }));
