@@ -1735,7 +1735,7 @@ export default function ProductWorkspacePage() {
     setGenerating(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/ai-content/generate/`, {
-        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: listingTargets }),
+        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: contentTargets }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || "AI generation could not be started.");
