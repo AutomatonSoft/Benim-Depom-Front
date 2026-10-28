@@ -11,6 +11,9 @@ export const listingTargets: ListingTarget[] = [
   { marketplace: "kaufland", account: "xl" },
 ];
 
+// Content generation includes eBay; legacy publication jobs keep their existing targets.
+export const contentTargets = [...listingTargets, { marketplace: "ebay", account: "depotum" }];
+
 export const listingTargetKey = (target: ListingTarget) => `${target.marketplace}:${target.account}`;
 
 export const marketplaceName: Record<Marketplace, string> = {
