@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Suspense, use, useState } from "react";
 
 import { ListingPrep } from "@/components/ListingPrep";
-import { EbayListingPanel } from "@/components/EbayListingPanel";
+import { EbayCategoryPicker, EbayListingProvider } from "@/components/EbayListingPanel";
 import { ProductPublishPanel } from "@/components/ProductPublishPanel";
 import { EmptyState, PageContainer, PageHeader, SectionCard } from "@/components/manager/ui";
 import { OttoCategoryPicker } from "@/components/OttoCategoryPicker";
@@ -122,8 +122,6 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
   const { t } = useI18n();
   const [categoryName, setCategoryName] = useState(product.otto_category_name);
   const [groupName, setGroupName] = useState(product.otto_category_group_name);
-  const [channel, setChannel] = useState<"legacy" | "ebay">("legacy");
-  const [ebayOpened, setEbayOpened] = useState(false);
 
   return (
     <PageContainer>
@@ -141,12 +139,8 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
           </Button>
         }
       />
-      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={t("listing.eyebrow")}>
-        <Button variant={channel === "legacy" ? "default" : "secondary"} aria-pressed={channel === "legacy"} onClick={() => setChannel("legacy")}>OTTO / Hood / Kaufland</Button>
-        <Button variant={channel === "ebay" ? "default" : "secondary"} aria-pressed={channel === "ebay"} onClick={() => { setEbayOpened(true); setChannel("ebay"); }}>{t("ebay.tab")}</Button>
-      </div>
-      <div hidden={channel !== "legacy"}>
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+      <EbayListingProvider productId={product.id}>
+      <div className="grid gap-4 xl:grid-cols-3 xl:items-start">
         <ListingPrep productId={product.id} />
         <OttoCategoryPicker
           productId={product.id}
@@ -161,12 +155,12 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
             productCache.delete(product.id);
           }}
         />
+        <EbayCategoryPicker />
       </div>
       <div className="mt-4">
         <ProductPublishPanel productId={product.id} productStatus={product.status} />
       </div>
-      </div>
-      {ebayOpened && <div hidden={channel !== "ebay"}><EbayListingPanel key={product.id} productId={product.id} /></div>}
+      </EbayListingProvider>
     </PageContainer>
   );
 }
