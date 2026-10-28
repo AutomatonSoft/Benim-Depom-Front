@@ -93,6 +93,38 @@ export function ebayBaseTitle(title: string) {
   return title.replace(/\s*(?:\(BD\)|\bBD)\s*$/i, "").trim();
 }
 
+export function ebayDisplayTitle(title: string) {
+  const base = ebayBaseTitle(title);
+  return base ? `${base} BD` : "";
+}
+
+export async function submitEbayListing(
+  operation: "publish" | "update",
+  environment: EbayEnvironment,
+  send: <T>(path: string, init?: RequestInit, optional?: boolean) => Promise<T | null>,
+) {
+  const snapshot = await send<EbaySnapshot>("listing/", undefined, true);
+  if (snapshot && snapshot.environment !== environment) throw new Error("eBay environment mismatch.");
+  const active = snapshot?.remote_status === "PUBLISHED" && snapshot.listing_status === "ACTIVE";
+  if (operation === "publish" && active) return;
+  if (operation === "update" && !active) throw new Error("eBay: no active listing to update.");
+  const write = async <T>(path: string, method: string, body: unknown) => {
+    return send<T>(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  };
+  if (operation === "update") {
+    await write("listing/", "PUT", { confirm_stock_location: true, confirm_update: true });
+    return;
+  }
+  await write("prepare/", "POST", { confirm_stock_location: true });
+  const checks = await send<EbayChecks>("publish/");
+  if (!checks || checks.environment !== environment || !checks.ready || !checks.preview_hash) {
+    throw new Error(checks?.blocking_reasons.join("; ") || "eBay listing is not ready.");
+  }
+  await write("publish/", "POST", {
+    confirm_stock_location: true, confirm_publication: true, preview_hash: checks.preview_hash,
+  });
+}
+
 export function newEbayDraft(): EbayDraft {
   return { title: "", description: "", image_urls: [], price_eur: null, quantity: null,
     category_id: "", aspects: {}, regulatory: {}, fulfillment_policy_id: "", payment_policy_id: "",

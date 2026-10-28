@@ -11,10 +11,11 @@ export const listingTargets: ListingTarget[] = [
   { marketplace: "kaufland", account: "xl" },
 ];
 
-// Content generation includes eBay; legacy publication jobs keep their existing targets.
-export const contentTargets = [...listingTargets, { marketplace: "ebay", account: "depotum" }];
+export type PublicationTarget = ListingTarget | { marketplace: "ebay"; account: "depotum" };
+export const publicationTargets: PublicationTarget[] = [...listingTargets, { marketplace: "ebay", account: "depotum" }];
+export const contentTargets = publicationTargets;
 
-export const listingTargetKey = (target: ListingTarget) => `${target.marketplace}:${target.account}`;
+export const listingTargetKey = (target: PublicationTarget) => `${target.marketplace}:${target.account}`;
 
 export const marketplaceName: Record<Marketplace, string> = {
   otto: "OTTO",
@@ -40,7 +41,8 @@ export function defaultOttoShippingProfileId(
   return match?.shipping_profile_id ?? "";
 }
 
-export function listingChannelLabel(target: ListingTarget) {
+export function listingChannelLabel(target: PublicationTarget) {
+  if (target.marketplace === "ebay") return "eBay Depotum";
   return `${marketplaceName[target.marketplace]} ${target.account.toUpperCase()}`;
 }
 
