@@ -18,8 +18,10 @@ import {
 } from "@/lib/listings";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { useEbay } from "@/components/EbayListingPanel";
+import { publicationTargets, type ListingTarget, type PublicationTarget } from "@/lib/listings";
 
-type Target = (typeof listingTargets)[number];
+type Target = PublicationTarget;
 type Publication = {
   marketplace: string;
   account: string;
@@ -51,7 +53,9 @@ export function ProductPublishPanel({
   productStatus?: string;
 }) {
   const { t } = useI18n();
-  const [selectedTargets, setSelectedTargets] = useState(() => listingTargets.map(listingTargetKey));
+  const ebay = useEbay();
+  const ebayActive = ebay.snapshot?.remote_status === "PUBLISHED" && ebay.snapshot?.listing_status === "ACTIVE";
+  const [selectedTargets, setSelectedTargets] = useState(() => publicationTargets.map(listingTargetKey));
   const [publishing, setPublishing] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -61,6 +65,7 @@ export function ProductPublishPanel({
   const [fetchedStatus, setFetchedStatus] = useState("");
   const [publications, setPublications] = useState<Publication[]>([]);
   const status = productStatus || fetchedStatus;
+  const actionBusy = publishing || updating || previewing || (selectedTargets.includes("ebay:depotum") && ebay.busy);
 
   async function loadPublications() {
     const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`);
@@ -115,18 +120,19 @@ export function ProductPublishPanel({
 
   const selectedLiveTargets = useMemo(
     () =>
-      listingTargets.filter((target) => {
+      publicationTargets.filter((target) => {
         const key = listingTargetKey(target);
         if (!selectedTargets.includes(key)) return false;
+        if (target.marketplace === "ebay") return ebayActive;
         const publication = publicationByTarget.get(key);
         return Boolean(publication && isLivePublication(publication.status));
       }),
-    [publicationByTarget, selectedTargets],
+    [publicationByTarget, selectedTargets, ebayActive],
   );
 
   const hasAnyLivePublication = useMemo(
-    () => publications.some((publication) => isLivePublication(publication.status)),
-    [publications],
+    () => ebayActive || publications.some((publication) => isLivePublication(publication.status)),
+    [publications, ebayActive],
   );
 
   const canUpdate = canPublish && hasAnyLivePublication && selectedLiveTargets.length > 0;
@@ -139,7 +145,7 @@ export function ProductPublishPanel({
     );
   }
 
-  async function queueJob(operation: "publish" | "update", targets: Target[]) {
+  async function queueJob(operation: "publish" | "update", targets: ListingTarget[]) {
     const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/${operation}/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
@@ -159,73 +165,90 @@ export function ProductPublishPanel({
   }
 
   async function publish() {
-    if (!canPublish || selectedTargets.length === 0) return;
+    if (!canPublish || selectedTargets.length === 0 || actionBusy) return;
+    const includesEbay = selectedTargets.includes("ebay:depotum");
+    if (includesEbay && !window.confirm(`${ebay.environment?.toUpperCase() || "eBay"} · Depotum\n${t("ebay.confirmPublish")}\n${ebay.draft?.title || ""}\n${ebay.draft?.price_eur || "—"} EUR · ${ebay.draft?.quantity ?? "—"}`)) return;
     setPublishing(true);
     setError("");
     setNotice("");
     try {
-      await ensureOttoListingDefaults(productId, authorizedFetch);
+      const legacy = listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target)));
+      if (includesEbay) { await ebay.submit("publish"); setNotice(t("ebay.published")); }
+      if (!legacy.length) { setNotice(t("ebay.published")); return; }
+      if (legacy.some((target) => target.marketplace === "otto")) await ensureOttoListingDefaults(productId, authorizedFetch);
       const job = await queueJob(
         "publish",
-        listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target))),
+        legacy,
       );
       if (!job) return;
       setNotice(
-        t("marketplaces.jobQueued", {
+        (includesEbay ? `${t("ebay.published")} ` : "") + t("marketplaces.jobQueued", {
           id: job.id.slice(0, 8),
           operation: t(`job.op.${job.operation}` as MessageKey),
         }),
       );
       await loadPublications();
-    } catch {
-      setError(t("common.apiUnreachable"));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : t("common.apiUnreachable"));
     } finally {
       setPublishing(false);
     }
   }
 
   async function updateLive() {
-    if (!canUpdate) return;
+    if (!canUpdate || actionBusy) return;
     if (!window.confirm(t("listing.confirmUpdate"))) return;
     setUpdating(true);
     setError("");
     setNotice("");
     try {
-      await ensureOttoListingDefaults(productId, authorizedFetch);
+      const legacy = selectedLiveTargets.filter((target): target is ListingTarget => target.marketplace !== "ebay");
+      const includesEbay = selectedLiveTargets.some((target) => target.marketplace === "ebay");
+      if (includesEbay) { await ebay.submit("update"); setNotice(t("ebay.updated")); }
+      if (!legacy.length) { setNotice(t("ebay.updated")); return; }
+      if (legacy.some((target) => target.marketplace === "otto")) await ensureOttoListingDefaults(productId, authorizedFetch);
       // OTTO update still uses the marketplace upsert under the hood, but the
       // Benim job operation is `update` so Marketplaces history shows it correctly.
-      const job = await queueJob("update", selectedLiveTargets);
+      const job = await queueJob("update", legacy);
       if (!job) return;
       setNotice(
-        t("marketplaces.jobQueued", {
+        (includesEbay ? `${t("ebay.updated")} ` : "") + t("marketplaces.jobQueued", {
           id: job.id.slice(0, 8),
           operation: t(`job.op.${job.operation}` as MessageKey),
         }),
       );
       await loadPublications();
-    } catch {
-      setError(t("common.apiUnreachable"));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : t("common.apiUnreachable"));
     } finally {
       setUpdating(false);
     }
   }
 
   async function previewSelected() {
-    if (selectedTargets.length === 0) return;
+    if (selectedTargets.length === 0 || actionBusy) return;
     setPreviewing(true);
     setError("");
     setNotice("");
     try {
-      await ensureOttoListingDefaults(productId, authorizedFetch);
+      if (listingTargets.some((target) => target.marketplace === "otto" && selectedTargets.includes(listingTargetKey(target)))) await ensureOttoListingDefaults(productId, authorizedFetch);
       const publicationResponse = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`);
       const publicationBody = publicationResponse.ok ? await publicationResponse.json() : [];
       const productPublications: Publication[] = Array.isArray(publicationBody)
         ? publicationBody
         : publicationBody.results ?? [];
       setPublications(productPublications);
-      const selected = listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target)));
+      const selected = publicationTargets.filter((target) => selectedTargets.includes(listingTargetKey(target)));
       const rows = await Promise.all(
         selected.map(async (target) => {
+          if (target.marketplace === "ebay") {
+            try {
+              await ebay.preview();
+              return { key: listingTargetKey(target), label: listingChannelLabel(target), ok: true, detail: t("listing.previewOk") };
+            } catch (failure) {
+              return { key: listingTargetKey(target), label: listingChannelLabel(target), ok: false, detail: failure instanceof Error ? failure.message : t("ebay.error") };
+            }
+          }
           const publication = productPublications.find(
             (item) => item.marketplace === target.marketplace && item.account === target.account,
           );
@@ -290,21 +313,22 @@ export function ProductPublishPanel({
             size="sm"
             variant="ghost"
             className="h-auto px-0 text-[var(--brand-accent)] hover:bg-transparent hover:underline"
+            disabled={actionBusy}
             onClick={() => {
               setPreviews([]);
-              setSelectedTargets(selectedTargets.length === listingTargets.length ? [] : listingTargets.map(listingTargetKey));
+              setSelectedTargets(selectedTargets.length === publicationTargets.length ? [] : publicationTargets.map(listingTargetKey));
             }}
           >
-            {selectedTargets.length === listingTargets.length ? t("marketplaces.clearAll") : t("marketplaces.selectAll")}
+            {selectedTargets.length === publicationTargets.length ? t("marketplaces.clearAll") : t("marketplaces.selectAll")}
           </Button>
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {listingTargets.map((target) => {
+          {publicationTargets.map((target) => {
             const key = listingTargetKey(target);
             const checked = selectedTargets.includes(key);
             const publication = publicationByTarget.get(key);
-            const live = Boolean(publication && isLivePublication(publication.status));
+            const live = target.marketplace === "ebay" ? ebayActive : Boolean(publication && isLivePublication(publication.status));
             return (
               <label
                 key={key}
@@ -315,6 +339,7 @@ export function ProductPublishPanel({
               >
                 <Checkbox
                   checked={checked}
+                  disabled={actionBusy}
                   onCheckedChange={() => toggleTarget(target)}
                   aria-label={listingChannelLabel(target)}
                 />
@@ -338,14 +363,14 @@ export function ProductPublishPanel({
           <Button
             type="button"
             variant="secondary"
-            disabled={selectedTargets.length === 0 || previewing}
+            disabled={selectedTargets.length === 0 || actionBusy}
             onClick={() => void previewSelected()}
           >
             {previewing ? t("listing.previewing") : t("listing.previewAll")}
           </Button>
           <Button
             variant="accent"
-            disabled={!canPublish || selectedTargets.length === 0 || publishing || updating}
+            disabled={!canPublish || selectedTargets.length === 0 || actionBusy}
             onClick={() => void publish()}
           >
             <Send className="size-4" />
@@ -358,7 +383,7 @@ export function ProductPublishPanel({
           <Button
             type="button"
             variant="secondary"
-            disabled={!canUpdate || publishing || updating}
+            disabled={!canUpdate || actionBusy}
             title={
               !hasAnyLivePublication
                 ? t("listing.updateDisabledNoActive")
