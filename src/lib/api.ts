@@ -33,19 +33,13 @@ export function clearLegacyRefreshToken() {
 }
 
 export async function logoutSession() {
-  const access = readToken(ACCESS_TOKEN_KEY);
-  if (access) {
-    try {
-      await authorizedFetch("/api/v1/auth/logout/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-    } catch {
-      // Tokens are still cleared locally so the panel cannot stay signed in.
-    }
+  try {
+    await fetch("/portal-auth/manager/logout/", { method: "POST", credentials: "same-origin" });
+  } catch {
+    // Still clear the local access token when the network is unavailable.
+  } finally {
+    clearTokens();
   }
-  clearTokens();
 }
 
 async function refreshAccessToken() {
@@ -59,7 +53,7 @@ async function refreshAccessToken() {
 }
 
 async function refreshAccessTokenRequest() {
-  const response = await fetch("/api/v1/auth/refresh/", {
+  const response = await fetch("/portal-auth/manager/refresh/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
@@ -71,8 +65,22 @@ async function refreshAccessTokenRequest() {
   }
 
   const tokens = (await response.json()) as RefreshResponse;
+  if (!tokens.access || await hasManagerRole(tokens.access) !== true) {
+    clearTokens();
+    return null;
+  }
   writeToken(ACCESS_TOKEN_KEY, tokens.access);
   return tokens.access;
+}
+
+async function hasManagerRole(access: string): Promise<boolean | null> {
+  const response = await fetch("/api/v2/auth/me/", {
+    credentials: "same-origin",
+    headers: { Authorization: `Bearer ${access}` },
+  });
+  if (!response.ok) return null;
+  const profile = await response.json() as { role?: string };
+  return profile.role === "manager" || profile.role === "admin";
 }
 
 export function apiErrorMessage(data: unknown, fallback: string) {
@@ -108,6 +116,10 @@ export async function authorizedFetch(input: RequestInfo | URL, init: RequestIni
   if (!access) return new Response(null, { status: 401 });
 
   const response = await request(access);
+  if (response.status === 403 && await hasManagerRole(access) === false) {
+    clearTokens();
+    return new Response(null, { status: 401 });
+  }
   if (response.status !== 401) return response;
 
   const refreshedAccess = await refreshAccessToken();

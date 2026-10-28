@@ -147,10 +147,10 @@ async function readJson(response: Response) {
 async function loadBundle(productId: number, failMessage: string): Promise<Bundle> {
   await ensureOttoListingDefaults(productId, authorizedFetch);
   const [publicationResponse, jvProfilesResponse, xlProfilesResponse, productResponse, ...configResponses] = await Promise.all([
-    authorizedFetch(`/api/v1/orchestrator/products/${productId}/publications/`),
-    authorizedFetch("/api/v1/catalog/otto/shipping-profiles/?account=jv"),
-    authorizedFetch("/api/v1/catalog/otto/shipping-profiles/?account=xl"),
-    authorizedFetch(`/api/v1/products/${productId}/`),
+    authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`),
+    authorizedFetch("/api/v2/catalog/otto/shipping-profiles/?account=jv"),
+    authorizedFetch("/api/v2/catalog/otto/shipping-profiles/?account=xl"),
+    authorizedFetch(`/api/v2/products/${productId}/`),
     ...listingTargets.map((target) => authorizedFetch(listingConfigPath(productId, target))),
   ]);
 

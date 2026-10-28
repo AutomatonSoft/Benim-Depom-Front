@@ -29,8 +29,8 @@ export type OttoCatalogLanguage = (typeof ottoCatalogLanguages)[number];
 
 export function ottoCatalogPath(path: string, language: OttoCatalogLanguage) {
   const trimmed = path.replace(/^\/+|\/+$/g, "");
-  if (language === "de") return `/api/v1/catalog/otto/${trimmed}/`;
-  return `/api/v1/catalog/otto/${trimmed}/${language}/`;
+  if (language === "de") return `/api/v2/catalog/otto/${trimmed}/`;
+  return `/api/v2/catalog/otto/${trimmed}/${language}/`;
 }
 
 export function defaultOttoShippingProfileId(
@@ -45,7 +45,7 @@ export function listingChannelLabel(target: ListingTarget) {
 }
 
 export function listingConfigPath(productId: number, target: ListingTarget) {
-  return `/api/v1/orchestrator/products/${productId}/${target.marketplace}/${target.account}/configuration/`;
+  return `/api/v2/orchestrator/products/${productId}/${target.marketplace}/${target.account}/configuration/`;
 }
 
 export function listingPreviewPath(
@@ -54,9 +54,9 @@ export function listingPreviewPath(
   kauflandMode: "create" | "update" = "create",
 ) {
   if (target.marketplace === "kaufland") {
-    return `/api/v1/orchestrator/products/${productId}/kaufland/${target.account}/${kauflandMode}-payload-preview/`;
+    return `/api/v2/orchestrator/products/${productId}/kaufland/${target.account}/${kauflandMode}-payload-preview/`;
   }
-  return `/api/v1/orchestrator/products/${productId}/${target.marketplace}/${target.account}/payload-preview/`;
+  return `/api/v2/orchestrator/products/${productId}/${target.marketplace}/${target.account}/payload-preview/`;
 }
 
 export function formatListingErrors(errors: unknown): string {
@@ -92,8 +92,8 @@ export async function ensureOttoListingDefaults(
 ) {
   const ottoTargets = listingTargets.filter((target) => target.marketplace === "otto");
   const [jvProfilesResponse, xlProfilesResponse] = await Promise.all([
-    authorizedFetchFn("/api/v1/catalog/otto/shipping-profiles/?account=jv"),
-    authorizedFetchFn("/api/v1/catalog/otto/shipping-profiles/?account=xl"),
+    authorizedFetchFn("/api/v2/catalog/otto/shipping-profiles/?account=jv"),
+    authorizedFetchFn("/api/v2/catalog/otto/shipping-profiles/?account=xl"),
   ]);
   const profilesByAccount: Record<Account, ShippingProfile[]> = {
     jv: jvProfilesResponse.ok ? ((await jvProfilesResponse.json().catch(() => [])) as ShippingProfile[]) : [],

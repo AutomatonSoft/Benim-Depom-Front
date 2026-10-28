@@ -71,7 +71,7 @@ export default function CreateManagerPage() {
     );
 
     try {
-      const response = await authorizedFetch("/api/v1/manager/users/", {
+      const response = await authorizedFetch("/api/v2/manager/users/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

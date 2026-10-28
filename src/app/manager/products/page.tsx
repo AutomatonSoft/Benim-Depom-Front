@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { authorizedFetch } from "@/lib/api";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatTime } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
 
 type ProductImage = {
@@ -27,6 +27,7 @@ type Product = {
   listing_price_eur?: string | null;
   status: string;
   total_quantity: number;
+  active_listing_count?: number;
   images: ProductImage[];
   created_at: string;
   seller?: { id: number; username: string; first_name: string; email: string };
@@ -75,7 +76,7 @@ export default function ProductsPage() {
       setError("");
 
       try {
-        const response = await authorizedFetch(`/api/v1/manager/products/?${params}`);
+        const response = await authorizedFetch(`/api/v2/manager/products/?${params}`);
 
         if (response.status === 401) {
           window.localStorage.removeItem("benim_access_token");
@@ -191,12 +192,13 @@ export default function ProductsPage() {
               pageLabel={t("common.page", { page })}
             />
             <div className="overflow-x-auto">
-            <div className="grid min-w-[980px] grid-cols-[minmax(280px,2fr)_140px_90px_90px_140px_140px] gap-3 border-b border-border bg-[#f8fafc] px-5 py-2 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+            <div className="grid min-w-[1100px] grid-cols-[minmax(280px,2fr)_140px_90px_90px_140px_120px_140px] gap-3 border-b border-border bg-[#f8fafc] px-5 py-2 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
               <span>{t("products.col.product")}</span>
               <span>{t("products.col.status")}</span>
               <span className="text-right">{t("products.col.ean")}</span>
               <span className="text-right">{t("products.col.stock")}</span>
               <span className="text-right">{t("products.col.sellerListing")}</span>
+              <span className="text-center">{t("products.col.activeListings")}</span>
               <span>{t("products.col.created")}</span>
             </div>
             {products.map((product) => {
@@ -206,7 +208,7 @@ export default function ProductsPage() {
                 <Link
                   key={product.id}
                   href={`/manager/products/${product.id}`}
-                  className="grid min-w-[980px] grid-cols-[minmax(280px,2fr)_140px_90px_90px_140px_140px] items-center gap-3 border-b border-border px-5 py-2.5 transition-colors hover:bg-[#f8fafc]"
+                  className="grid min-w-[1100px] grid-cols-[minmax(280px,2fr)_140px_90px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-5 py-2.5 transition-colors hover:bg-[#f8fafc]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary text-muted-foreground">
@@ -240,8 +242,14 @@ export default function ProductsPage() {
                     <span className="block">{formatPrice(product)}</span>
                     <small className="font-semibold text-muted-foreground">{formatListing(product)}</small>
                   </strong>
+                  <span className="text-center">
+                    <strong className={`inline-flex min-w-8 justify-center rounded-full px-2.5 py-1 text-xs font-extrabold tabular-nums ${(product.active_listing_count ?? 0) > 0 ? "bg-emerald-50 text-emerald-700" : "bg-secondary text-muted-foreground"}`}>
+                      {product.active_listing_count ?? "—"}
+                    </strong>
+                  </span>
                   <time className="text-xs font-semibold text-muted-foreground" dateTime={product.created_at}>
-                    {formatDate(product.created_at, true)}
+                    <span className="block whitespace-nowrap">{formatDate(product.created_at)}</span>
+                    <span className="mt-1 block text-[11px] font-normal tabular-nums">{formatTime(product.created_at)}</span>
                   </time>
                 </Link>
               );

@@ -63,11 +63,11 @@ export default function SettingsPage() {
     async function loadProfile() {
       setTimezone(localStorage.getItem(TIMEZONE_STORAGE_KEY) || "UTC");
       try {
-        const response = await authorizedFetch("/api/v1/auth/me/");
+        const response = await authorizedFetch("/api/v2/auth/me/");
         if (response.status === 401) return void window.location.replace("/manager/login");
         if (!response.ok) throw new Error();
         setProfile((await response.json()) as Profile);
-        const contactResponse = await authorizedFetch("/api/v1/contact/whatsapp/");
+        const contactResponse = await authorizedFetch("/api/v2/contact/whatsapp/");
         if (contactResponse.ok) {
           const contact = (await contactResponse.json()) as { phone?: string };
           setWhatsappPhone(contact.phone || "");
@@ -97,7 +97,7 @@ export default function SettingsPage() {
 
     setSubmitting(true);
     try {
-      const response = await authorizedFetch("/api/v1/auth/password/change/", {
+      const response = await authorizedFetch("/api/v2/auth/password/change/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -137,7 +137,7 @@ export default function SettingsPage() {
     setWhatsappSuccess("");
     setWhatsappSaving(true);
     try {
-      const response = await authorizedFetch("/api/v1/contact/whatsapp/", {
+      const response = await authorizedFetch("/api/v2/contact/whatsapp/", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: whatsappPhone }),

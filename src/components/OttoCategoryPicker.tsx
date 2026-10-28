@@ -383,7 +383,7 @@ export function OttoCategoryPicker({
     setError("");
     setNotice("");
     try {
-      const response = await authorizedFetch(`/api/v1/products/${productId}/`, {
+      const response = await authorizedFetch(`/api/v2/products/${productId}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

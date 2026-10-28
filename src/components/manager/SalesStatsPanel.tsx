@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Barcode, Mail, Package, Receipt, Search, Wallet } from "lucide-react";
+import { Barcode, Phone, Package, Receipt, Search, Wallet } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { ChannelCard } from "@/components/manager/ChannelCard";
@@ -82,25 +82,25 @@ export function SalesStatsPanel() {
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [eanInput, setEanInput] = useState("");
-  const [emailInput, setEmailInput] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
   const [ean, setEan] = useState("");
-  const [sellerEmail, setSellerEmail] = useState("");
+  const [sellerPhone, setSellerPhone] = useState("");
   const [stats, setStats] = useState<SalesStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(
-    async (query: { from: string; to: string; ean: string; sellerEmail: string }) => {
+    async (query: { from: string; to: string; ean: string; sellerPhone: string }) => {
       setLoading(true);
       setError("");
       const params = new URLSearchParams();
       if (query.from) params.set("from", query.from);
       if (query.to) params.set("to", query.to);
       if (query.ean.trim()) params.set("ean", query.ean.trim());
-      if (query.sellerEmail.trim()) params.set("seller_email", query.sellerEmail.trim());
+      if (query.sellerPhone.trim()) params.set("seller_phone", query.sellerPhone.trim());
       const suffix = params.toString() ? `?${params}` : "";
       try {
-        const response = await authorizedFetch(`/api/v1/manager/sales-stats/${suffix}`);
+        const response = await authorizedFetch(`/api/v2/manager/sales-stats/${suffix}`);
         const data = await response.json().catch(() => null);
         if (!response.ok) {
           setStats(null);
@@ -127,7 +127,7 @@ export function SalesStatsPanel() {
         from: initial.from,
         to: initial.to,
         ean: "",
-        sellerEmail: "",
+        sellerPhone: "",
       });
     })();
     return () => {
@@ -139,22 +139,22 @@ export function SalesStatsPanel() {
     event.preventDefault();
     const nextEan = eanInput.trim();
     setEan(nextEan);
-    void load({ from, to, ean: nextEan, sellerEmail });
+    void load({ from, to, ean: nextEan, sellerPhone });
   }
 
   function searchSeller(event: FormEvent) {
     event.preventDefault();
-    const nextEmail = emailInput.trim();
-    setSellerEmail(nextEmail);
-    void load({ from, to, ean, sellerEmail: nextEmail });
+    const nextPhone = phoneInput.trim();
+    setSellerPhone(nextPhone);
+    void load({ from, to, ean, sellerPhone: nextPhone });
   }
 
   function resetLookups() {
     setEanInput("");
-    setEmailInput("");
+    setPhoneInput("");
     setEan("");
-    setSellerEmail("");
-    void load({ from, to, ean: "", sellerEmail: "" });
+    setSellerPhone("");
+    void load({ from, to, ean: "", sellerPhone: "" });
   }
 
   const scopeKey: MessageKey =
@@ -173,7 +173,7 @@ export function SalesStatsPanel() {
           onChange={(range) => {
             setFrom(range.from);
             setTo(range.to);
-            void load({ from: range.from, to: range.to, ean, sellerEmail });
+            void load({ from: range.from, to: range.to, ean, sellerPhone });
           }}
         />
 
@@ -195,14 +195,14 @@ export function SalesStatsPanel() {
             </div>
           </form>
           <form onSubmit={searchSeller} className="min-w-0">
-            <Label htmlFor="stats-email">{t("overview.sellerEmailLabel")}</Label>
+            <Label htmlFor="stats-phone">{t("overview.sellerPhoneLabel")}</Label>
             <div className="flex gap-2">
               <Input
-                id="stats-email"
-                type="email"
-                value={emailInput}
-                onChange={(event) => setEmailInput(event.target.value)}
-                placeholder={t("overview.sellerEmailPlaceholder")}
+                id="stats-phone"
+                type="tel"
+                value={phoneInput}
+                onChange={(event) => setPhoneInput(event.target.value)}
+                placeholder={t("overview.sellerPhonePlaceholder")}
                 autoComplete="off"
               />
               <Button type="submit" size="icon" aria-label={t("overview.searchSeller")}>
@@ -212,7 +212,7 @@ export function SalesStatsPanel() {
           </form>
         </div>
 
-        {(ean || sellerEmail) && (
+        {(ean || sellerPhone) && (
           <div className="flex flex-wrap items-center gap-2">
             {ean ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-bold text-primary">
@@ -220,10 +220,10 @@ export function SalesStatsPanel() {
                 {ean}
               </span>
             ) : null}
-            {sellerEmail ? (
+            {sellerPhone ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-bold text-primary">
-                <Mail className="size-3.5" />
-                {sellerEmail}
+                <Phone className="size-3.5" />
+                {sellerPhone}
               </span>
             ) : null}
             <Button type="button" variant="ghost" size="sm" onClick={resetLookups}>

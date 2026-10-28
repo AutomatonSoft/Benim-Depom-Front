@@ -32,7 +32,7 @@ const productCache = new Map<number, Promise<ProductLoad>>();
 function getProduct(productId: number) {
   const cached = productCache.get(productId);
   if (cached) return cached;
-  const request = authorizedFetch(`/api/v1/products/${productId}/`)
+  const request = authorizedFetch(`/api/v2/products/${productId}/`)
     .then(async (response) => {
       if (response.status === 401) return "unauthorized" as const;
       if (response.status === 404) return "missing" as const;
