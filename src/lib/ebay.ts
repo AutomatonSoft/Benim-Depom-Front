@@ -131,6 +131,15 @@ export function newEbayDraft(): EbayDraft {
     return_policy_id: "", merchant_location_key: "" };
 }
 
+export function ebayCardDimensions(variant?: EbayProduct["variants"][number]): Record<string, string[]> {
+  const dimensions: Record<string, string[]> = {};
+  for (const [name, value] of [["Breite", variant?.width_cm], ["Länge", variant?.length_cm], ["Höhe", variant?.height_cm]] as const) {
+    const size = Number(value);
+    if (Number.isFinite(size) && size > 0) dimensions[name] = [`${size} cm`];
+  }
+  return dimensions;
+}
+
 export function ebayDraftPayload(draft: EbayDraft) {
   return {
     sync_product: true,

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/i18n";
 import { authorizedFetch } from "@/lib/api";
+import type { EbayProduct } from "@/lib/ebay";
 
 type ProductSummary = {
   id: number;
@@ -23,6 +24,7 @@ type ProductSummary = {
   otto_category_id: number | null;
   otto_category_group_id: number | null;
   otto_attributes: Record<string, unknown>;
+  variants: EbayProduct["variants"];
 };
 
 type ProductLoad = ProductSummary | "unauthorized" | "missing" | "failed";
@@ -155,7 +157,7 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
             productCache.delete(product.id);
           }}
         />
-        <EbayCategoryPicker />
+        <EbayCategoryPicker variants={product.variants} />
       </div>
       <div className="mt-4">
         <ProductPublishPanel productId={product.id} productStatus={product.status} />
