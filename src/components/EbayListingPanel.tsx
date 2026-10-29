@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { SectionCard, SectionCardHeader, Feedback } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -139,6 +140,7 @@ export function useEbay() {
 
 export function EbayListingPanel() {
   const { t } = useI18n();
+  const fieldId = useId();
   const state = useEbay();
   const { draft, environment, locked, busy, preparation, snapshot } = state;
   if (!draft || !environment) return <div>
@@ -148,16 +150,18 @@ export function EbayListingPanel() {
   const listingUrl = ebayListingUrl(environment, snapshot?.remote_listing_id || preparation?.listing_id || "");
   return <div className="grid gap-4">
     <fieldset disabled={locked} className="grid min-w-0 gap-4">
-      <label className="grid gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("ebay.title")}
-        <Input className="font-medium normal-case tracking-normal text-primary" maxLength={78} value={draft.title} onChange={(event) => state.edit({ title: event.target.value })} onBlur={() => {
+      <div>
+        <Label htmlFor={`${fieldId}-title`}>{t("ebay.title")}</Label>
+        <Input id={`${fieldId}-title`} maxLength={78} value={draft.title} onChange={(event) => state.edit({ title: event.target.value })} onBlur={() => {
           const title = ebayDisplayTitle(draft.title);
           if (title !== draft.title) state.edit({ title });
         }} />
-        <span className="text-xs font-medium normal-case tracking-normal">{draft.title.length}/78</span>
-      </label>
-      <label className="grid gap-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">{t("ebay.description")}
-        <Textarea className="min-h-64 font-medium normal-case tracking-normal text-primary" rows={12} value={draft.description} onChange={(event) => state.edit({ description: event.target.value })} />
-      </label>
+        <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{draft.title.length}/78</p>
+      </div>
+      <div>
+        <Label htmlFor={`${fieldId}-description`}>{t("ebay.description")}</Label>
+        <Textarea id={`${fieldId}-description`} rows={7} value={draft.description} onChange={(event) => state.edit({ description: event.target.value })} />
+      </div>
       <Button className="justify-self-start" variant="accent" onClick={() => void state.save()}>{t("listing.saveChannel")}</Button>
     </fieldset>
     {state.error && <Feedback tone="error">{state.error}</Feedback>}
