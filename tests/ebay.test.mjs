@@ -1,7 +1,15 @@
 // Run with: node --experimental-strip-types --test tests/ebay.test.mjs
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ebayBaseTitle, ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft, submitEbayListing } from "../src/lib/ebay.ts";
+import { ebayBaseTitle, ebayCardDimensions, ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft, submitEbayListing } from "../src/lib/ebay.ts";
+
+test("card dimensions are available before saving an eBay draft", () => {
+  assert.deepEqual(ebayCardDimensions({ width_cm: "40.00", length_cm: "40.50", height_cm: "47", quantity: 1 }), {
+    Breite: ["40 cm"], Länge: ["40.5 cm"], Höhe: ["47 cm"],
+  });
+  assert.deepEqual(ebayCardDimensions(), {});
+  assert.deepEqual(ebayCardDimensions({ width_cm: "0", length_cm: "-2", height_cm: "invalid", quantity: 1 }), {});
+});
 
 test("manager payload sends only editable fields; backend owns card facts and Depotum settings", () => {
   const draft = { ...newEbayDraft(), id: 9, environment: "production", account: "jv", title: "Sofa BD",

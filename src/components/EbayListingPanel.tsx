@@ -1,18 +1,20 @@
 "use client";
 
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronDown, ChevronRight, List, ListChecks, X } from "lucide-react";
+import { CatalogLanguageSelect } from "@/components/CatalogLanguageSelect";
 import { SectionCard, SectionCardHeader, Feedback } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useI18n } from "@/i18n";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
-import { ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft, submitEbayListing,
+import { ebayCardDimensions, ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft, submitEbayListing,
   type EbayAspectSchema, type EbayCategory, type EbayDraft,
-  type EbayPreparation, type EbaySnapshot, type EbayEnvironment,
+  type EbayPreparation, type EbaySnapshot, type EbayEnvironment, type EbayProduct, type EbayAspect,
 } from "@/lib/ebay";
 import { ottoCatalogLanguages } from "@/lib/listings";
 
@@ -170,7 +172,7 @@ export function EbayListingPanel() {
   </div>;
 }
 
-export function EbayCategoryPicker() {
+export function EbayCategoryPicker({ variants }: { variants: EbayProduct["variants"] }) {
   const { t, locale } = useI18n();
   const state = useEbay();
   const [language, setLanguage] = useState<string>(() => {
@@ -181,12 +183,38 @@ export function EbayCategoryPicker() {
   const [categories, setCategories] = useState<EbayCategory[]>([]);
   const [path, setPath] = useState<EbayCategory[]>([]);
   const [schema, setSchema] = useState<EbayAspectSchema | null>(null);
-  const [sheet, setSheet] = useState<"category" | "aspects" | null>(null);
+  const [sheet, setSheet] = useState<"category" | "aspects" | "value" | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [draftValues, setDraftValues] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const categoryId = state.draft?.category_id;
   const fallback = useRef(t("ebay.error"));
+  const cardDimensions = ebayCardDimensions(variants?.[0]);
+  const automaticAspects = Object.fromEntries(Object.entries(cardDimensions).filter(([name]) => schema?.aspects.some((aspect) => aspect.localizedAspectName === name)));
+  const displayedAspects = { ...state.draft?.aspects, ...automaticAspects };
+  const editingAspect = schema?.aspects.find((aspect) => aspect.localizedAspectName === editingName);
+  const automatic = Boolean(automaticAspects[editingName]);
+  const multiple = editingAspect?.aspectConstraint.itemToAspectCardinality === "MULTI";
+  const freeText = editingAspect?.aspectConstraint.aspectMode !== "SELECTION_ONLY";
+  const matchesQuery = (name: string, label = "") => `${name} ${label}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
+
+  function openAspect(aspect: EbayAspect) {
+    setEditingName(aspect.localizedAspectName);
+    setDraftValues(displayedAspects[aspect.localizedAspectName] || []);
+    setQuery("");
+    setSheet("value");
+  }
+
+  function commitAspect() {
+    if (!state.draft || !editingAspect) return;
+    if (!automatic) {
+      const values = draftValues.map((value) => value.trim()).filter(Boolean);
+      state.edit({ aspects: { ...state.draft.aspects, [editingName]: values } });
+    }
+    setSheet(null);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -212,6 +240,7 @@ export function EbayCategoryPicker() {
       if (category?.is_leaf) {
         if (category.id !== categoryId && state.draft && Object.keys(state.draft.aspects).some((name) => name !== "Farbe") && !window.confirm(t("ebay.changeCategory"))) return;
         state.edit({ category_id: category.id, aspects: category.id === categoryId ? state.draft!.aspects : (state.draft?.aspects.Farbe ? { Farbe: state.draft.aspects.Farbe } : {}) });
+        if (category.id !== categoryId) setSchema(null);
         setSheet(null);
       } else {
         const result = await request<{ categories: EbayCategory[] }>(`/api/v1/ebay/catalog/categories/?language=${language}&parent_id=${category?.id || "3197"}`, t("ebay.error"));
@@ -223,23 +252,46 @@ export function EbayCategoryPicker() {
   }
 
   return <SectionCard>
-    <SectionCardHeader title={t("ebay.category")} description={t("ebay.categoryHint")} />
+    <SectionCardHeader title={t("ebay.category")} description={t("ebay.categoryHint")} actions={
+      <div className="min-w-[140px]">
+        <Label htmlFor="ebay-catalog-lang" className="mb-1">{t("listing.catalogLanguage")}</Label>
+        <CatalogLanguageSelect id="ebay-catalog-lang" value={language} onValueChange={(next) => { setLanguage(next); window.localStorage.setItem("benim_ebay_catalog_lang", next); }} />
+      </div>
+    } />
     <div className="grid gap-4 p-4 md:p-5">
-      <FilterSelect aria-label={t("listing.catalogLanguage")} value={language} onChange={(event) => { setLanguage(event.target.value); window.localStorage.setItem("benim_ebay_catalog_lang", event.target.value); }}>
-        {ottoCatalogLanguages.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>)}
-      </FilterSelect>
       <fieldset disabled={state.locked || loading || !state.draft} className="grid min-w-0 gap-4">
-        <p className="text-sm font-semibold">{schema?.category.label || schema?.category.name || categoryId || "—"}</p>
-        <Button variant="secondary" className="justify-between" onClick={() => { setSheet("category"); void select(); }}>{t("ebay.category")} ›</Button>
-        <article className="grid gap-3 rounded-xl border p-3">
-          <strong className="text-sm">{t("ebay.aspects")}</strong>
-          {schema?.aspects.filter((aspect) => aspect.aspectConstraint.aspectRequired || state.draft?.aspects[aspect.localizedAspectName]?.length).map((aspect) => {
-            const values = state.draft?.aspects[aspect.localizedAspectName] || [];
-            return <button type="button" key={aspect.localizedAspectName} className="grid gap-1 rounded-xl border bg-secondary/30 px-3 py-2 text-left" onClick={() => { setQuery(aspect.label || aspect.localizedAspectName); setSheet("aspects"); }}>
-              <strong className="text-sm">{aspect.label || aspect.localizedAspectName}{aspect.aspectConstraint.aspectRequired ? " *" : ""}</strong>
-              <span className="text-xs text-muted-foreground">{values.map((value) => aspect.aspectValues?.find((item) => item.localizedValue === value)?.label || value).join(", ") || (["Breite", "Länge", "Höhe"].includes(aspect.localizedAspectName) ? t("ebay.fromCard") : t("ebay.choose"))}</span>
-            </button>;
+        <article className="rounded-xl border border-border bg-card p-3">
+          <header className="mb-2 flex items-center gap-2">
+            <span className="grid size-8 place-items-center rounded-lg bg-secondary text-primary"><List className="size-4" aria-hidden /></span>
+            <strong className="text-sm font-extrabold text-primary">{t("ebay.category")}</strong>
+          </header>
+          <button type="button" className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-[#f8fafc] px-3 py-2.5 text-left transition-colors hover:border-primary/30" onClick={() => { setQuery(""); setSheet("category"); void select(); }}>
+            <strong className={`text-sm font-extrabold ${categoryId ? "text-primary" : "text-muted-foreground"}`}>{schema?.category.label || schema?.category.name || categoryId || t("ebay.choose")}</strong>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+        </article>
+        <article className="rounded-xl border border-border bg-card p-3">
+          <header className="mb-2 flex items-center gap-2">
+            <span className="grid size-8 place-items-center rounded-lg bg-secondary text-primary"><ListChecks className="size-4" aria-hidden /></span>
+            <strong className="text-sm font-extrabold text-primary">{t("ebay.aspects")}</strong>
+          </header>
+          <ul className="mb-3 grid gap-2">
+          {schema?.aspects.filter((aspect) => aspect.aspectConstraint.aspectRequired || displayedAspects[aspect.localizedAspectName]?.some(Boolean)).map((aspect) => {
+            const name = aspect.localizedAspectName;
+            const values = displayedAspects[name] || [];
+            return <li key={name} className="flex items-stretch gap-2">
+              <button type="button" className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border border-border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30" onClick={() => openAspect(aspect)}>
+                <strong className="text-sm font-extrabold text-primary">{aspect.label || name}{aspect.aspectConstraint.aspectRequired ? " *" : ""}</strong>
+                <span className="w-full truncate text-xs font-semibold text-muted-foreground">{values.map((value) => aspect.aspectValues?.find((item) => item.localizedValue === value)?.label || value).join(", ") || t("ebay.choose")}</span>
+              </button>
+              {!aspect.aspectConstraint.aspectRequired && !automaticAspects[name] && <Button type="button" size="icon" variant="ghost" className="shrink-0 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-bg)]" aria-label={t("listing.removeAttribute")} onClick={() => {
+                const aspects = { ...state.draft!.aspects };
+                delete aspects[name];
+                state.edit({ aspects });
+              }}><X className="size-4" aria-hidden /></Button>}
+            </li>;
           })}
+          </ul>
           <Button variant="secondary" disabled={!schema} onClick={() => { setQuery(""); setSheet("aspects"); }}>{t("listing.addAttribute")}</Button>
         </article>
         <Button variant="accent" className="justify-self-start" onClick={() => void state.save()}>{t("listing.saveChannel")}</Button>
@@ -249,42 +301,52 @@ export function EbayCategoryPicker() {
       {state.notice && <Feedback tone="success">{state.notice}</Feedback>}
     </div>
     <Dialog open={sheet !== null} onOpenChange={(open) => { if (!open) setSheet(null); }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-        <DialogTitle>{t(sheet === "category" ? "ebay.category" : "ebay.aspects")}</DialogTitle>
-        <DialogDescription>{t("ebay.categoryHint")}</DialogDescription>
-        <Input aria-label={t("common.search")} placeholder={t("common.search")} value={query} onChange={(event) => setQuery(event.target.value)} />
-        <fieldset disabled={loading || state.locked} className="grid gap-3">
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-lg">
+        <div className="grid shrink-0 gap-3 border-b border-border p-4">
+          <DialogTitle className="pr-8 text-base font-extrabold text-primary">{sheet === "value" ? editingAspect?.label || editingName : t(sheet === "category" ? "ebay.category" : "ebay.aspects")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("ebay.categoryHint")}</DialogDescription>
+          {(sheet !== "value" || (!automatic && Boolean(editingAspect?.aspectValues?.length))) && <Input autoFocus={sheet !== "value" || !freeText} aria-label={t("common.search")} placeholder={t("common.search")} value={query} onChange={(event) => setQuery(event.target.value)} />}
+        </div>
+        <fieldset disabled={loading || state.locked} className="grid min-h-0 gap-1 overflow-y-auto p-3">
         {sheet === "category" && <>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => void select()}>{t("ebay.furniture")}</Button>
           {path.map((node, index) => <Button key={node.id} variant="secondary" onClick={() => void select(node, path.slice(0, index + 1))}>{node.label || node.name}</Button>)}
         </div>
-        {categories.filter((item) => `${item.name} ${item.label || ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map((item) => <Button className="h-auto justify-between whitespace-normal py-2 text-left" variant="ghost" key={item.id} onClick={() => void select(item, [...path, item])}>{item.label || item.name}{item.is_leaf ? "" : " ›"}</Button>)}
+        {categories.filter((item) => matchesQuery(item.name, item.label)).map((item) => <button type="button" className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-extrabold text-primary hover:bg-secondary" key={item.id} onClick={() => void select(item, [...path, item])}>{item.label || item.name}{!item.is_leaf && <ChevronRight className="size-4" aria-hidden />}</button>)}
         </>}
         {sheet === "aspects" && schema && state.draft && <>
-          {schema.aspects.filter((aspect) => `${aspect.localizedAspectName} ${aspect.label || ""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map((aspect, index) => {
+          {schema.aspects.filter((aspect) => matchesQuery(aspect.localizedAspectName, aspect.label)).map((aspect) => {
             const name = aspect.localizedAspectName;
-            const constraint = aspect.aspectConstraint;
-            const values = state.draft!.aspects[name] || [];
-            const multiple = constraint.itemToAspectCardinality === "MULTI";
-            const automatic = ["Breite", "Länge", "Höhe"].includes(name);
-            const change = (next: string[]) => state.edit({ aspects: { ...state.draft!.aspects, [name]: next } });
-            return <label key={name} className="grid min-w-0 gap-2 text-sm font-semibold">
-              {aspect.label || name}{constraint.aspectRequired ? " *" : ""}
-              {automatic ? <Input readOnly value={values[0] || t("ebay.fromCard")} /> : constraint.aspectMode === "SELECTION_ONLY" ?
-                <FilterSelect multiple={multiple} style={multiple ? { height: "8rem" } : undefined} value={multiple ? values : values[0] || ""} onChange={(event) => change(multiple ? Array.from(event.target.selectedOptions, (option) => option.value) : [event.target.value])}>
-                  {!multiple && <option value="">{t("ebay.choose")}</option>}{aspect.aspectValues?.map((item) => <option key={item.localizedValue} value={item.localizedValue}>{item.label || item.localizedValue}</option>)}
-                </FilterSelect> : multiple ? <Textarea rows={3} placeholder={t("ebay.multiple")} value={values.join("\n")} onChange={(event) => change(event.target.value.split("\n"))} /> : <>
-                  <Input value={values[0] || ""} maxLength={constraint.aspectMaxLength || 65} list={`ebay-aspect-${index}`} onChange={(event) => change([event.target.value])} />
-                  <datalist id={`ebay-aspect-${index}`}>{aspect.aspectValues?.slice(0, 100).map((item) => <option key={item.localizedValue} value={item.localizedValue}>{item.label || item.localizedValue}</option>)}</datalist>
-                </>}
-            </label>;
+            return <button type="button" key={name} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-secondary" onClick={() => openAspect(aspect)}>
+              <span className="flex min-w-0 flex-col gap-0.5"><strong className="text-sm font-extrabold text-primary">{aspect.label || name}{aspect.aspectConstraint.aspectRequired ? " *" : ""}</strong><small className="text-xs font-semibold text-muted-foreground">{schema.category.label || schema.category.name}</small></span>
+              {displayedAspects[name]?.some(Boolean) && <Check className="size-4 shrink-0 text-primary" aria-hidden />}
+            </button>;
           })}
+          {!schema.aspects.some((aspect) => matchesQuery(aspect.localizedAspectName, aspect.label)) && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t("listing.sheetEmpty")}</p>}
         </>}
+        {sheet === "value" && editingAspect && <div className="grid gap-3 p-1">
+          {automatic ? <Input readOnly aria-label={editingAspect.label || editingName} value={automaticAspects[editingName][0]} /> : freeText ? multiple ?
+            <Textarea autoFocus aria-label={editingAspect.label || editingName} rows={3} placeholder={t("ebay.multiple")} value={draftValues.join("\n")} onChange={(event) => setDraftValues(event.target.value.split("\n"))} /> :
+            <Input autoFocus aria-label={editingAspect.label || editingName} maxLength={editingAspect.aspectConstraint.aspectMaxLength || 65} value={draftValues[0] || ""} onChange={(event) => setDraftValues([event.target.value])} /> : null}
+          {!automatic && <div className="grid gap-1">
+            {editingAspect.aspectValues?.filter((item) => matchesQuery(item.localizedValue, item.label)).slice(0, 100).map((item) => {
+              const checked = draftValues.includes(item.localizedValue);
+              const toggle = () => setDraftValues(multiple ? checked ? draftValues.filter((value) => value !== item.localizedValue) : [...draftValues, item.localizedValue] : [item.localizedValue]);
+              return multiple ? <label key={item.localizedValue} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-sm font-semibold text-primary hover:bg-secondary">
+                <Checkbox checked={checked} onCheckedChange={toggle} />{item.label || item.localizedValue}
+              </label> : <button type="button" key={item.localizedValue} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-primary hover:bg-secondary ${checked ? "bg-secondary" : ""}`} onClick={toggle}>{item.label || item.localizedValue}{checked && <Check className="size-4 shrink-0" aria-hidden />}</button>;
+            })}
+            {Boolean(editingAspect.aspectValues?.length) && !editingAspect.aspectValues?.some((item) => matchesQuery(item.localizedValue, item.label)) && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t("listing.sheetEmpty")}</p>}
+          </div>}
+        </div>}
         </fieldset>
-        {loading && <p role="status">{t("common.loading")}</p>}
-        {error && <Feedback tone="error">{error}</Feedback>}
-        <Button variant="secondary" onClick={() => setSheet(null)}>{t("common.close")}</Button>
+        {loading && <p role="status" className="px-4">{t("common.loading")}</p>}
+        {error && <div className="px-4"><Feedback tone="error">{error}</Feedback></div>}
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border p-4">
+          <Button variant="secondary" onClick={() => setSheet(null)}>{t(sheet === "value" ? "common.cancel" : "common.close")}</Button>
+          {sheet === "value" && <Button variant="accent" disabled={loading || state.locked} onClick={commitAspect}>{t("common.save")}</Button>}
+        </div>
       </DialogContent>
     </Dialog>
   </SectionCard>;
