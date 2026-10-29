@@ -279,12 +279,16 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
           {schema?.aspects.filter((aspect) => aspect.aspectConstraint.aspectRequired || displayedAspects[aspect.localizedAspectName]?.some(Boolean)).map((aspect) => {
             const name = aspect.localizedAspectName;
             const values = displayedAspects[name] || [];
+            const freeText = !automaticAspects[name] && aspect.aspectConstraint.aspectMode === "FREE_TEXT";
             return <li key={name} className="flex items-stretch gap-2">
-              <button type="button" className="flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border border-border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30" onClick={() => openAspect(aspect)}>
-                <strong className="text-sm font-extrabold text-primary">{aspect.label || name}{aspect.aspectConstraint.aspectRequired ? " *" : ""}</strong>
-                <span className="w-full truncate text-xs font-semibold text-muted-foreground">{values.map((value) => aspect.aspectValues?.find((item) => item.localizedValue === value)?.label || value).join(", ") || t("ebay.choose")}</span>
+              <button type="button" className={`flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30 ${freeText ? "border-[rgba(247,148,29,0.45)]" : "border-border"}`} onClick={() => openAspect(aspect)}>
+                <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+                  <strong className="truncate text-sm font-extrabold text-primary">{aspect.label || name}{aspect.aspectConstraint.aspectRequired ? " *" : ""}</strong>
+                  {freeText && <span className="rounded-md bg-[rgba(247,148,29,0.16)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent,#f7941d)]">{t("ebay.freeTextBadge")}</span>}
+                </div>
+                <span className="truncate text-xs font-semibold text-muted-foreground">{values.map((value) => aspect.aspectValues?.find((item) => item.localizedValue === value)?.label || value).join(", ") || t("ebay.choose")}</span>
               </button>
-              {!aspect.aspectConstraint.aspectRequired && !automaticAspects[name] && <Button type="button" size="icon" variant="ghost" className="shrink-0 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-bg)]" aria-label={t("listing.removeAttribute")} onClick={() => {
+              {values.some(Boolean) && !automaticAspects[name] && <Button type="button" size="icon" variant="ghost" className="shrink-0 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-bg)]" aria-label={t("listing.removeAttribute")} onClick={() => {
                 const aspects = { ...state.draft!.aspects };
                 delete aspects[name];
                 state.edit({ aspects });
@@ -294,20 +298,21 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
           </ul>
           <Button variant="secondary" disabled={!schema} onClick={() => { setQuery(""); setSheet("aspects"); }}>{t("listing.addAttribute")}</Button>
         </article>
-        <Button variant="accent" className="justify-self-start" onClick={() => void state.save()}>{t("listing.saveChannel")}</Button>
+        <Button variant="accent" className="justify-self-start" onClick={() => void state.save()}>{state.busy ? t("product.saving") : t("ebay.saveCategory")}</Button>
       </fieldset>
       {loading && <p role="status">{t("common.loading")}</p>}
       {(error || state.error) && <Feedback tone="error">{error || state.error}</Feedback>}
       {state.notice && <Feedback tone="success">{state.notice}</Feedback>}
     </div>
     <Dialog open={sheet !== null} onOpenChange={(open) => { if (!open) setSheet(null); }}>
-      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden p-0 sm:max-w-lg">
+      <DialogContent className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
         <div className="grid shrink-0 gap-3 border-b border-border p-4">
           <DialogTitle className="pr-8 text-base font-extrabold text-primary">{sheet === "value" ? editingAspect?.label || editingName : t(sheet === "category" ? "ebay.category" : "ebay.aspects")}</DialogTitle>
           <DialogDescription className="sr-only">{t("ebay.categoryHint")}</DialogDescription>
           {(sheet !== "value" || (!automatic && Boolean(editingAspect?.aspectValues?.length))) && <Input autoFocus={sheet !== "value" || !freeText} aria-label={t("common.search")} placeholder={t("common.search")} value={query} onChange={(event) => setQuery(event.target.value)} />}
         </div>
-        <fieldset disabled={loading || state.locked} className="grid min-h-0 gap-1 overflow-y-auto p-3">
+        <div className="min-h-0 flex-auto overflow-y-auto overscroll-contain">
+        <fieldset disabled={loading || state.locked} className="grid min-w-0 gap-1 p-3">
         {sheet === "category" && <>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => void select()}>{t("ebay.furniture")}</Button>
@@ -341,6 +346,7 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
           </div>}
         </div>}
         </fieldset>
+        </div>
         {loading && <p role="status" className="px-4">{t("common.loading")}</p>}
         {error && <div className="px-4"><Feedback tone="error">{error}</Feedback></div>}
         <div className="flex shrink-0 justify-end gap-2 border-t border-border p-4">
