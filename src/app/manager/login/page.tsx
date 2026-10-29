@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/i18n";
+import { setSessionItem } from "@/lib/browser-storage";
 
 type LoginResponse = {
   access: string;
@@ -59,7 +60,7 @@ export default function LoginPage() {
         return;
       }
 
-      window.localStorage.setItem("benim_access_token", tokens.access);
+      setSessionItem(window.localStorage, "benim_access_token", tokens.access);
       window.localStorage.removeItem("benim_refresh_token");
       window.location.replace("/manager");
     } catch {
