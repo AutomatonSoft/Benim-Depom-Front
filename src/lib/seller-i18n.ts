@@ -248,6 +248,7 @@ const messages = Object.fromEntries([
   ["Add product details and photos. Your product will be sent to moderation.",["Заполните данные и добавьте фото. Товар будет отправлен на модерацию.","Ürün bilgilerini ve fotoğrafları ekleyin. Ürün incelemeye gönderilir.","Ergänzen Sie Produktdetails und Fotos. Das Produkt wird zur Prüfung eingereicht."]],
   ["Product information",["Информация о товаре","Ürün bilgileri","Produktinformationen"]],
   ["Product title",["Название товара","Ürün adı","Produktname"]],
+  ["Product model",["Модель товара","Ürün modeli","Produktmodell"]],
   ["Product type",["Тип товара","Ürün türü","Produkttyp"]],
   ["Unit price",["Цена за единицу","Birim fiyatı","Stückpreis"]],
   ["Currency",["Валюта","Para birimi","Währung"]],

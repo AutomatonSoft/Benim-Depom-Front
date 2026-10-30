@@ -18,6 +18,7 @@ import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerPro
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
   title: string;
+  model: string;
   product_type: string;
   unit_price: string;
   currency: "" | "TRY" | "EUR" | "USD";
@@ -39,7 +40,7 @@ type EditorPhoto =
 type SetPartField = "description" | "width_cm" | "height_cm" | "length_cm";
 
 const empty: Fields = {
-  title: "", product_type: "", unit_price: "", currency: "", warehouse_city: "",
+  title: "", model: "", product_type: "", unit_price: "", currency: "", warehouse_city: "",
   color: "", material1: "", material2: "", material_composition: "", width_cm: "", height_cm: "",
   length_cm: "", quantity: "", comment: "",
 };
@@ -48,6 +49,7 @@ function fieldsFor(product: SellerProduct): Fields {
   const variant = product.variants[0];
   return {
     title: product.title,
+    model: product.model || "",
     product_type: sellerProductTypeLabel(product.product_type),
     unit_price: product.unit_price,
     currency: product.currency,
@@ -210,6 +212,7 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
     const variant: SellerVariant = sellerProductVariant(fields, materials);
     const body = {
       title: fields.title.trim(),
+      model: fields.model.trim(),
       product_type: fields.product_type.trim(),
       unit_price: fields.unit_price,
       currency: fields.currency,
@@ -308,6 +311,8 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
       <Input
       name={name}
       required={required}
+      minLength={name === "model" ? 3 : undefined}
+      maxLength={name === "model" ? 200 : undefined}
       type={type}
       aria-invalid={Boolean(fieldErrors[name])}
       step={type === "number" ? name === "quantity" ? "1" : "0.01" : undefined}
@@ -412,6 +417,7 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
             {heading("Product information", Tag)}
             <div className="seller-form-grid">
               {field("title", "Product title")}
+              {field("model", "Product model")}
               <div className="seller-price-row">
                 {field("unit_price", "Unit price", "number")}
                 <div className="seller-field seller-currency-field"><span>{t("Currency (required)")}</span>
