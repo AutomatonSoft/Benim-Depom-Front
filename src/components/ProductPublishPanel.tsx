@@ -19,7 +19,7 @@ import {
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { useEbay } from "@/components/EbayListingPanel";
-import { publicationTargets, type ListingTarget, type PublicationTarget } from "@/lib/listings";
+import { publicationTargets, type PublicationTarget } from "@/lib/listings";
 
 type Target = PublicationTarget;
 type Publication = {
@@ -54,7 +54,6 @@ export function ProductPublishPanel({
 }) {
   const { t } = useI18n();
   const ebay = useEbay();
-  const ebayActive = ebay.snapshot?.remote_status === "PUBLISHED" && ebay.snapshot?.listing_status === "ACTIVE";
   const [selectedTargets, setSelectedTargets] = useState(() => publicationTargets.map(listingTargetKey));
   const [publishing, setPublishing] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -64,8 +63,11 @@ export function ProductPublishPanel({
   const [notice, setNotice] = useState("");
   const [fetchedStatus, setFetchedStatus] = useState("");
   const [publications, setPublications] = useState<Publication[]>([]);
+  const ebayPublication = publications.find((item) => item.marketplace === "ebay");
+  const ebayActive = ebayPublication ? isLivePublication(ebayPublication.status)
+    : ebay.snapshot?.remote_status === "PUBLISHED" && ebay.snapshot?.listing_status === "ACTIVE";
   const status = productStatus || fetchedStatus;
-  const actionBusy = publishing || updating || previewing || (selectedTargets.includes("ebay:depotum") && ebay.busy);
+  const actionBusy = publishing || updating || previewing;
 
   async function loadPublications() {
     const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/publications/`);
@@ -145,7 +147,7 @@ export function ProductPublishPanel({
     );
   }
 
-  async function queueJob(operation: "publish" | "update", targets: ListingTarget[]) {
+  async function queueJob(operation: "publish" | "update", targets: PublicationTarget[]) {
     const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/${operation}/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
@@ -166,23 +168,20 @@ export function ProductPublishPanel({
 
   async function publish() {
     if (!canPublish || selectedTargets.length === 0 || actionBusy) return;
-    const includesEbay = selectedTargets.includes("ebay:depotum");
-    if (includesEbay && !window.confirm(`${ebay.environment?.toUpperCase() || "eBay"} · Depotum\n${t("ebay.confirmPublish")}\n${ebay.draft?.title || ""}\n${ebay.draft?.price_eur || "—"} EUR · ${ebay.draft?.quantity ?? "—"}`)) return;
+    if (selectedTargets.includes("ebay:depotum") && ebay.dirty) { setError(t("ebay.dirty")); return; }
     setPublishing(true);
     setError("");
     setNotice("");
     try {
-      const legacy = listingTargets.filter((target) => selectedTargets.includes(listingTargetKey(target)));
-      if (includesEbay) { await ebay.submit("publish"); setNotice(t("ebay.published")); }
-      if (!legacy.length) { setNotice(t("ebay.published")); return; }
-      if (legacy.some((target) => target.marketplace === "otto")) await ensureOttoListingDefaults(productId, authorizedFetch);
+      const targets = publicationTargets.filter((target) => selectedTargets.includes(listingTargetKey(target)));
+      if (targets.some((target) => target.marketplace === "otto")) await ensureOttoListingDefaults(productId, authorizedFetch);
       const job = await queueJob(
         "publish",
-        legacy,
+        targets,
       );
       if (!job) return;
       setNotice(
-        (includesEbay ? `${t("ebay.published")} ` : "") + t("marketplaces.jobQueued", {
+        t("marketplaces.jobQueued", {
           id: job.id.slice(0, 8),
           operation: t(`job.op.${job.operation}` as MessageKey),
         }),
@@ -197,22 +196,19 @@ export function ProductPublishPanel({
 
   async function updateLive() {
     if (!canUpdate || actionBusy) return;
-    if (!window.confirm(t("listing.confirmUpdate"))) return;
+    if (selectedLiveTargets.some((target) => target.marketplace !== "ebay") && !window.confirm(t("listing.confirmUpdate"))) return;
     setUpdating(true);
     setError("");
     setNotice("");
     try {
-      const legacy = selectedLiveTargets.filter((target): target is ListingTarget => target.marketplace !== "ebay");
-      const includesEbay = selectedLiveTargets.some((target) => target.marketplace === "ebay");
-      if (includesEbay) { await ebay.submit("update"); setNotice(t("ebay.updated")); }
-      if (!legacy.length) { setNotice(t("ebay.updated")); return; }
-      if (legacy.some((target) => target.marketplace === "otto")) await ensureOttoListingDefaults(productId, authorizedFetch);
+      if (selectedLiveTargets.some((target) => target.marketplace === "ebay") && ebay.dirty) throw new Error(t("ebay.dirty"));
+      if (selectedLiveTargets.some((target) => target.marketplace === "otto")) await ensureOttoListingDefaults(productId, authorizedFetch);
       // OTTO update still uses the marketplace upsert under the hood, but the
       // Benim job operation is `update` so Marketplaces history shows it correctly.
-      const job = await queueJob("update", legacy);
+      const job = await queueJob("update", selectedLiveTargets);
       if (!job) return;
       setNotice(
-        (includesEbay ? `${t("ebay.updated")} ` : "") + t("marketplaces.jobQueued", {
+        t("marketplaces.jobQueued", {
           id: job.id.slice(0, 8),
           operation: t(`job.op.${job.operation}` as MessageKey),
         }),

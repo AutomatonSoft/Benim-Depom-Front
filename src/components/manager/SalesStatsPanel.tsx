@@ -46,6 +46,7 @@ const CHANNEL_ORDER: Array<{ marketplace: string; account: string; label: string
   { marketplace: "otto", account: "xl", label: "OTTO XL" },
   { marketplace: "kaufland", account: "xl", label: "KAUFLAND XL" },
   { marketplace: "hood", account: "xl", label: "HOOD XL" },
+  { marketplace: "ebay", account: "jv", label: "eBay Depotum" },
 ];
 
 function berlinTodayIso() {

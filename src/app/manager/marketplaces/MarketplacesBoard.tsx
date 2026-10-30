@@ -26,8 +26,8 @@ import { formatDate } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
-type Marketplace = "hood" | "otto" | "kaufland";
-type Account = "jv" | "xl";
+type Marketplace = "hood" | "otto" | "kaufland" | "ebay";
+type Account = "jv" | "xl" | "depotum";
 type Target = { marketplace: Marketplace; account: Account };
 
 type Publication = {
@@ -41,6 +41,7 @@ type Publication = {
   last_job_id: string | null;
   last_error: unknown;
   updated_at: string;
+  listing_url?: string;
 };
 
 type JobResult = {
@@ -82,6 +83,7 @@ const marketplaceName: Record<Marketplace, string> = {
   otto: "OTTO",
   hood: "Hood",
   kaufland: "Kaufland",
+  ebay: "eBay",
 };
 const publicationStatusKeys = [
   "pending",
@@ -347,7 +349,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
       publish: t("marketplaces.confirmPublish"),
       update: t("marketplaces.confirmUpdate", { marketplace: marketplaceName[publication.marketplace] }),
     };
-    if (!window.confirm(confirms[action])) return;
+    if (publication.marketplace !== "ebay" && !window.confirm(confirms[action])) return;
 
     const key = `${publication.id}:${action}`;
     setBusyKey(key);
@@ -374,7 +376,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
         const nextStatus =
           action === "activate" || action === "publish" || action === "update"
             ? "publishing"
-            : action === "delete" || publication.marketplace !== "otto"
+            : action === "delete" || !["otto", "ebay"].includes(publication.marketplace)
               ? "deleting"
               : "deactivating";
         setPublications((rows) =>
@@ -403,7 +405,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
             {isBusy("check") || checking ? t("marketplaces.checkingStatus") : t("marketplaces.checkStatus")}
           </Button>
         )}
-        {["failed", "active", "deactivated", "deleted"].includes(publication.status) && (
+        {publication.marketplace !== "ebay" && ["failed", "active", "deactivated", "deleted"].includes(publication.status) && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
             setManualStatus("");
             setManualPublication(publication);
@@ -425,7 +427,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                 : t("marketplaces.actionTakeDown")}
           </Button>
         )}
-        {publication.status === "deactivated" && publication.marketplace === "otto" && (
+        {publication.status === "deactivated" && ["otto", "ebay"].includes(publication.marketplace) && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void runListingAction(publication, "activate")}>
             {isBusy("activate") ? t("marketplaces.queueing") : t("marketplaces.actionActivate")}
           </Button>
@@ -529,6 +531,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
               <option value="otto">OTTO</option>
               <option value="hood">Hood</option>
               <option value="kaufland">Kaufland</option>
+              <option value="ebay">eBay</option>
             </FilterSelect>
             <FilterSelect
               aria-label={t("marketplaces.filterAccount")}
@@ -541,6 +544,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
               <option value="">{t("marketplaces.allAccounts")}</option>
               <option value="jv">JV</option>
               <option value="xl">XL</option>
+              <option value="depotum">Depotum</option>
             </FilterSelect>
             <FilterSelect
               aria-label={t("marketplaces.filterStatus")}
@@ -609,6 +613,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                     <Link className="listing-open-marketplaces" href={`/manager/products/${publication.product_id}/listings`}>
                       {t("listing.openPage")}
                     </Link>
+                    {publication.listing_url && <a className="listing-open-marketplaces" href={publication.listing_url} target="_blank" rel="noreferrer">{t("ebay.open")}</a>}
                   </div>
                   <span>{marketplaceName[publication.marketplace]}</span>
                   <code>{publication.ean || "—"}</code>
