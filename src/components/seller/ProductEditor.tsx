@@ -18,6 +18,7 @@ import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerPro
 const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
 type Fields = {
   title: string;
+  description: string;
   model: string;
   product_type: string;
   unit_price: string;
@@ -42,13 +43,14 @@ type SetPartField = "description" | "width_cm" | "height_cm" | "length_cm";
 const empty: Fields = {
   title: "", model: "", product_type: "", unit_price: "", currency: "", warehouse_city: "",
   color: "", material1: "", material2: "", material_composition: "", width_cm: "", height_cm: "",
-  length_cm: "", quantity: "", comment: "",
+  length_cm: "", quantity: "", comment: "", description: "",
 };
 
 function fieldsFor(product: SellerProduct): Fields {
   const variant = product.variants[0];
   return {
     title: product.title,
+    description: product.description || "",
     model: product.model || "",
     product_type: sellerProductTypeLabel(product.product_type),
     unit_price: product.unit_price,
@@ -212,6 +214,7 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
     const variant: SellerVariant = sellerProductVariant(fields, materials);
     const body = {
       title: fields.title.trim(),
+      description: fields.description.trim(),
       model: fields.model.trim(),
       product_type: fields.product_type.trim(),
       unit_price: fields.unit_price,
@@ -418,6 +421,11 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
             <div className="seller-form-grid">
               {field("title", "Product title")}
               {field("model", "Product model")}
+              <label className="seller-field">{t("Description (optional)")}
+                <textarea name="description" rows={4} minLength={10} maxLength={1200} value={fields.description} aria-invalid={Boolean(fieldErrors.description)} onChange={event => set("description", event.target.value)} />
+                <small>{t("10–1200 characters if provided.")}</small>
+                {fieldErrors.description && <small className="seller-field-error">{fieldErrors.description}</small>}
+              </label>
               <div className="seller-price-row">
                 {field("unit_price", "Unit price", "number")}
                 <div className="seller-field seller-currency-field"><span>{t("Currency (required)")}</span>

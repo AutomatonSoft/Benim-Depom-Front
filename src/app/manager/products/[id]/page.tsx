@@ -96,6 +96,7 @@ type Product = {
   owner: number;
   title: string;
   model: string;
+  description: string;
   product_type: string;
   unit_price: string;
   currency: "TRY" | "EUR" | "USD";
@@ -2008,7 +2009,7 @@ export default function ProductWorkspacePage() {
                         ? t("product.variantsField")
                         : field === "images"
                           ? t("product.images")
-                          : field}
+                          : field === "description" ? t("product.fieldDescription") : field}
                   </dt>
                   <dd className="mt-1 grid gap-1 text-sm">
                     {field === "images" ? (
@@ -2084,7 +2085,7 @@ export default function ProductWorkspacePage() {
                         ? t("product.variantsField")
                         : field === "images"
                           ? t("product.images")
-                          : field}
+                          : field === "description" ? t("product.fieldDescription") : field}
                   </dt>
                     <dd className="mt-1 grid gap-1 text-sm">
                       {field === "images" ? (
@@ -2297,6 +2298,10 @@ export default function ProductWorkspacePage() {
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldModel")}</Label>
                 <Input required={Boolean(product.model)} minLength={3} maxLength={200} value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
               </div>
+              {product.description ? <div>
+                <p className="text-[13px] font-extrabold text-primary">{t("product.fieldDescription")}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-primary">{product.description}</p>
+              </div> : null}
               <div>
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldType")}</Label>
                 <Input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} />
