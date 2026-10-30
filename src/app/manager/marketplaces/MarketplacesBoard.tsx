@@ -405,7 +405,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
             {isBusy("check") || checking ? t("marketplaces.checkingStatus") : t("marketplaces.checkStatus")}
           </Button>
         )}
-        {publication.marketplace !== "ebay" && ["failed", "active", "deactivated", "deleted"].includes(publication.status) && (
+        {["failed", "active", "deactivated", "deleted"].includes(publication.status) && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => {
             setManualStatus("");
             setManualPublication(publication);
