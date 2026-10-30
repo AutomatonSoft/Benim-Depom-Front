@@ -2,6 +2,8 @@ export const sellerLocales = ["en", "ru", "tr", "de"] as const;
 export type SellerLocale = (typeof sellerLocales)[number];
 export const SELLER_LOCALE_KEY = "benim_seller_locale";
 const messages = Object.fromEntries([
+  ["Description (optional)", ["Описание (необязательно)", "Açıklama (isteğe bağlı)", "Beschreibung (optional)"]],
+  ["10–1200 characters if provided.", ["От 10 до 1200 символов, если заполнено.", "Doldurulursa 10–1200 karakter.", "Falls ausgefüllt: 10–1200 Zeichen."]],
   ["Enter your account phone number and email. We will send a reset code to that email.", ["Введите номер телефона и почту вашего аккаунта. Мы отправим код для сброса пароля на эту почту.", "Hesabınızın telefon numarasını ve e-posta adresini girin. Sıfırlama kodunu bu adrese göndereceğiz.", "Geben Sie Telefonnummer und E-Mail-Adresse Ihres Kontos ein. Wir senden den Code an diese E-Mail-Adresse."]],
   ["Phone number and email do not match an active account.", ["Номер телефона и почта не совпадают с данными активного аккаунта. Проверьте их.", "Telefon numarası ve e-posta etkin bir hesapla eşleşmiyor. Bilgilerinizi kontrol edin.", "Telefonnummer und E-Mail-Adresse passen zu keinem aktiven Konto. Prüfen Sie Ihre Angaben."]],
   ["A reset code has been sent to your email.", ["Код для сброса пароля отправлен на вашу почту.", "Şifre sıfırlama kodu e-posta adresinize gönderildi.", "Ein Code zum Zurücksetzen des Passworts wurde an Ihre E-Mail-Adresse gesendet."]],
