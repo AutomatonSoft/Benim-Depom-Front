@@ -160,6 +160,7 @@ type ModerationDecision = {
 
 type FormState = {
   title: string;
+  model: string;
   product_type: string;
   unit_price: string;
   currency: Product["currency"];
@@ -776,6 +777,7 @@ function reviewOldValue(product: Product, review: Record<string, unknown>, field
 function toForm(product: Product): FormState {
   return {
     title: product.title,
+    model: product.model || "",
     product_type: product.product_type,
     unit_price: product.unit_price,
     currency: product.currency,
@@ -1253,6 +1255,9 @@ export default function ProductWorkspacePage() {
           quantity: Number(quantity),
         })),
       };
+      if (form.model !== (product?.model || "")) {
+        payload.model = form.model.trim();
+      }
       if (form.set_parts.length > 0 || meaningfulSetParts(product?.set_parts).length > 0) {
         payload.set_parts = form.set_parts.map(({ description, width_cm, height_cm, length_cm }) => ({
           description,
@@ -2290,7 +2295,7 @@ export default function ProductWorkspacePage() {
       </div>
               <div>
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldModel")}</Label>
-                <Input readOnly value={product.model || ""} />
+                <Input required={Boolean(product.model)} minLength={3} maxLength={200} value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
               </div>
               <div>
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldType")}</Label>
