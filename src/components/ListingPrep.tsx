@@ -5,6 +5,7 @@ import { FormEvent, Suspense, use, useState } from "react";
 
 import { Feedback, SectionCard, SectionCardHeader } from "@/components/manager/ui";
 import { OttoShippingGuide } from "@/components/OttoShippingGuide";
+import { EbayListingPanel } from "@/components/EbayListingPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -234,14 +235,16 @@ function toDraft(item: ChannelRecord | ChannelDraft): ChannelDraft {
 function ChannelPills({
   channel,
   onSelect,
+  onEbay,
 }: {
-  channel: ListingTarget;
+  channel: ListingTarget | null;
   onSelect: (target: ListingTarget) => void;
+  onEbay?: () => void;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
       {listingTargets.map((target) => {
-        const active = listingTargetKey(target) === listingTargetKey(channel);
+        const active = channel !== null && listingTargetKey(target) === listingTargetKey(channel);
         return (
           <Button
             key={listingTargetKey(target)}
@@ -255,6 +258,7 @@ function ChannelPills({
           </Button>
         );
       })}
+      <Button type="button" size="sm" variant={channel === null ? "accent" : "secondary"} onClick={onEbay}>eBay Depotum</Button>
     </div>
   );
 }
@@ -268,6 +272,8 @@ export function ListingPrep({
 }) {
   const { t } = useI18n();
   const [mountId] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const [channel, setChannel] = useState<ListingTarget>(listingTargets[0]);
+  const [showEbay, setShowEbay] = useState(false);
 
   return (
     <SectionCard>
@@ -276,9 +282,13 @@ export function ListingPrep({
         <p className="text-sm font-medium text-muted-foreground">{t("listing.hint")}</p>
         <p className="text-xs font-semibold text-muted-foreground">{t("listing.publishFieldsHint")}</p>
         <div className="grid gap-4">
-          <Suspense fallback={<ListingPrepSkeleton />}>
-            <ListingPrepFields productId={productId} epoch={`${mountId}:${reloadToken}`} />
-          </Suspense>
+          <div hidden={showEbay}><Suspense fallback={<ListingPrepSkeleton />}>
+            <ListingPrepFields productId={productId} epoch={`${mountId}:${reloadToken}`} channel={channel} onSelect={setChannel} onEbay={() => setShowEbay(true)} />
+          </Suspense></div>
+          {showEbay && <>
+            <ChannelPills channel={null} onSelect={(next) => { setChannel(next); setShowEbay(false); }} />
+            <EbayListingPanel />
+          </>}
         </div>
         <Button asChild variant="outline" className="justify-self-start">
           <Link href={`/manager/marketplaces?q=${productId}`}>{t("listing.viewPublications")}</Link>
@@ -329,13 +339,18 @@ function ListingPrepSkeleton() {
 function ListingPrepFields({
   productId,
   epoch,
+  channel,
+  onSelect,
+  onEbay,
 }: {
   productId: number;
   epoch: string;
+  channel: ListingTarget;
+  onSelect: (target: ListingTarget) => void;
+  onEbay: () => void;
 }) {
   const { t } = useI18n();
   const view = use(getBundle(productId, epoch, t("listing.loadFailed")));
-  const [channel, setChannel] = useState<ListingTarget>(listingTargets[0]);
   const key = listingTargetKey(channel);
   const loadError = view.channels[key]?.error || "";
   const [baselines, setBaselines] = useState<Record<string, ChannelDraft>>(() =>
@@ -364,7 +379,7 @@ function ListingPrepFields({
   function selectChannel(target: ListingTarget) {
     if (listingTargetKey(target) === listingTargetKey(channel)) return;
     if (dirty && !window.confirm(t("listing.unsaved"))) return;
-    setChannel(target);
+    onSelect(target);
     setError(view.channels[listingTargetKey(target)]?.error || "");
     setNotice("");
     setPreviewOk(null);
@@ -476,7 +491,7 @@ function ListingPrepFields({
   if (loadError) {
     return (
       <>
-        <ChannelPills channel={channel} onSelect={selectChannel} />
+        <ChannelPills channel={channel} onSelect={selectChannel} onEbay={onEbay} />
         <Feedback>{loadError}</Feedback>
       </>
     );
@@ -484,7 +499,7 @@ function ListingPrepFields({
 
   return (
     <>
-      <ChannelPills channel={channel} onSelect={selectChannel} />
+      <ChannelPills channel={channel} onSelect={selectChannel} onEbay={onEbay} />
       <form className="grid gap-4" onSubmit={(event) => void save(event)}>
         <div>
           <Label>{channel.marketplace === "otto" ? t("listing.productLine") : t("product.draftTitle")}</Label>

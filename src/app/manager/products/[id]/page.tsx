@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
-import { listingTargetKey, listingTargets } from "@/lib/listings";
+import { contentTargets } from "@/lib/listings";
 import { materialPair, materialsPayload } from "@/lib/materials";
 import { calculateMarginEur } from "@/lib/pricing-margin";
 import { cn } from "@/lib/utils";
@@ -169,6 +169,7 @@ type FormState = {
 
 type GenerationContent = {
   title?: string;
+  ebay_title?: string;
   description?: string;
   bullet_points?: string[];
   materials?: string[];
@@ -177,6 +178,7 @@ type GenerationContent = {
 };
 type DraftForm = {
   title: string;
+  ebayTitle: string;
   description: string;
   bullets: string;
   material1: string;
@@ -1010,6 +1012,7 @@ export default function ProductWorkspacePage() {
       const [material1, material2] = materialPair(generationContent.materials);
       setDraftForm({
         title: generationContent.title ?? "",
+        ebayTitle: generationContent.ebay_title ?? generationContent.title ?? "",
         description: generationContent.description ?? "",
         bullets: (generationContent.bullet_points ?? []).join("\n"),
         material1,
@@ -1032,6 +1035,7 @@ export default function ProductWorkspacePage() {
     try {
       const payload = {
         title: draftForm.title.trim(),
+        ebay_title: draftForm.ebayTitle.trim(),
         description: draftForm.description.trim(),
         bullet_points: draftForm.bullets.split("\n").map((item) => item.trim()).filter(Boolean),
         materials: materialsPayload(draftForm.material1, draftForm.material2),
@@ -1064,8 +1068,8 @@ export default function ProductWorkspacePage() {
       const allowed = generation.targets ?? [];
       const allowedKeys = new Set(allowed.map((item) => `${item.marketplace}:${item.account}`));
       const targets = allowed.length
-        ? listingTargets.filter((item) => allowedKeys.has(listingTargetKey(item)))
-        : listingTargets;
+        ? contentTargets.filter((item) => allowedKeys.has(`${item.marketplace}:${item.account}`))
+        : contentTargets;
       const applyTargets = targets.length ? targets : allowed;
       const response = await authorizedFetch(
         `/api/v2/orchestrator/products/${productId}/ai-content/generations/${generation.id}/apply/`,
@@ -1731,7 +1735,7 @@ export default function ProductWorkspacePage() {
     setGenerating(true); setError(""); setFeedback("");
     try {
       const response = await authorizedFetch(`/api/v2/orchestrator/products/${productId}/ai-content/generate/`, {
-        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: listingTargets }),
+        method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ targets: contentTargets }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || "AI generation could not be started.");
@@ -2738,6 +2742,10 @@ export default function ProductWorkspacePage() {
                   <div>
                     <Label className="text-[13px] font-extrabold text-primary">{t("product.draftTitle")}</Label>
                     <Input required maxLength={65} value={draftForm.title} onChange={(event) => updateDraft("title", event.target.value)} />
+                    {generationContent?.ebay_title !== undefined && <>
+                      <Label className="text-[13px] font-extrabold text-primary">{t("ebay.title")}</Label>
+                      <Input required maxLength={75} value={draftForm.ebayTitle} onChange={(event) => updateDraft("ebayTitle", event.target.value)} />
+                    </>}
                   </div>
                   <div>
                     <Label className="text-[13px] font-extrabold text-primary">{t("product.draftDescription")}</Label>

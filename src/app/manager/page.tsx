@@ -66,6 +66,7 @@ function emptyActiveListings(): ActiveListing[] {
     { marketplace: "otto", account: "xl", count: 0 },
     { marketplace: "kaufland", account: "xl", count: 0 },
     { marketplace: "hood", account: "xl", count: 0 },
+    { marketplace: "ebay", account: "depotum", count: 0 },
   ];
 }
 
@@ -79,6 +80,7 @@ function orderedListings(listings: ActiveListing[]): ActiveListing[] {
 }
 
 function channelLabel(listing: ActiveListing) {
+  if (listing.marketplace === "ebay") return "eBay Depotum";
   const marketplace = listing.marketplace === "otto" ? "OTTO" : listing.marketplace === "hood" ? "Hood" : "Kaufland";
   return `${marketplace} ${listing.account.toUpperCase()}`;
 }

@@ -1,6 +1,7 @@
 import { ottoCatalogPath, type OttoCatalogLanguage } from "./listings.ts";
 import { loadOttoCatalogPages, type OttoCatalogPage } from "./otto-catalog.ts";
 import { sellerRequest } from "./seller.ts";
+import { storeSellerOttoCatalog } from "./browser-storage.ts";
 
 export type SellerOttoGroup = { category_group_id: number; category_group: string };
 export type SellerOttoCategory = { category_id: number; name: string };
@@ -24,7 +25,7 @@ function loadCatalog<T>(path: string): Promise<T[]> {
   const expires = Date.now() + lifetime;
   const promise = loadOttoCatalogPages<T>(path, url => sellerRequest<OttoCatalogPage<T>>(url), 3)
     .then(values => {
-      try { localStorage.setItem(key, JSON.stringify({ expires, values })); } catch { /* Browser storage may be full. */ }
+      try { storeSellerOttoCatalog(localStorage, key, expires, values); } catch { /* Storage may be unavailable. */ }
       return values;
     }).catch(error => { cache.delete(key); throw error; });
   cache.set(key, { expires, promise });
