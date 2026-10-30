@@ -23,6 +23,7 @@ import { FilterSelect } from "@/components/ui/filter-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
+import { ebayCheckedListingStatus } from "@/lib/ebay";
 import { useI18n, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -291,6 +292,11 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
     return t(`job.op.${job.operation}` as MessageKey);
   }
 
+  function jobStatusLabel(job: Job) {
+    const listingStatus = ebayCheckedListingStatus(job);
+    return listingStatus ? t(`pub.${listingStatus}`) : t(`job.${job.status}` as MessageKey);
+  }
+
   async function reconcilePublication(publication: Publication, action: "check" | "set_manual") {
     if (busyKey) return;
     setBusyKey(`${publication.id}:${action}`);
@@ -491,7 +497,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                 </div>
                 <span>{jobOperationLabel(job)}</span>
                 <span>{(job.requested_targets || []).map(targetKey).join(" · ") || job.requested_channels.join(", ")}</span>
-                <StatusBadge status={job.status}>{t(`job.${job.status}` as MessageKey)}</StatusBadge>
+                <StatusBadge status={ebayCheckedListingStatus(job) || job.status}>{jobStatusLabel(job)}</StatusBadge>
                 <time dateTime={job.created_at}>{formatDate(job.created_at, true)}</time>
               </article>
             ))}
@@ -713,10 +719,10 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                       aria-label={t("marketplaces.jobDetailsAria")}
                       title={t("marketplaces.jobDetailsAria")}
                     >
-                      <StatusBadge status={job.status}>{t(`job.${job.status}` as MessageKey)}</StatusBadge>
+                      <StatusBadge status={ebayCheckedListingStatus(job) || job.status}>{jobStatusLabel(job)}</StatusBadge>
                     </button>
                   ) : (
-                    <StatusBadge status={job.status}>{t(`job.${job.status}` as MessageKey)}</StatusBadge>
+                    <StatusBadge status={ebayCheckedListingStatus(job) || job.status}>{jobStatusLabel(job)}</StatusBadge>
                   )}
                   <time dateTime={job.created_at}>{formatDate(job.created_at, true)}</time>
                 </article>
@@ -770,7 +776,7 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
             <>
               <DialogHeader>
                 <DialogTitle className="pr-8 font-extrabold text-primary">
-                  {t(`job.${detailJob.status}` as MessageKey)}
+                  {jobStatusLabel(detailJob)}
                   {" · "}
                   {jobOperationLabel(detailJob)}
                 </DialogTitle>
@@ -791,7 +797,9 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
                     ]
                       .filter(Boolean)
                       .join(" ");
+                    const checkedStatus = ebayCheckedListingStatus(detailJob);
                     const text =
+                      (checkedStatus ? t(`pub.${checkedStatus}`) : "") ||
                       (result.ok && detailJob.reconciliation_action ? t(detailJob.reconciliation_action === "set_manual" ? "marketplaces.statusSaved" : "marketplaces.publicationConfirmed") : "") ||
                       detailText(result.details) ||
                       detailText(result.error) ||
