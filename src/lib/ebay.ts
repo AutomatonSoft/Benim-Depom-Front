@@ -1,4 +1,19 @@
 export type EbayEnvironment = "sandbox" | "production";
+
+export function ebayCheckedListingStatus(job: {
+  status: string;
+  reconciliation_action?: string;
+  results?: Array<{ marketplace?: string; ok?: boolean; details?: unknown }>;
+}): "active" | "deactivated" | null {
+  if (job.reconciliation_action !== "check" || job.status !== "succeeded" || job.results?.length !== 1) return null;
+  const result = job.results[0];
+  if (result.marketplace !== "ebay" || !result.ok || !result.details || typeof result.details !== "object") return null;
+  const details = result.details as Record<string, unknown>;
+  if (details.remote_status === "UNPUBLISHED") return "deactivated";
+  if (details.remote_status === "PUBLISHED" && (details.listing_status == null || details.listing_status === "ACTIVE")) return "active";
+  return null;
+}
+
 export type EbayContact = {
   companyName?: string;
   addressLine1?: string;
