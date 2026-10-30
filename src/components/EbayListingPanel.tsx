@@ -131,14 +131,30 @@ export function EbayListingPanel() {
   const { t } = useI18n();
   const fieldId = useId();
   const state = useEbay();
+  const [previewing, setPreviewing] = useState(false);
+  const [payloadPreview, setPayloadPreview] = useState<{ draft: EbayDraft; ok: boolean; text: string } | null>(null);
   const { draft, environment, locked, busy, preparation, snapshot } = state;
+
+  async function previewPayload() {
+    if (!draft || state.dirty || locked || previewing) return;
+    const sourceDraft = draft;
+    setPreviewing(true);
+    setPayloadPreview(null);
+    try {
+      const data = await request<{ draft_complete: boolean; missing_regulatory_fields: string[] }>(`${state.base}?preview=1`, t("listing.previewNotReady"));
+      if (data) setPayloadPreview({ draft: sourceDraft, ok: data.draft_complete && !data.missing_regulatory_fields.length, text: JSON.stringify(data, null, 2) });
+    } catch (error) {
+      setPayloadPreview({ draft: sourceDraft, ok: false, text: error instanceof Error ? error.message : t("common.apiUnreachable") });
+    } finally { setPreviewing(false); }
+  }
+
   if (!draft || !environment) return <div>
     <p role="status">{state.error || t("common.loading")}</p>
     {state.error && <Button variant="secondary" disabled={busy} onClick={state.reload}>{t("ebay.refresh")}</Button>}
   </div>;
   const listingUrl = ebayListingUrl(environment, snapshot?.remote_listing_id || preparation?.listing_id || "");
   return <div className="grid gap-4">
-    <fieldset disabled={locked} className="grid min-w-0 gap-4">
+    <fieldset disabled={locked || previewing} className="grid min-w-0 gap-4">
       <div>
         <Label htmlFor={`${fieldId}-title`}>{t("ebay.title")}</Label>
         <Input id={`${fieldId}-title`} maxLength={78} value={draft.title} onChange={(event) => state.edit({ title: event.target.value })} onBlur={() => {
@@ -151,10 +167,20 @@ export function EbayListingPanel() {
         <Label htmlFor={`${fieldId}-description`}>{t("ebay.description")}</Label>
         <Textarea id={`${fieldId}-description`} rows={7} value={draft.description} onChange={(event) => state.edit({ description: event.target.value })} />
       </div>
-      <Button className="justify-self-start" variant="accent" onClick={() => void state.save()}>{t("listing.saveChannel")}</Button>
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" variant="accent" onClick={() => { setPayloadPreview(null); void state.save(); }}>{t("listing.saveChannel")}</Button>
+        <Button type="button" variant="secondary" disabled={state.dirty || previewing} onClick={() => void previewPayload()}>
+          {previewing ? t("listing.previewing") : t("listing.preview")}
+        </Button>
+      </div>
+      {state.dirty && <p className="text-xs font-semibold text-muted-foreground">{t("listing.saveBeforePreview")}</p>}
     </fieldset>
     {state.error && <Feedback tone="error">{state.error}</Feedback>}
     {state.notice && <Feedback tone="success">{state.notice}</Feedback>}
+    {payloadPreview && payloadPreview.draft === draft && !state.dirty && <div className={`rounded-xl border px-4 py-3 ${payloadPreview.ok ? "border-[rgba(34,140,90,0.28)] bg-[var(--ui-success-bg)]" : "border-[rgba(196,64,56,0.28)] bg-[var(--ui-danger-bg)]"}`}>
+      <strong className={`text-sm font-extrabold ${payloadPreview.ok ? "text-[var(--ui-success)]" : "text-[var(--ui-danger)]"}`}>{t(payloadPreview.ok ? "listing.previewOk" : "listing.previewBad")}</strong>
+      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs font-semibold text-primary">{payloadPreview.text}</pre>
+    </div>}
     {listingUrl && <a className="text-xs font-semibold text-muted-foreground underline underline-offset-4" href={listingUrl} target="_blank" rel="noopener noreferrer">{t("ebay.open")}</a>}
   </div>;
 }
@@ -271,7 +297,7 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
               <button type="button" className={`flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30 ${freeText ? "border-[rgba(247,148,29,0.45)]" : "border-border"}`} onClick={() => openAspect(aspect)}>
                 <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
                   <strong className="truncate text-sm font-extrabold text-primary">{aspect.label || name}{aspect.aspectConstraint.aspectRequired ? " *" : ""}</strong>
-                  {freeText && <span className="rounded-md bg-[rgba(247,148,29,0.16)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent,#f7941d)]">{t("ebay.freeTextBadge")}</span>}
+                  {freeText && name !== "Farbe" && <span className="rounded-md bg-[rgba(247,148,29,0.16)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.04em] text-[var(--brand-accent,#f7941d)]">{t("ebay.freeTextBadge")}</span>}
                 </div>
                 <span className="truncate text-xs font-semibold text-muted-foreground">{values.map((value) => aspect.aspectValues?.find((item) => item.localizedValue === value)?.label || value).join(", ") || t("ebay.choose")}</span>
               </button>
