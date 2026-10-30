@@ -95,6 +95,7 @@ type Product = {
   id: number;
   owner: number;
   title: string;
+  model: string;
   product_type: string;
   unit_price: string;
   currency: "TRY" | "EUR" | "USD";
@@ -2287,6 +2288,10 @@ export default function ProductWorkspacePage() {
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldTitle")}</Label>
                 <Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
       </div>
+              <div>
+                <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldModel")}</Label>
+                <Input readOnly value={product.model || ""} />
+              </div>
               <div>
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldType")}</Label>
                 <Input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} />

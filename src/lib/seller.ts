@@ -24,7 +24,7 @@ export function sellerAvatarInitial(profile: Pick<SellerProfile, "first_name" | 
 export type SellerImage = { id: number; image: string; preview: string; thumbnail: string; position: number; is_primary: boolean };
 export type SellerVariant = { id?: number; color: string; materials: string[]; material_composition?: string; width_cm: string; height_cm: string; length_cm: string; quantity: number };
 export type SellerProduct = {
-  id: number; title: string; product_type: string; unit_price: string; currency: "TRY" | "EUR" | "USD";
+  id: number; title: string; model: string; product_type: string; unit_price: string; currency: "TRY" | "EUR" | "USD";
   warehouse_city: string; status: string; is_available: boolean; deactivated_at: string | null; deactivation_requested_at?: string | null; total_quantity: number; total_amount: string;
   variants: SellerVariant[]; set_parts: Array<{ id?: number; description: string; width_cm: string; height_cm: string; length_cm: string }>;
   images: SellerImage[]; otto_category_id: number | null; otto_category_group_id: number | null; otto_attributes: Record<string, unknown>;

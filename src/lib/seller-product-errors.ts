@@ -1,7 +1,7 @@
 import { sellerApiErrorDetails, sellerErrorEntries, sellerErrorMessage } from "./seller-error-messages.ts";
 
 const fields = new Set([
-  "title", "product_type", "unit_price", "currency", "warehouse_city", "color", "materials", "material_composition",
+  "title", "model", "product_type", "unit_price", "currency", "warehouse_city", "color", "materials", "material_composition",
   "width_cm", "height_cm", "length_cm", "quantity", "set_parts", "otto_attributes", "images", "change_comment",
   "variants",
 ]);
