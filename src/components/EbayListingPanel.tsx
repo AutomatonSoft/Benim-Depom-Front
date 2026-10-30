@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useI18n } from "@/i18n";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
-import { ebayCardDimensions, ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft, submitEbayListing,
+import { ebayCardDimensions, ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft,
   type EbayAspectSchema, type EbayCategory, type EbayDraft,
   type EbayPreparation, type EbaySnapshot, type EbayEnvironment, type EbayProduct, type EbayAspect,
 } from "@/lib/ebay";
@@ -101,19 +101,6 @@ function useEbayState(productId: number) {
     });
   }
 
-  async function submit(operation: "publish" | "update") {
-    if (busyRef.current || busy || !draft || !environment) throw new Error(t("common.loading"));
-    if (dirty) throw new Error(t("ebay.dirty"));
-    if (preparation?.status === "processing" || preparation?.status === "uncertain") throw new Error(t("ebay.pending"));
-    busyRef.current = true; setBusy(true); setError("");
-    try {
-      // Always read remote state first; a lost response must never trigger an automatic retry.
-      await submitEbayListing(operation, environment,
-        <T,>(path: string, init?: RequestInit, optional?: boolean) => request<T>(base + path, t("ebay.error"), init, optional));
-      await refresh();
-    } finally { busyRef.current = false; setBusy(false); }
-  }
-
   async function preview() {
     if (dirty) throw new Error(t("ebay.dirty"));
     await refresh();
@@ -124,7 +111,7 @@ function useEbayState(productId: number) {
 
   return { base, draft, environment, snapshot, preparation, dirty, busy,
     locked: busy || preparation?.status === "processing" || preparation?.status === "uncertain",
-    error, notice, edit, save, submit, preview,
+    error, notice, edit, save, preview,
     reload: () => { setError(""); setVersion((current) => current + 1); },
   };
 }
