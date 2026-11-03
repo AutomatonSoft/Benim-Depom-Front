@@ -95,6 +95,7 @@ type Product = {
   id: number;
   owner: number;
   title: string;
+  description?: string;
   product_type: string;
   unit_price: string;
   currency: "TRY" | "EUR" | "USD";
@@ -159,6 +160,7 @@ type ModerationDecision = {
 
 type FormState = {
   title: string;
+  description: string;
   product_type: string;
   unit_price: string;
   currency: Product["currency"];
@@ -773,6 +775,7 @@ function reviewOldValue(product: Product, review: Record<string, unknown>, field
 function toForm(product: Product): FormState {
   return {
     title: product.title,
+    description: product.description || "",
     product_type: product.product_type,
     unit_price: product.unit_price,
     currency: product.currency,
@@ -1248,6 +1251,9 @@ export default function ProductWorkspacePage() {
           quantity: Number(quantity),
         })),
       };
+      if (form.description !== (product?.description || "")) {
+        payload.description = form.description.trim();
+      }
       if (form.set_parts.length > 0 || meaningfulSetParts(product?.set_parts).length > 0) {
         payload.set_parts = form.set_parts.map(({ description, width_cm, height_cm, length_cm }) => ({
           description,
@@ -2283,6 +2289,10 @@ export default function ProductWorkspacePage() {
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldTitle")}</Label>
                 <Input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
       </div>
+              {product.description ? <div>
+                <Label htmlFor="product-description" className="text-[13px] font-extrabold text-primary">{t("product.fieldDescription")}</Label>
+                <Textarea id="product-description" rows={4} minLength={10} maxLength={1200} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+              </div> : null}
               <div>
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldType")}</Label>
                 <Input required value={form.product_type} onChange={(event) => setForm({ ...form, product_type: event.target.value })} />
