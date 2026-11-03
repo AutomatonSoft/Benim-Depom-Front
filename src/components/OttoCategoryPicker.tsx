@@ -7,7 +7,7 @@ import { Feedback, SectionCard, SectionCardHeader } from "@/components/manager/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { CatalogLanguageSelect } from "@/components/CatalogLanguageSelect";
 import { useI18n } from "@/i18n";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import {
@@ -419,16 +419,11 @@ export function OttoCategoryPicker({
             <Label htmlFor="otto-catalog-lang" className="mb-1">
               {t("listing.catalogLanguage")}
             </Label>
-            <FilterSelect
+            <CatalogLanguageSelect
               id="otto-catalog-lang"
               value={language}
-              onChange={(event) => changeLanguage(event.target.value as OttoCatalogLanguage)}
-            >
-              <option value="ru">{t("listing.langRu")}</option>
-              <option value="en">{t("listing.langEn")}</option>
-              <option value="tr">{t("listing.langTr")}</option>
-              <option value="de">{t("listing.langDe")}</option>
-            </FilterSelect>
+              onValueChange={changeLanguage}
+            />
           </div>
         }
       />

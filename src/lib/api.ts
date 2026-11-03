@@ -1,3 +1,5 @@
+import { setSessionItem } from "./browser-storage.ts";
+
 const ACCESS_TOKEN_KEY = "benim_access_token";
 const LEGACY_REFRESH_TOKEN_KEY = "benim_refresh_token";
 
@@ -18,7 +20,7 @@ function readToken(key: string) {
 
 function writeToken(key: string, value: string) {
   if (!canUseStorage()) return;
-  window.localStorage.setItem(key, value);
+  setSessionItem(window.localStorage, key, value);
 }
 
 export function clearTokens() {

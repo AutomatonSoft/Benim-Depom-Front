@@ -1,4 +1,5 @@
 import { sellerApiErrorDetails } from "./seller-error-messages.ts";
+import { setSessionItem } from "./browser-storage.ts";
 
 export type SellerProfile = {
   id: number;
@@ -23,7 +24,7 @@ export function sellerAvatarInitial(profile: Pick<SellerProfile, "first_name" | 
 export type SellerImage = { id: number; image: string; preview: string; thumbnail: string; position: number; is_primary: boolean };
 export type SellerVariant = { id?: number; color: string; materials: string[]; material_composition?: string; width_cm: string; height_cm: string; length_cm: string; quantity: number };
 export type SellerProduct = {
-  id: number; title: string; product_type: string; unit_price: string; currency: "TRY" | "EUR" | "USD";
+  id: number; title: string; model: string; description: string; product_type: string; unit_price: string; currency: "TRY" | "EUR" | "USD";
   warehouse_city: string; status: string; is_available: boolean; deactivated_at: string | null; deactivation_requested_at?: string | null; total_quantity: number; total_amount: string;
   variants: SellerVariant[]; set_parts: Array<{ id?: number; description: string; width_cm: string; height_cm: string; length_cm: string }>;
   images: SellerImage[]; otto_category_id: number | null; otto_category_group_id: number | null; otto_attributes: Record<string, unknown>;
@@ -45,7 +46,7 @@ let refreshInFlight: Promise<string | null> | null = null;
 export function sellerToken() {
   return typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY);
 }
-export function saveSellerToken(token: string) { localStorage.setItem(TOKEN_KEY, token); }
+export function saveSellerToken(token: string) { setSessionItem(localStorage, TOKEN_KEY, token); }
 export function sellerProfileId() {
   if (typeof window === "undefined") return null;
   try {
@@ -75,7 +76,7 @@ export function saveSellerProfileId(id: number) {
   if (typeof window === "undefined" || !Number.isSafeInteger(id) || id <= 0) return;
   const previousId = sellerProfileId();
   if (previousId !== null && previousId !== id) clearAvailabilityAnswers(previousId);
-  window.localStorage.setItem(SELLER_PROFILE_ID_KEY, String(id));
+  setSessionItem(window.localStorage, SELLER_PROFILE_ID_KEY, String(id));
   if (previousId !== id) window.dispatchEvent(new Event(SELLER_PROFILE_CHANGED_EVENT));
 }
 export function clearSellerToken() {
@@ -222,7 +223,7 @@ export async function sellerLogin(phone: string, password: string) {
   if (!profileResponse.ok) throw new SellerApiError(profileResponse.status, "Could not verify your account role.");
   const profile = await profileResponse.json() as SellerProfile;
   if (profile.role !== "seller") { clearSellerToken(); throw new SellerApiError(403, "This portal is available to seller accounts only."); }
-  localStorage.setItem("benim_seller_locale", profile.preferred_language);
+  setSessionItem(localStorage, "benim_seller_locale", profile.preferred_language);
   window.dispatchEvent(new Event("seller-locale-updated"));
   saveSellerToken(token);
   saveSellerProfileId(profile.id);

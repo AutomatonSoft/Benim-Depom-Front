@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Suspense, use, useState } from "react";
 
 import { ListingPrep } from "@/components/ListingPrep";
+import { EbayCategoryPicker, EbayListingProvider } from "@/components/EbayListingPanel";
 import { ProductPublishPanel } from "@/components/ProductPublishPanel";
 import { EmptyState, PageContainer, PageHeader, SectionCard } from "@/components/manager/ui";
 import { OttoCategoryPicker } from "@/components/OttoCategoryPicker";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/i18n";
 import { authorizedFetch } from "@/lib/api";
+import type { EbayProduct } from "@/lib/ebay";
 
 type ProductSummary = {
   id: number;
@@ -22,6 +24,7 @@ type ProductSummary = {
   otto_category_id: number | null;
   otto_category_group_id: number | null;
   otto_attributes: Record<string, unknown>;
+  variants: EbayProduct["variants"];
 };
 
 type ProductLoad = ProductSummary | "unauthorized" | "missing" | "failed";
@@ -138,7 +141,8 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
           </Button>
         }
       />
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
+      <EbayListingProvider productId={product.id}>
+      <div className="grid gap-4 xl:grid-cols-3 xl:items-start">
         <ListingPrep productId={product.id} />
         <OttoCategoryPicker
           productId={product.id}
@@ -153,10 +157,12 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
             productCache.delete(product.id);
           }}
         />
+        <EbayCategoryPicker variants={product.variants} />
       </div>
       <div className="mt-4">
         <ProductPublishPanel productId={product.id} productStatus={product.status} />
       </div>
+      </EbayListingProvider>
     </PageContainer>
   );
 }
