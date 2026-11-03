@@ -162,6 +162,7 @@ type ModerationDecision = {
 type FormState = {
   title: string;
   model: string;
+  description: string;
   product_type: string;
   unit_price: string;
   currency: Product["currency"];
@@ -779,6 +780,7 @@ function toForm(product: Product): FormState {
   return {
     title: product.title,
     model: product.model || "",
+    description: product.description || "",
     product_type: product.product_type,
     unit_price: product.unit_price,
     currency: product.currency,
@@ -1258,6 +1260,9 @@ export default function ProductWorkspacePage() {
       };
       if (form.model !== (product?.model || "")) {
         payload.model = form.model.trim();
+      }
+      if (form.description !== (product?.description || "")) {
+        payload.description = form.description.trim();
       }
       if (form.set_parts.length > 0 || meaningfulSetParts(product?.set_parts).length > 0) {
         payload.set_parts = form.set_parts.map(({ description, width_cm, height_cm, length_cm }) => ({
@@ -2299,8 +2304,8 @@ export default function ProductWorkspacePage() {
                 <Input required={Boolean(product.model)} minLength={3} maxLength={200} value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
               </div>
               {product.description ? <div>
-                <p className="text-[13px] font-extrabold text-primary">{t("product.fieldDescription")}</p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-primary">{product.description}</p>
+                <Label htmlFor="product-description" className="text-[13px] font-extrabold text-primary">{t("product.fieldDescription")}</Label>
+                <Textarea id="product-description" rows={4} minLength={10} maxLength={1200} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
               </div> : null}
               <div>
                 <Label className="text-[13px] font-extrabold text-primary">{t("product.fieldType")}</Label>
