@@ -1,0 +1,20 @@
+{
+  "scanned": "2026-11-10",
+  "findings": {
+    "fonts": "Montserrat from src/app/globals.css; monospace is scoped to EAN and ItemID measurements.",
+    "palette": "BENIM navy #173968, orange #f7941d and semantic colors from src/app/globals.css.",
+    "motion": "No motion library needed; page-local loading and progress states honor reduced motion.",
+    "spacing": "Page-local responsive CSS module; existing shared UI controls remain untouched.",
+    "framework": "Next.js 16.3.3 app router; manager tool is a client page with an isolated CSS module."
+  },
+  "preserve": [
+    "BENIM navy and orange palette",
+    "Montserrat font stack",
+    "Existing authorizedFetch and manager login behavior"
+  ],
+  "introduce": [
+    "Rim station treatment scoped to the new eBay route",
+    "Exact EAN-to-ItemID preview and confirmation workflow",
+    "Loading, empty, error, progress and report states"
+  ]
+}

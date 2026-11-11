@@ -1,0 +1,32 @@
+[
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "Rim",
+  "rim": "station",
+  "axes": "dark/grotesk-sans/warm",
+  "hero": "none; compact operations header",
+  "nav": "project top bar with account environment",
+  "footer": "safety reminder about selected ItemIDs and unchanged BENIM products",
+  "imagery": "none; the live listing table is the material",
+  "photos": [],
+  "entry": "manager-only exact-EAN eBay listing review and end tool",
+  "fingerprint": "exact EAN-to-ItemID preview table",
+  "sections": [
+   "account status",
+   "EAN input",
+   "matching guidance",
+   "preview and selection",
+   "confirmation",
+   "progress and CSV report"
+  ],
+  "signature": "exact EAN-to-ItemID preview table",
+  "waived": [],
+  "dismissed": [
+   "F7: shared panel geometry keeps one task area; the guidance panel changes fill"
+  ],
+  "prompt": "Managers receive an EAN list, inspect exact matches among active listings in their JV or XL seller account, then select ItemIDs to end. Preserve BENIM navy and orange. Tone is utilitarian and careful.",
+  "date": "2026-11-10",
+  "mode": "build"
+ }
+]
