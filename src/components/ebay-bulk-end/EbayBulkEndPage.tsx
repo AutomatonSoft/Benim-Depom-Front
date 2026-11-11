@@ -46,13 +46,24 @@ type Account = {
 type Match = {
   item_id: string;
   title: string;
+  sku: string;
+  match_type: string;
+  identifier_conflict?: boolean;
   seller_id: string;
   listing_status: string;
   listing_type: string;
   bid_count: number | null;
   auction_risky: boolean;
   view_url: string;
-  matches: Array<{ ean: string; type: "listing" | "variation"; variation?: string }>;
+  matches: Array<{
+    ean: string;
+    type: "listing" | "variation";
+    variation?: string;
+    source?: string;
+    match_type?: string;
+    sku?: string;
+    identifier_conflict?: boolean;
+  }>;
   risky: boolean;
   variation_count: number;
   managed_by_benim?: boolean;
@@ -75,7 +86,7 @@ type Job = {
   account: AccountName;
   environment: "sandbox" | "production";
   status: string;
-  progress: { current: number; total: number | null };
+  progress: { stage?: string; current: number; total: number | null };
   message: string;
   cancel_requested?: boolean;
   created_at?: string | null;
@@ -84,9 +95,13 @@ type Job = {
   summary?: JobSummary;
   preview_expires_at?: string | null;
   unmatched_eans: string[];
+  unmatched_status_by_ean?: Record<string, string>;
   matches: Match[];
   results: Result[];
   report_rows?: Result[];
+  discovery_complete?: boolean;
+  discovery_strategy?: string;
+  discovery_details?: { ean_search_complete?: boolean; sku_search_complete?: boolean };
 };
 
 type Connections = {
@@ -289,7 +304,7 @@ export default function EbayBulkEndPage() {
         const next = payload as unknown as Job;
         setJob(next);
         if (next.status === "preview") {
-          setSelectedIds(next.matches.filter((match) => !match.risky && !match.auction_risky && !match.managed_by_benim).map((match) => match.item_id));
+          setSelectedIds(next.matches.filter((match) => !match.risky && !match.auction_risky && !match.managed_by_benim && !match.identifier_conflict).map((match) => match.item_id));
         }
         if (!cancelled && activeStatuses.has(next.status)) {
           timer = window.setTimeout(poll, 1800);
@@ -667,7 +682,18 @@ export default function EbayBulkEndPage() {
   const progressPercent = job?.progress.total
     ? Math.min(100, Math.round((job.progress.current / job.progress.total) * 100))
     : 0;
+  const progressStage = job?.progress.stage === "requesting_report"
+    ? copy.progressRequestReport
+    : job?.progress.stage === "waiting_for_report"
+      ? copy.progressWaitingReport
+      : job?.progress.stage === "downloading_report"
+        ? copy.progressDownloadReport
+        : job?.progress.stage === "verifying_candidates"
+          ? copy.progressVerifyCandidates
+          : copy.progressPreparing;
   const selectedMatches = job?.matches.filter((match) => selectedIds.includes(match.item_id)) ?? [];
+  const unverifiedEans = job?.unmatched_eans.filter((ean) => job.unmatched_status_by_ean?.[ean] === "verification_failed") ?? [];
+  const notIndexedEans = job?.unmatched_eans.filter((ean) => job.unmatched_status_by_ean?.[ean] !== "verification_failed") ?? [];
   const selectedEanCount = new Set(selectedMatches.flatMap((match) => match.matches.map((value) => value.ean))).size;
   const managedMatchCount = job?.summary?.managed_listing_count ?? job?.matches.filter((match) => match.managed_by_benim).length ?? 0;
   const canStartScan = Boolean(
@@ -685,6 +711,7 @@ export default function EbayBulkEndPage() {
             </span>
           ) : null}
           <span className={styles.topbarLabel}>eBay</span>
+          <Link className={styles.historyLink} href="/ebay/history">{copy.historyNav}</Link>
         </div>
       </header>
 
@@ -841,10 +868,18 @@ export default function EbayBulkEndPage() {
 
             {jobIsWorking ? (
               <div className={styles.progressBlock}>
-                <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={job.progress.total ?? undefined} aria-valuenow={job.progress.current}>
-                  <span style={{ width: progressPercent + "%" }} />
+                <div
+                  className={`${styles.progressTrack} ${job.progress.total == null ? styles.progressIndeterminate : ""}`}
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={job.progress.total ?? undefined}
+                  aria-valuenow={job.progress.total == null ? undefined : job.progress.current}
+                >
+                  <span style={job.progress.total == null ? undefined : { width: progressPercent + "%" }} />
                 </div>
-                <p>{job.progress.total ? interpolateEbayBulkEnd(copy.progressOf, { current: job.progress.current, total: job.progress.total }) : copy.progressPreparing}{job.kind === "end" ? " " + copy.listings : " " + copy.pages}</p>
+                <p>{job.progress.total != null
+                  ? interpolateEbayBulkEnd(copy.progressOf, { current: job.progress.current, total: job.progress.total }) + " " + (job.kind === "end" ? copy.listings : copy.listings)
+                  : progressStage}</p>
               </div>
             ) : null}
 
@@ -876,9 +911,8 @@ export default function EbayBulkEndPage() {
                     time: job.preview_expires_at ? new Date(job.preview_expires_at).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : copy.fifteenMinutes,
                   })}</p>
                 </div>
-                {job.unmatched_eans.length ? (
-                  <p className={styles.infoBanner}>{copy.noMatches}{job.unmatched_eans.join(", ")}</p>
-                ) : null}
+                {unverifiedEans.length ? <p className={styles.warningBanner}><AlertTriangle aria-hidden />{copy.verificationFailed} {unverifiedEans.join(", ")}</p> : null}
+                {notIndexedEans.length ? <p className={styles.infoBanner}>{copy.coverageWarning} {notIndexedEans.join(", ")}</p> : null}
                 {job.matches.length ? (
                   <>
                     <div className={styles.tableTools}>
@@ -886,7 +920,7 @@ export default function EbayBulkEndPage() {
                       <button
                         className={styles.textButton}
                         type="button"
-                        onClick={() => setSelectedIds(job.matches.filter((match) => !match.managed_by_benim && (!match.risky || includeVariations) && (!match.auction_risky || includeAuctionRisk)).map((match) => match.item_id))}
+                        onClick={() => setSelectedIds(job.matches.filter((match) => !match.managed_by_benim && !match.identifier_conflict && (!match.risky || includeVariations) && (!match.auction_risky || includeAuctionRisk)).map((match) => match.item_id))}
                       >
                         {copy.selectAvailable}
                       </button>
@@ -902,13 +936,15 @@ export default function EbayBulkEndPage() {
                                   type="checkbox"
                                   aria-label={copy.selectItem + match.item_id}
                                   checked={selectedIds.includes(match.item_id)}
-                                  disabled={Boolean(match.managed_by_benim) || (match.risky && !includeVariations) || (match.auction_risky && !includeAuctionRisk)}
+                                  disabled={Boolean(match.managed_by_benim || match.identifier_conflict) || (match.risky && !includeVariations) || (match.auction_risky && !includeAuctionRisk)}
                                   onChange={() => toggleSelected(match.item_id)}
                                 />
                               </td>
                               <td data-label={copy.listing}>
                                 <strong className={styles.itemTitle}>{match.title || copy.untitled}</strong>
                                 <span className={styles.itemId}>ItemID {match.item_id}</span>
+                                {match.sku ? <span className={styles.itemId}>{copy.skuLabel}{match.sku}</span> : null}
+                                <span className={styles.itemId}>{copy.matchType}{match.match_type?.includes("variation") ? match.match_type.includes("sku") ? copy.labelExactVariationSku : copy.labelExactVariationEan : match.match_type?.includes("sku") ? copy.labelExactSku : copy.labelExactEan}</span>
                                 <span className={styles.itemId}>{copy.seller}{match.seller_id || copy.sellerUnknown}</span>
                                 {match.view_url ? <a className={styles.itemLink} href={match.view_url} target="_blank" rel="noreferrer">{copy.openEbay}</a> : null}
                               </td>
@@ -924,7 +960,9 @@ export default function EbayBulkEndPage() {
                               <td data-label={copy.accountStatus}>{job.account.toUpperCase()} · {match.listing_status || copy.eBayActive}</td>
                               <td data-label={copy.variations}>{match.variation_count ?? 0}</td>
                               <td data-label={copy.risk}>
-                                {match.managed_by_benim ? (
+                                {match.identifier_conflict ? (
+                                  <div className={styles.eanTags}><span className={styles.eanRisk}><AlertTriangle aria-hidden />{copy.identifierConflict}</span></div>
+                                ) : match.managed_by_benim ? (
                                   <div className={styles.eanTags}>
                                     <span className={styles.managedBadge}><LockKeyhole aria-hidden /> {copy.managedListing}</span>
                                   </div>

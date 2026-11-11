@@ -63,6 +63,14 @@
   font-weight: 650;
 }
 
+.historyLink {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration-color: #c5d2e1;
+  text-underline-offset: 4px;
+}
+
 .environmentProduction,
 .environmentSandbox {
   border: 1px solid var(--line);
@@ -619,6 +627,11 @@
   border-radius: inherit;
   background: var(--orange);
   transition: width 180ms ease;
+}
+
+.progressIndeterminate span {
+  width: 38%;
+  animation: progressSlide 1.4s ease-in-out infinite alternate;
 }
 
 .progressBlock p {
@@ -1307,6 +1320,7 @@
   }
 
   .spin,
+  .progressIndeterminate span,
   .loadingLine,
   .loadingHeading,
   .loadingText,
@@ -1323,4 +1337,9 @@
 
 @keyframes turn {
   to { transform: rotate(360deg); }
+}
+
+@keyframes progressSlide {
+  from { transform: translateX(-5%); }
+  to { transform: translateX(175%); }
 }
