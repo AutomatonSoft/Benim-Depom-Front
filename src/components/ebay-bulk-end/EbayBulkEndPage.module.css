@@ -1001,7 +1001,11 @@
 .loginIcon {
   width: 42px;
   height: 42px;
-  margin-bottom: 14px;
+  margin: 0 auto 14px;
+}
+
+.loginCard .primaryButton {
+  color: #fff;
 }
 
 .loginIcon svg,
