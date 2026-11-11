@@ -101,7 +101,7 @@ type Job = {
   report_rows?: Result[];
   discovery_complete?: boolean;
   discovery_strategy?: string;
-  discovery_details?: { ean_search_complete?: boolean; sku_search_complete?: boolean };
+  discovery_details?: { ean_search_complete?: boolean; sku_search_complete?: boolean; report_request_unconfirmed?: boolean };
 };
 
 type Connections = {
@@ -682,15 +682,21 @@ export default function EbayBulkEndPage() {
   const progressPercent = job?.progress.total
     ? Math.min(100, Math.round((job.progress.current / job.progress.total) * 100))
     : 0;
-  const progressStage = job?.progress.stage === "requesting_report"
-    ? copy.progressRequestReport
-    : job?.progress.stage === "waiting_for_report"
-      ? copy.progressWaitingReport
-      : job?.progress.stage === "downloading_report"
-        ? copy.progressDownloadReport
-        : job?.progress.stage === "verifying_candidates"
-          ? copy.progressVerifyCandidates
-          : copy.progressPreparing;
+  const progressStages: Record<string, string> = {
+    requesting_report: copy.progressRequestReport,
+    recovering_report_request: copy.progressRecoverReport,
+    retrying_report: copy.progressRetryReport,
+    waiting_for_report: copy.progressWaitingReport,
+    downloading_report: copy.progressDownloadReport,
+    importing_report: copy.progressImportReport,
+    verifying_report: copy.progressVerifyReport,
+    verifying_candidates: copy.progressVerifyCandidates,
+  };
+  const progressStage = progressStages[job?.progress.stage ?? ""] ?? copy.progressPreparing;
+  const recoveringReport = job?.progress.stage === "recovering_report_request";
+  const jobMessage = jobIsWorking && job?.kind === "scan"
+    ? (recoveringReport ? copy.progressRecoverReportDetails : null)
+    : job?.discovery_details?.report_request_unconfirmed ? copy.reportRecoveryFailed : job?.message;
   const selectedMatches = job?.matches.filter((match) => selectedIds.includes(match.item_id)) ?? [];
   const unverifiedEans = job?.unmatched_eans.filter((ean) => job.unmatched_status_by_ean?.[ean] === "verification_failed") ?? [];
   const notIndexedEans = job?.unmatched_eans.filter((ean) => job.unmatched_status_by_ean?.[ean] !== "verification_failed") ?? [];
@@ -874,6 +880,7 @@ export default function EbayBulkEndPage() {
                   aria-valuemin={0}
                   aria-valuemax={job.progress.total ?? undefined}
                   aria-valuenow={job.progress.total == null ? undefined : job.progress.current}
+                  aria-valuetext={job.progress.total == null ? progressStage : undefined}
                 >
                   <span style={job.progress.total == null ? undefined : { width: progressPercent + "%" }} />
                 </div>
@@ -883,7 +890,8 @@ export default function EbayBulkEndPage() {
               </div>
             ) : null}
 
-            {job.message ? <p className={job.status === "incomplete" || job.status === "uncertain" ? styles.warningBanner : styles.infoBanner}>{job.message}</p> : null}
+            {jobMessage ? <p className={recoveringReport || job.status === "incomplete" || job.status === "uncertain" ? styles.warningBanner : styles.infoBanner}>{jobMessage}</p> : null}
+            <p className={styles.jobReference}>{copy.taskReference}: {job.job_id}</p>
 
             {job.status === "ending" && !job.cancel_requested ? (
               <button className={styles.secondaryButton} type="button" disabled={cancelBusy} onClick={() => void cancelEnd()}>
