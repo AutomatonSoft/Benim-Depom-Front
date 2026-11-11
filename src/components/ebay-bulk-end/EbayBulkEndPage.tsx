@@ -299,6 +299,9 @@ export default function EbayBulkEndPage() {
         const payload = (await response.json().catch(() => ({}))) as ApiPayload;
         if (!response.ok) {
           setActionError(apiMessage(payload, copy.errors.jobRefresh));
+          if (!cancelled && (response.status === 429 || response.status >= 500)) {
+            timer = window.setTimeout(poll, 5000);
+          }
           return;
         }
         const next = payload as unknown as Job;
@@ -686,6 +689,7 @@ export default function EbayBulkEndPage() {
     requesting_report: copy.progressRequestReport,
     recovering_report_request: copy.progressRecoverReport,
     retrying_report: copy.progressRetryReport,
+    waiting_report_quota: copy.progressReportQuota,
     waiting_for_report: copy.progressWaitingReport,
     downloading_report: copy.progressDownloadReport,
     importing_report: copy.progressImportReport,
