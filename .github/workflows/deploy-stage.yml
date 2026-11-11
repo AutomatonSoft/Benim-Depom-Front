@@ -84,30 +84,27 @@ jobs:
           set -Eeuo pipefail
           cd "$DEPLOY_DIR"
 
+          compose_command=(docker compose)
+          if ! "${compose_command[@]}" version >/dev/null 2>&1; then
+            compose_command=(/usr/libexec/docker/cli-plugins/docker-compose)
+            "${compose_command[@]}" version
+          fi
+
           printf 'IMAGE_TAG=%s\nAPP_BIND_PORT=%s\nBACKEND_URL=%s\n' "$IMAGE_TAG" "$APP_BIND_PORT" "$BACKEND_URL" > .deploy.env.tmp
           mv .deploy.env.tmp .deploy.env
           chmod 600 .deploy.env
 
-          docker compose \
-            --project-name "$PROJECT_NAME" \
-            --env-file .deploy.env \
-            -f docker-compose.prod.yml \
-            pull
+          compose() {
+            "${compose_command[@]}" --project-name "$PROJECT_NAME" --env-file .deploy.env -f docker-compose.prod.yml "$@"
+          }
 
-          docker compose \
-            --project-name "$PROJECT_NAME" \
-            --env-file .deploy.env \
-            -f docker-compose.prod.yml \
-            up -d --force-recreate --wait --wait-timeout 120 web
+          compose pull
+          compose up -d --force-recreate --wait --wait-timeout 120 web
 
           curl --fail --silent --show-error \
             "http://127.0.0.1:${APP_BIND_PORT}/"
 
-          docker compose \
-            --project-name "$PROJECT_NAME" \
-            --env-file .deploy.env \
-            -f docker-compose.prod.yml \
-            ps
+          compose ps
           REMOTE
 
           
