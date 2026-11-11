@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Check,
+  Clock3,
   CircleHelp,
   Download,
   LoaderCircle,
@@ -908,49 +909,44 @@ export default function EbayBulkEndPage() {
             {jobIsPreview && !previewExpired ? (
               <div className={styles.preview}>
                 <div className={styles.previewSummary}>
-                  <p>{interpolateEbayBulkEnd(copy.previewSummary, {
-                    listings: job.summary?.listing_count ?? job.matches.length,
-                    eans: job.summary?.matched_ean_count ?? new Set(job.matches.flatMap((match) => match.matches.map((value) => value.ean))).size,
-                  })}</p>
-                  <p>{interpolateEbayBulkEnd(copy.eligibleSummary, {
-                    eligible: job.summary?.eligible_count ?? job.matches.filter((match) => !match.risky && !match.auction_risky && !match.managed_by_benim).length,
-                    risky: job.summary?.risky_count ?? job.matches.filter((match) => (match.risky || match.auction_risky) && !match.managed_by_benim).length,
-                    managed: managedMatchCount,
-                    selected: selectedIds.length,
-                    selectedEans: selectedEanCount,
-                  })}</p>
-                  <p>{interpolateEbayBulkEnd(copy.previewExpires, {
+                  <div><span>{copy.previewFound}</span><strong>{job.summary?.listing_count ?? job.matches.length}</strong><small>{copy.uniqueListings}</small></div>
+                  <div><span>{copy.previewEligible}</span><strong>{job.summary?.eligible_count ?? job.matches.filter((match) => !match.risky && !match.auction_risky && !match.managed_by_benim && !match.identifier_conflict).length}</strong><small>{copy.previewEligibleHint}</small></div>
+                  <div><span><LockKeyhole aria-hidden /> BENIM DEPOM</span><strong>{managedMatchCount}</strong><small>{copy.previewProtectedHint}</small></div>
+                  <div className={styles.selectedStat}><span>{copy.previewSelected}</span><strong>{selectedIds.length}</strong><small>{selectedEanCount} EAN</small></div>
+                </div>
+                <p className={styles.previewExpiry}><Clock3 aria-hidden />{interpolateEbayBulkEnd(copy.previewExpires, {
                     time: job.preview_expires_at ? new Date(job.preview_expires_at).toLocaleTimeString(locale === "ru" ? "ru-RU" : "en-GB", { hour: "2-digit", minute: "2-digit" }) : copy.fifteenMinutes,
                   })}</p>
-                </div>
                 {unverifiedEans.length ? <p className={styles.warningBanner}><AlertTriangle aria-hidden />{copy.verificationFailed} {unverifiedEans.join(", ")}</p> : null}
                 {notIndexedEans.length ? <p className={styles.infoBanner}>{copy.coverageWarning} {notIndexedEans.join(", ")}</p> : null}
                 {job.matches.length ? (
                   <>
                     <div className={styles.tableTools}>
-                      <span>{job.matches.length} {copy.uniqueListings}</span>
+                      <span>{copy.previewSelectionHint}</span>
                       <button
-                        className={styles.textButton}
+                        className={styles.secondaryButton}
                         type="button"
                         onClick={() => setSelectedIds(job.matches.filter((match) => !match.managed_by_benim && !match.identifier_conflict && (!match.risky || includeVariations) && (!match.auction_risky || includeAuctionRisk)).map((match) => match.item_id))}
                       >
-                        {copy.selectAvailable}
+                        <Check aria-hidden />{copy.selectAvailable}
                       </button>
                     </div>
                     <div className={styles.tableFrame}>
-                      <table className={styles.resultsTable}>
-                        <thead><tr><th scope="col">{copy.selectLabel}</th><th scope="col">{copy.listing}</th><th scope="col">{copy.matchedEans}</th><th scope="col">{copy.accountStatus}</th><th scope="col">{copy.variations}</th><th scope="col">{copy.risk}</th></tr></thead>
+                      <table className={`${styles.resultsTable} ${styles.previewTable}`}>
+                        <thead><tr><th scope="col">{copy.selectLabel}</th><th scope="col">{copy.listing}</th><th scope="col">{copy.matchedEans}</th><th scope="col">{copy.previewCheck}</th></tr></thead>
                         <tbody>
                           {job.matches.map((match) => (
-                            <tr key={match.item_id}>
+                            <tr key={match.item_id} data-selected={selectedIds.includes(match.item_id)} data-protected={Boolean(match.managed_by_benim)}>
                               <td data-label={copy.selectLabel}>
-                                <input
-                                  type="checkbox"
-                                  aria-label={copy.selectItem + match.item_id}
-                                  checked={selectedIds.includes(match.item_id)}
-                                  disabled={Boolean(match.managed_by_benim || match.identifier_conflict) || (match.risky && !includeVariations) || (match.auction_risky && !includeAuctionRisk)}
-                                  onChange={() => toggleSelected(match.item_id)}
-                                />
+                                <label className={styles.rowSelection}>
+                                  <input
+                                    type="checkbox"
+                                    aria-label={copy.selectItem + match.item_id}
+                                    checked={selectedIds.includes(match.item_id)}
+                                    disabled={Boolean(match.managed_by_benim || match.identifier_conflict) || (match.risky && !includeVariations) || (match.auction_risky && !includeAuctionRisk)}
+                                    onChange={() => toggleSelected(match.item_id)}
+                                  />
+                                </label>
                               </td>
                               <td data-label={copy.listing}>
                                 <strong className={styles.itemTitle}>{match.title || copy.untitled}</strong>
@@ -958,25 +954,25 @@ export default function EbayBulkEndPage() {
                                 {match.sku ? <span className={styles.itemId}>{copy.skuLabel}{match.sku}</span> : null}
                                 <span className={styles.itemId}>{copy.matchType}{match.match_type?.includes("variation") ? match.match_type.includes("sku") ? copy.labelExactVariationSku : copy.labelExactVariationEan : match.match_type?.includes("sku") ? copy.labelExactSku : copy.labelExactEan}</span>
                                 <span className={styles.itemId}>{copy.seller}{match.seller_id || copy.sellerUnknown}</span>
+                                <span className={styles.itemId}>{job.account.toUpperCase()} · {match.listing_status || copy.eBayActive}{match.variation_count ? ` · ${copy.variations}: ${match.variation_count}` : ""}</span>
                                 {match.view_url ? <a className={styles.itemLink} href={match.view_url} target="_blank" rel="noreferrer">{copy.openEbay}</a> : null}
                               </td>
                               <td data-label={copy.matchedEans}>
                                 <div className={styles.eanTags}>
                                   {match.matches.map((value) => (
-                  <span className={value.type === "variation" ? styles.eanRisk : styles.eanTag} key={value.ean}>
+                                    <span className={value.type === "variation" ? styles.eanRisk : styles.eanTag} key={value.ean}>
                                       {value.ean}{value.type === "variation" ? copy.variation + (value.variation ? ": " + value.variation : "") : ""}
                                     </span>
                                   ))}
                                 </div>
                               </td>
-                              <td data-label={copy.accountStatus}>{job.account.toUpperCase()} · {match.listing_status || copy.eBayActive}</td>
-                              <td data-label={copy.variations}>{match.variation_count ?? 0}</td>
-                              <td data-label={copy.risk}>
+                              <td data-label={copy.previewCheck}>
                                 {match.identifier_conflict ? (
                                   <div className={styles.eanTags}><span className={styles.eanRisk}><AlertTriangle aria-hidden />{copy.identifierConflict}</span></div>
                                 ) : match.managed_by_benim ? (
                                   <div className={styles.eanTags}>
-                                    <span className={styles.managedBadge}><LockKeyhole aria-hidden /> {copy.managedListing}</span>
+                                    <span className={styles.managedBadge} title={copy.managedListing}><LockKeyhole aria-hidden /> {copy.previewProtected}</span>
+                                    <span className={styles.protectionNote}>{copy.previewProtectedHint}</span>
                                   </div>
                                 ) : match.risky || match.auction_risky ? (
                                   <div className={styles.eanTags}>
@@ -1007,7 +1003,7 @@ export default function EbayBulkEndPage() {
                       </label>
                     ) : null}
                     <div className={styles.confirmRow}>
-                      <p className={styles.fieldHint}>{copy.confirmStep}</p>
+                      <div className={styles.selectionSummary} aria-live="polite"><strong>{copy.previewSelected}: {selectedIds.length}<span> · {selectedEanCount} EAN</span></strong><p className={styles.fieldHint}>{copy.confirmStep}</p></div>
                       <button className={styles.dangerButton} type="button" disabled={busy || selectedIds.length === 0} onClick={() => { setActionError(""); setConfirmUnavailableReason(false); setConfirmOpen(true); }}>
                         {busy ? <LoaderCircle aria-hidden className={styles.spin} /> : <X aria-hidden />}
                         {interpolateEbayBulkEnd(copy.endSelected, { count: selectedIds.length })}
