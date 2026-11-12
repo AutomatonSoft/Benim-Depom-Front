@@ -696,6 +696,7 @@ export default function EbayBulkEndPage() {
     importing_report: copy.progressImportReport,
     verifying_report: copy.progressVerifyReport,
     verifying_candidates: copy.progressVerifyCandidates,
+    indexing_identifiers: copy.progressIndexIdentifiers,
   };
   const progressStage = progressStages[job?.progress.stage ?? ""] ?? copy.progressPreparing;
   const recoveringReport = job?.progress.stage === "recovering_report_request";
@@ -952,7 +953,7 @@ export default function EbayBulkEndPage() {
                                 <strong className={styles.itemTitle}>{match.title || copy.untitled}</strong>
                                 <span className={styles.itemId}>ItemID {match.item_id}</span>
                                 {match.sku ? <span className={styles.itemId}>{copy.skuLabel}{match.sku}</span> : null}
-                                <span className={styles.itemId}>{copy.matchType}{match.match_type?.includes("variation") ? match.match_type.includes("sku") ? copy.labelExactVariationSku : copy.labelExactVariationEan : match.match_type?.includes("sku") ? copy.labelExactSku : copy.labelExactEan}</span>
+                                <span className={styles.itemId}>{copy.matchType}{match.match_type?.includes("mpn") ? (match.match_type.includes("variation") ? copy.labelExactVariationMpn : copy.labelExactMpn) : match.match_type?.includes("variation") ? match.match_type.includes("sku") ? copy.labelExactVariationSku : copy.labelExactVariationEan : match.match_type?.includes("sku") ? copy.labelExactSku : copy.labelExactEan}</span>
                                 <span className={styles.itemId}>{copy.seller}{match.seller_id || copy.sellerUnknown}</span>
                                 <span className={styles.itemId}>{job.account.toUpperCase()} · {match.listing_status || copy.eBayActive}{match.variation_count ? ` · ${copy.variations}: ${match.variation_count}` : ""}</span>
                                 {match.view_url ? <a className={styles.itemLink} href={match.view_url} target="_blank" rel="noreferrer">{copy.openEbay}</a> : null}
