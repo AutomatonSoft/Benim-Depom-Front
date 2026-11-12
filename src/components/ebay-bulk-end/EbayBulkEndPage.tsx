@@ -21,14 +21,6 @@ import { setSessionItem } from "@/lib/browser-storage";
 import { useI18n } from "@/i18n";
 import { managerAccessStateForStatus } from "./ebayBulkEndAccess";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 import styles from "./EbayBulkEndPage.module.css";
 import { eanIsValid, parseEanTokens, parseEans } from "./ebayBulkEndEans";
@@ -160,9 +152,6 @@ export default function EbayBulkEndPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [includeVariations, setIncludeVariations] = useState(false);
   const [includeAuctionRisk, setIncludeAuctionRisk] = useState(false);
-  const [typedAccount, setTypedAccount] = useState("");
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmUnavailableReason, setConfirmUnavailableReason] = useState(false);
   const [cancelBusy, setCancelBusy] = useState(false);
 
   const rawEans = useMemo(() => parseEanTokens(eanInput), [eanInput]);
@@ -181,7 +170,6 @@ export default function EbayBulkEndPage() {
     setJob(null);
     setJobId("");
     setSelectedIds([]);
-    setConfirmOpen(false);
     // Retain the opaque job ID so its owner can recover it after signing in again.
     return true;
   }, []);
@@ -416,7 +404,6 @@ export default function EbayBulkEndPage() {
     setSelectedIds([]);
     setIncludeVariations(false);
     setIncludeAuctionRisk(false);
-    setTypedAccount("");
     try {
       const response = await authorizedFetch(apiRoot + "/scans/", {
         method: "POST",
@@ -456,13 +443,10 @@ export default function EbayBulkEndPage() {
   }
 
   async function confirmEnd() {
+    if (busy) return;
     setActionError("");
     if (!job || selectedIds.length === 0) {
       setActionError(copy.errors.selectListing);
-      return;
-    }
-    if (typedAccount !== job.account.toUpperCase()) {
-      setActionError(copy.errors.typeAccount);
       return;
     }
     const hasRiskySelection = job.matches.some(
@@ -477,10 +461,6 @@ export default function EbayBulkEndPage() {
       setActionError(copy.errors.auctionConsent);
       return;
     }
-    if (!confirmUnavailableReason) {
-      setActionError(copy.errors.reasonConsent);
-      return;
-    }
     setBusy(true);
     try {
       const response = await authorizedFetch(apiRoot + "/jobs/" + job.job_id + "/confirm/", {
@@ -488,10 +468,10 @@ export default function EbayBulkEndPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           item_ids: selectedIds,
-          typed_account: typedAccount,
+          typed_account: job.account.toUpperCase(),
           include_variations: includeVariations,
           include_auction_risk: includeAuctionRisk,
-          confirm_unavailable_reason: confirmUnavailableReason,
+          confirm_unavailable_reason: true,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as ApiPayload;
@@ -506,9 +486,6 @@ export default function EbayBulkEndPage() {
       setJob((current) =>
         current ? { ...current, kind: "end", status: "ending", progress: { current: 0, total: selectedIds.length } } : current,
       );
-      setConfirmOpen(false);
-      setConfirmUnavailableReason(false);
-      setTypedAccount("");
     } catch {
       setActionError(copy.errors.server);
     } finally {
@@ -708,10 +685,24 @@ export default function EbayBulkEndPage() {
   const unverifiedEans = job?.unmatched_eans.filter((ean) => job.unmatched_status_by_ean?.[ean] === "verification_failed") ?? [];
   const notIndexedEans = job?.unmatched_eans.filter((ean) => job.unmatched_status_by_ean?.[ean] !== "verification_failed") ?? [];
   const selectedEanCount = new Set(selectedMatches.flatMap((match) => match.matches.map((value) => value.ean))).size;
+  const listingIdsByEan = new Map<string, Set<string>>();
+  for (const listing of job?.matches ?? []) {
+    for (const { ean } of listing.matches) {
+      const ids = listingIdsByEan.get(ean) ?? new Set<string>();
+      ids.add(listing.item_id);
+      listingIdsByEan.set(ean, ids);
+    }
+  }
+  const repeatedEans = [...listingIdsByEan].filter(([, ids]) => ids.size > 1);
+  const eligibleMatches = job?.matches.filter((match) => !match.risky && !match.auction_risky && !match.managed_by_benim && !match.identifier_conflict) ?? [];
+  const eligibleEanCount = new Set(eligibleMatches.flatMap((match) => match.matches.map((value) => value.ean))).size;
   const managedMatchCount = job?.summary?.managed_listing_count ?? job?.matches.filter((match) => match.managed_by_benim).length ?? 0;
   const canStartScan = Boolean(
     account && connectedAccount?.connected && connectedAccount.refresh_token_valid && connections,
   );
+  const reportDateFormatter = new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-GB", {
+    dateStyle: "medium", timeStyle: "medium",
+  });
 
   return (
     <main className={styles.page}>
@@ -911,8 +902,8 @@ export default function EbayBulkEndPage() {
             {jobIsPreview && !previewExpired ? (
               <div className={styles.preview}>
                 <div className={styles.previewSummary}>
-                  <div><span>{copy.previewFound}</span><strong>{job.summary?.listing_count ?? job.matches.length}</strong><small>{copy.uniqueListings}</small></div>
-                  <div><span>{copy.previewEligible}</span><strong>{job.summary?.eligible_count ?? job.matches.filter((match) => !match.risky && !match.auction_risky && !match.managed_by_benim && !match.identifier_conflict).length}</strong><small>{copy.previewEligibleHint}</small></div>
+                  <div><span>{copy.previewFound}</span><strong>{job.matches.length}</strong><small>{interpolateEbayBulkEnd(copy.previewEanCoverage, { matched: listingIdsByEan.size, total: job.summary?.submitted_ean_count ?? listingIdsByEan.size + job.unmatched_eans.length })}</small></div>
+                  <div><span>{copy.previewEligible}</span><strong>{eligibleMatches.length}</strong><small>{eligibleEanCount} EAN · {copy.previewEligibleHint}</small></div>
                   <div><span><LockKeyhole aria-hidden /> BENIM DEPOM</span><strong>{managedMatchCount}</strong><small>{copy.previewProtectedHint}</small></div>
                   <div className={styles.selectedStat}><span>{copy.previewSelected}</span><strong>{selectedIds.length}</strong><small>{selectedEanCount} EAN</small></div>
                 </div>
@@ -921,6 +912,7 @@ export default function EbayBulkEndPage() {
                   })}</p>
                 {unverifiedEans.length ? <p className={styles.warningBanner}><AlertTriangle aria-hidden />{copy.verificationFailed} {unverifiedEans.join(", ")}</p> : null}
                 {notIndexedEans.length ? <p className={styles.infoBanner}>{copy.coverageWarning} {notIndexedEans.join(", ")}</p> : null}
+                {repeatedEans.length ? <p className={styles.infoBanner}>{copy.previewRepeatedEans} {repeatedEans.map(([ean, ids]) => `${ean} (${ids.size})`).join(", ")}</p> : null}
                 {job.matches.length ? (
                   <>
                     <div className={styles.tableTools}>
@@ -1006,7 +998,7 @@ export default function EbayBulkEndPage() {
                     ) : null}
                     <div className={styles.confirmRow}>
                       <div className={styles.selectionSummary} aria-live="polite"><strong>{copy.previewSelected}: {selectedIds.length}<span> · {selectedEanCount} EAN</span></strong><p className={styles.fieldHint}>{copy.confirmStep}</p></div>
-                      <button className={styles.dangerButton} type="button" disabled={busy || selectedIds.length === 0} onClick={() => { setActionError(""); setConfirmUnavailableReason(false); setConfirmOpen(true); }}>
+                      <button className={styles.dangerButton} type="button" disabled={busy || selectedIds.length === 0} onClick={() => void confirmEnd()}>
                         {busy ? <LoaderCircle aria-hidden className={styles.spin} /> : <X aria-hidden />}
                         {interpolateEbayBulkEnd(copy.endSelected, { count: selectedIds.length })}
                       </button>
@@ -1034,7 +1026,7 @@ export default function EbayBulkEndPage() {
                 <div className={styles.reportStats} aria-label={copy.reportSummary}>
                   <div><strong>{job.summary?.submitted_ean_count ?? 0}</strong><span>{copy.reportSubmitted}</span></div>
                   <div><strong>{job.summary?.listing_count ?? 0}</strong><span>{copy.reportListings}</span></div>
-                  <div><strong>{job.summary?.ended_item_count ?? job.results.filter((result) => result.status === "ended").length}</strong><span>{copy.reportEnded}</span></div>
+                  <div className={styles.reportSuccessStat}><strong>{job.summary?.ended_item_count ?? job.results.filter((result) => result.status === "ended").length}</strong><span>{copy.reportEnded}</span></div>
                   <div><strong>{job.summary?.failed_item_count ?? 0}</strong><span>{copy.reportFailed}</span></div>
                   <div><strong>{job.summary?.not_found_ean_count ?? job.unmatched_eans.length}</strong><span>{copy.reportNotFound}</span></div>
                   <div><strong>{job.summary?.uncertain_item_count ?? job.results.filter((result) => result.status === "uncertain").length}</strong><span>{copy.reportNeedsReview}</span></div>
@@ -1044,20 +1036,32 @@ export default function EbayBulkEndPage() {
                   <Download aria-hidden /> {copy.downloadCsv}
                 </button>
                 <div className={styles.tableFrame}>
-                  <table className={styles.resultsTable}>
-                    <thead><tr><th scope="col">{copy.listing}</th><th scope="col">{copy.account}</th><th scope="col">EAN</th><th scope="col">{copy.result}</th><th scope="col">{copy.details}</th></tr></thead>
+                  <table className={`${styles.resultsTable} ${styles.reportTable}`}>
+                    <thead><tr><th scope="col">{copy.listing}</th><th scope="col">EAN</th><th scope="col">{copy.result}</th><th scope="col">{copy.details}</th></tr></thead>
                     <tbody>
                       {(job.report_rows ?? job.results).map((result) => (
-                        <tr key={result.item_id || result.eans.join(",") + result.status}>
-                          <td data-label={copy.listing}><strong className={styles.itemTitle}>{result.title || copy.untitled}</strong>{result.item_id ? <span className={styles.itemId}>ItemID {result.item_id}</span> : null}</td>
-                          <td data-label={copy.account}>{job.account.toUpperCase()}</td>
-                          <td data-label="EAN">{result.eans.join(", ")}</td>
-                          <td data-label={copy.result}><span className={result.status === "ended" ? styles.safeBadge : styles.statusWarning}>{statusLabel(result.status, copy.status)}</span></td>
+                        <tr key={result.item_id || result.eans.join(",") + result.status} data-status={result.status}>
+                          <td data-label={copy.listing}>
+                            <strong className={styles.itemTitle}>{result.title || copy.untitled}</strong>
+                            <div className={styles.reportMeta}>
+                              <span className={styles.reportAccount} title={copy.account}>{job.account.toUpperCase()}</span>
+                              {result.item_id ? <span className={styles.itemId}>ItemID {result.item_id}</span> : null}
+                            </div>
+                          </td>
+                          <td data-label="EAN"><div className={styles.eanTags}>{result.eans.map((ean) => <span className={styles.eanTag} key={ean}>{ean}</span>)}</div></td>
+                          <td data-label={copy.result}>
+                            <span className={`${styles.reportStatus} ${result.status === "ended" ? styles.safeBadge : styles.statusWarning}`}>
+                              {result.status === "ended" ? <Check aria-hidden /> : <AlertTriangle aria-hidden />}
+                              {statusLabel(result.status, copy.status)}
+                            </span>
+                          </td>
                           <td data-label={copy.details}>
-                            {result.message}
-                            {result.error_code ? <span className={styles.itemId}>{copy.ebayCode}{result.error_code}</span> : null}
-                            {result.end_time ? <span className={styles.itemId}>{copy.ebayTime}{result.end_time}</span> : null}
-                            {result.finished_at ? <span className={styles.itemId}>{copy.processedAt}{new Date(result.finished_at).toLocaleString(locale === "ru" ? "ru-RU" : "en-GB")}</span> : null}
+                            {result.message ? <p className={styles.reportMessage}>{result.message}</p> : null}
+                            <dl className={styles.reportTimes}>
+                              {result.error_code ? <div><dt>{copy.ebayCode}</dt><dd className={styles.reportErrorCode}>{result.error_code}</dd></div> : null}
+                              {result.end_time ? <div><dt>{copy.ebayTime}</dt><dd><time dateTime={result.end_time} title={result.end_time}>{reportDateFormatter.format(new Date(result.end_time))}</time></dd></div> : null}
+                              {result.finished_at ? <div><dt>{copy.processedAt}</dt><dd><time dateTime={result.finished_at}>{reportDateFormatter.format(new Date(result.finished_at))}</time></dd></div> : null}
+                            </dl>
                           </td>
                         </tr>
                       ))}
@@ -1074,49 +1078,6 @@ export default function EbayBulkEndPage() {
           <span>{copy.footer}</span>
         </footer>
       </div>
-      {jobIsPreview && job ? (
-        <Dialog
-          open={confirmOpen}
-          onOpenChange={(open) => {
-            setConfirmOpen(open);
-            if (!open) {
-              setTypedAccount("");
-              setConfirmUnavailableReason(false);
-            }
-          }}
-        >
-          <DialogContent className={styles.confirmDialog}>
-            <DialogHeader>
-              <DialogTitle>{interpolateEbayBulkEnd(copy.confirmTitle, { count: selectedIds.length })}</DialogTitle>
-              <DialogDescription asChild>
-                <div className={styles.dialogContent}>
-              <p><strong>{copy.confirmAccount}</strong> {job.account.toUpperCase()} · {job.environment === "production" ? "Production" : "Sandbox"}</p>
-              <p><strong>{copy.confirmSelection}</strong> {selectedIds.length} ItemID, {selectedEanCount} EAN.</p>
-              <p>{copy.actionConsequence}</p>
-              <p>{copy.endingReason}</p>
-              {selectedMatches.some((match) => match.risky) ? <p className={styles.dialogWarning}>{copy.variationWarning}</p> : null}
-              {selectedMatches.some((match) => match.auction_risky) ? <p className={styles.dialogWarning}>{copy.auctionRiskWarning}</p> : null}
-              <label className={styles.dialogField}>
-                <span>{interpolateEbayBulkEnd(copy.typeAccountPrompt, { account: job.account.toUpperCase() })}</span>
-                <input value={typedAccount} onChange={(event) => setTypedAccount(event.target.value)} autoComplete="off" />
-              </label>
-              <label className={styles.dialogCheck}>
-                <input type="checkbox" checked={confirmUnavailableReason} onChange={(event) => setConfirmUnavailableReason(event.target.checked)} />
-                <span>{copy.unavailableReasonConsent}</span>
-              </label>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={busy}>{copy.backToPreview}</Button>
-              <Button variant="destructive" onClick={() => void confirmEnd()} disabled={busy || !typedAccount || !confirmUnavailableReason}>
-                {busy ? <LoaderCircle aria-hidden className={styles.spin} /> : <X aria-hidden />}
-                {interpolateEbayBulkEnd(copy.confirmAction, { count: selectedIds.length })}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
     </main>
   );
 }

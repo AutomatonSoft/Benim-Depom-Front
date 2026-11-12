@@ -12,9 +12,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useI18n } from "@/i18n";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
-import { ebayCardDimensions, ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft,
+import { ebayDisplayTitle, ebayDraftPayload, ebayListingUrl, newEbayDraft,
   type EbayAspectSchema, type EbayCategory, type EbayDraft,
-  type EbayPreparation, type EbaySnapshot, type EbayEnvironment, type EbayProduct, type EbayAspect,
+  type EbayPreparation, type EbaySnapshot, type EbayEnvironment, type EbayAspect,
 } from "@/lib/ebay";
 import { ottoCatalogLanguages } from "@/lib/listings";
 
@@ -185,7 +185,7 @@ export function EbayListingPanel() {
   </div>;
 }
 
-export function EbayCategoryPicker({ variants }: { variants: EbayProduct["variants"] }) {
+export function EbayCategoryPicker() {
   const { t, locale } = useI18n();
   const state = useEbay();
   const [language, setLanguage] = useState<string>(() => {
@@ -204,11 +204,8 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
   const [error, setError] = useState("");
   const categoryId = state.draft?.category_id;
   const fallback = useRef(t("ebay.error"));
-  const cardDimensions = ebayCardDimensions(variants?.[0]);
-  const automaticAspects = Object.fromEntries(Object.entries(cardDimensions).filter(([name]) => schema?.aspects.some((aspect) => aspect.localizedAspectName === name)));
-  const displayedAspects = { ...state.draft?.aspects, ...automaticAspects };
+  const displayedAspects = state.draft?.aspects || {};
   const editingAspect = schema?.aspects.find((aspect) => aspect.localizedAspectName === editingName);
-  const automatic = Boolean(automaticAspects[editingName]);
   const multiple = editingAspect?.aspectConstraint.itemToAspectCardinality === "MULTI";
   const freeText = editingAspect?.aspectConstraint.aspectMode !== "SELECTION_ONLY";
   const matchesQuery = (name: string, label = "") => `${name} ${label}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
@@ -222,10 +219,8 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
 
   function commitAspect() {
     if (!state.draft || !editingAspect) return;
-    if (!automatic) {
-      const values = draftValues.map((value) => value.trim()).filter(Boolean);
-      state.edit({ aspects: { ...state.draft.aspects, [editingName]: values } });
-    }
+    const values = draftValues.map((value) => value.trim()).filter(Boolean);
+    state.edit({ aspects: { ...state.draft.aspects, [editingName]: values } });
     setSheet(null);
   }
 
@@ -292,7 +287,7 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
           {schema?.aspects.filter((aspect) => aspect.aspectConstraint.aspectRequired || displayedAspects[aspect.localizedAspectName]?.some(Boolean)).map((aspect) => {
             const name = aspect.localizedAspectName;
             const values = displayedAspects[name] || [];
-            const freeText = !automaticAspects[name] && aspect.aspectConstraint.aspectMode === "FREE_TEXT";
+            const freeText = aspect.aspectConstraint.aspectMode === "FREE_TEXT";
             return <li key={name} className="flex items-stretch gap-2">
               <button type="button" className={`flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border bg-[#f8fafc] px-3 py-2 text-left hover:border-primary/30 ${freeText ? "border-[rgba(247,148,29,0.45)]" : "border-border"}`} onClick={() => openAspect(aspect)}>
                 <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
@@ -301,7 +296,7 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
                 </div>
                 <span className="truncate text-xs font-semibold text-muted-foreground">{values.map((value) => aspect.aspectValues?.find((item) => item.localizedValue === value)?.label || value).join(", ") || t("ebay.choose")}</span>
               </button>
-              {values.some(Boolean) && !automaticAspects[name] && <Button type="button" size="icon" variant="ghost" className="shrink-0 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-bg)]" aria-label={t("listing.removeAttribute")} onClick={() => {
+              {values.some(Boolean) && <Button type="button" size="icon" variant="ghost" className="shrink-0 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-bg)]" aria-label={t("listing.removeAttribute")} onClick={() => {
                 const aspects = { ...state.draft!.aspects };
                 delete aspects[name];
                 state.edit({ aspects });
@@ -322,7 +317,7 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
         <div className="grid shrink-0 gap-3 border-b border-border p-4">
           <DialogTitle className="pr-8 text-base font-extrabold text-primary">{sheet === "value" ? editingAspect?.label || editingName : t(sheet === "category" ? "ebay.category" : "ebay.aspects")}</DialogTitle>
           <DialogDescription className="sr-only">{t("ebay.categoryHint")}</DialogDescription>
-          {(sheet !== "value" || (!automatic && Boolean(editingAspect?.aspectValues?.length))) && <Input autoFocus={sheet !== "value" || !freeText} aria-label={t("common.search")} placeholder={t("common.search")} value={query} onChange={(event) => setQuery(event.target.value)} />}
+          {(sheet !== "value" || Boolean(editingAspect?.aspectValues?.length)) && <Input autoFocus={sheet !== "value" || !freeText} aria-label={t("common.search")} placeholder={t("common.search")} value={query} onChange={(event) => setQuery(event.target.value)} />}
         </div>
         <div className="min-h-0 flex-auto overflow-y-auto overscroll-contain">
         <fieldset disabled={loading || state.locked} className="grid min-w-0 gap-1 p-3">
@@ -344,10 +339,10 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
           {!schema.aspects.some((aspect) => matchesQuery(aspect.localizedAspectName, aspect.label)) && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t("listing.sheetEmpty")}</p>}
         </>}
         {sheet === "value" && editingAspect && <div className="grid gap-3 p-1">
-          {automatic ? <Input readOnly aria-label={editingAspect.label || editingName} value={automaticAspects[editingName][0]} /> : freeText ? multiple ?
+          {freeText ? multiple ?
             <Textarea autoFocus aria-label={editingAspect.label || editingName} rows={3} placeholder={t("ebay.multiple")} value={draftValues.join("\n")} onChange={(event) => setDraftValues(event.target.value.split("\n"))} /> :
             <Input autoFocus aria-label={editingAspect.label || editingName} maxLength={editingAspect.aspectConstraint.aspectMaxLength || 65} value={draftValues[0] || ""} onChange={(event) => setDraftValues([event.target.value])} /> : null}
-          {!automatic && <div className="grid gap-1">
+          <div className="grid gap-1">
             {editingAspect.aspectValues?.filter((item) => matchesQuery(item.localizedValue, item.label)).slice(0, 100).map((item) => {
               const checked = draftValues.includes(item.localizedValue);
               const toggle = () => setDraftValues(multiple ? checked ? draftValues.filter((value) => value !== item.localizedValue) : [...draftValues, item.localizedValue] : [item.localizedValue]);
@@ -356,7 +351,7 @@ export function EbayCategoryPicker({ variants }: { variants: EbayProduct["varian
               </label> : <button type="button" key={item.localizedValue} className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-primary hover:bg-secondary ${checked ? "bg-secondary" : ""}`} onClick={toggle}>{item.label || item.localizedValue}{checked && <Check className="size-4 shrink-0" aria-hidden />}</button>;
             })}
             {Boolean(editingAspect.aspectValues?.length) && !editingAspect.aspectValues?.some((item) => matchesQuery(item.localizedValue, item.label)) && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{t("listing.sheetEmpty")}</p>}
-          </div>}
+          </div>
         </div>}
         </fieldset>
         </div>
