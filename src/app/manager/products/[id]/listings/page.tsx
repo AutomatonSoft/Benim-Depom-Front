@@ -157,7 +157,7 @@ function ListingsWorkspace({ product }: { product: ProductSummary }) {
             productCache.delete(product.id);
           }}
         />
-        <EbayCategoryPicker variants={product.variants} />
+        <EbayCategoryPicker />
       </div>
       <div className="mt-4">
         <ProductPublishPanel productId={product.id} productStatus={product.status} />
