@@ -697,6 +697,7 @@ export default function EbayBulkEndPage() {
     verifying_report: copy.progressVerifyReport,
     verifying_candidates: copy.progressVerifyCandidates,
     indexing_identifiers: copy.progressIndexIdentifiers,
+    searching_identifiers: copy.progressSearchIdentifiers,
   };
   const progressStage = progressStages[job?.progress.stage ?? ""] ?? copy.progressPreparing;
   const recoveringReport = job?.progress.stage === "recovering_report_request";
@@ -891,7 +892,7 @@ export default function EbayBulkEndPage() {
                   <span style={job.progress.total == null ? undefined : { width: progressPercent + "%" }} />
                 </div>
                 <p>{job.progress.total != null
-                  ? interpolateEbayBulkEnd(copy.progressOf, { current: job.progress.current, total: job.progress.total }) + " " + (job.kind === "end" ? copy.listings : copy.listings)
+                  ? interpolateEbayBulkEnd(copy.progressOf, { current: job.progress.current, total: job.progress.total }) + " " + (job.progress.stage === "searching_identifiers" ? copy.searchRequests : copy.listings)
                   : progressStage}</p>
               </div>
             ) : null}
