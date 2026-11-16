@@ -16,7 +16,7 @@ import {
 } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelectMenu } from "@/components/ui/filter-select";
 import { Textarea } from "@/components/ui/textarea";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
@@ -132,10 +132,8 @@ export default function EansPage() {
           <form className="grid gap-3 p-5" onSubmit={importCodes}>
             <div>
               <Label htmlFor="ean-import-account">{t("eans.col.account")}</Label>
-              <FilterSelect id="ean-import-account" value={importAccount} onChange={(event) => setImportAccount(event.target.value)}>
-                <option value="jv">{t("eans.jvAccount")}</option>
-                <option value="xl">{t("eans.xlAccount")}</option>
-              </FilterSelect>
+              <FilterSelectMenu id="ean-import-account" value={importAccount} onValueChange={setImportAccount}
+                options={[{ value: "jv", label: t("eans.jvAccount") }, { value: "xl", label: t("eans.xlAccount") }]} />
             </div>
             <div>
               <Label htmlFor="ean-codes">{t("eans.col.ean")}</Label>
@@ -155,30 +153,26 @@ export default function EansPage() {
         <SectionCard>
           <SectionToolbar>
             <div className="flex flex-wrap gap-3">
-              <FilterSelect
+              <FilterSelectMenu
                 className="w-[160px]"
+                aria-label={t("eans.allAccounts")}
                 value={account}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   setPage(1);
-                  setAccount(event.target.value);
+                  setAccount(value);
                 }}
-              >
-                <option value="">{t("eans.allAccounts")}</option>
-                <option value="jv">JV</option>
-                <option value="xl">XL</option>
-              </FilterSelect>
-              <FilterSelect
+                options={[{ value: "", label: t("eans.allAccounts") }, { value: "jv", label: "JV" }, { value: "xl", label: "XL" }]}
+              />
+              <FilterSelectMenu
                 className="w-[180px]"
+                aria-label={t("eans.all")}
                 value={assigned}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   setPage(1);
-                  setAssigned(event.target.value);
+                  setAssigned(value);
                 }}
-              >
-                <option value="">{t("eans.all")}</option>
-                <option value="false">{t("eans.availableFilter")}</option>
-                <option value="true">{t("eans.assigned")}</option>
-              </FilterSelect>
+                options={[{ value: "", label: t("eans.all") }, { value: "false", label: t("eans.availableFilter") }, { value: "true", label: t("eans.assigned") }]}
+              />
             </div>
           </SectionToolbar>
 
