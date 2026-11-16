@@ -57,6 +57,7 @@ function FilterSelectMenu({ value, onValueChange, options, className, id, disabl
         </SelectPrimitive.Trigger>
         <SelectPrimitive.Portal>
           <SelectPrimitive.Content
+            data-slot="filter-select-menu"
             position="popper"
             side="bottom"
             avoidCollisions={false}
