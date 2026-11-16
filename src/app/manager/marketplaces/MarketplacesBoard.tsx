@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelect, FilterSelectMenu } from "@/components/ui/filter-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage, authorizedFetch } from "@/lib/api";
 import { formatDate } from "@/lib/date";
@@ -525,48 +525,43 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
             <h2>{t("marketplaces.recent")}</h2>
           </div>
           <div className="marketplace-filters">
-            <FilterSelect
+            <FilterSelectMenu
               aria-label={t("marketplaces.filterMarketplace")}
               value={marketplace}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setPublicationPage(1);
-                setMarketplace(event.target.value);
+                setMarketplace(value);
               }}
-            >
-              <option value="">{t("marketplaces.allMarketplaces")}</option>
-              <option value="otto">OTTO</option>
-              <option value="hood">Hood</option>
-              <option value="kaufland">Kaufland</option>
-              <option value="ebay">eBay</option>
-            </FilterSelect>
-            <FilterSelect
+              options={[
+                { value: "", label: t("marketplaces.allMarketplaces") },
+                { value: "otto", label: "OTTO" }, { value: "hood", label: "Hood" },
+                { value: "kaufland", label: "Kaufland" }, { value: "ebay", label: "eBay" },
+              ]}
+            />
+            <FilterSelectMenu
               aria-label={t("marketplaces.filterAccount")}
               value={account}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setPublicationPage(1);
-                setAccount(event.target.value);
+                setAccount(value);
               }}
-            >
-              <option value="">{t("marketplaces.allAccounts")}</option>
-              <option value="jv">JV</option>
-              <option value="xl">XL</option>
-              <option value="depotum">Depotum</option>
-            </FilterSelect>
-            <FilterSelect
+              options={[
+                { value: "", label: t("marketplaces.allAccounts") },
+                { value: "jv", label: "JV" }, { value: "xl", label: "XL" }, { value: "depotum", label: "Depotum" },
+              ]}
+            />
+            <FilterSelectMenu
               aria-label={t("marketplaces.filterStatus")}
               value={status}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setPublicationPage(1);
-                setStatus(event.target.value);
+                setStatus(value);
               }}
-            >
-              <option value="">{t("marketplaces.allStatuses")}</option>
-              {publicationStatusKeys.map((value) => (
-                <option key={value} value={value}>
-                  {t(`pub.${value === "removed" ? "deactivated" : value}` as MessageKey)}
-                </option>
-              ))}
-            </FilterSelect>
+              options={[
+                { value: "", label: t("marketplaces.allStatuses") },
+                ...publicationStatusKeys.map((value) => ({ value, label: t(`pub.${value === "removed" ? "deactivated" : value}` as MessageKey) })),
+              ]}
+            />
           </div>
         </div>
 
@@ -642,36 +637,30 @@ export function MarketplacesBoard({ initialQuery = "" }: { initialQuery?: string
             <h2>{t("marketplaces.jobsTitle")}</h2>
           </div>
           <div className="marketplace-filters">
-            <FilterSelect
+            <FilterSelectMenu
               aria-label={t("marketplaces.filterOperation")}
               value={jobOperation}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setJobPage(1);
-                setJobOperation(event.target.value);
+                setJobOperation(value);
               }}
-            >
-              <option value="">{t("marketplaces.allOperations")}</option>
-              {operationKeys.map((value) => (
-                <option key={value} value={value}>
-                  {t(`job.op.${value}` as MessageKey)}
-                </option>
-              ))}
-            </FilterSelect>
-            <FilterSelect
+              options={[
+                { value: "", label: t("marketplaces.allOperations") },
+                ...operationKeys.map((value) => ({ value, label: t(`job.op.${value}` as MessageKey) })),
+              ]}
+            />
+            <FilterSelectMenu
               aria-label={t("marketplaces.filterJobStatus")}
               value={jobStatus}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setJobPage(1);
-                setJobStatus(event.target.value);
+                setJobStatus(value);
               }}
-            >
-              <option value="">{t("marketplaces.allJobStatuses")}</option>
-              {jobStatusKeys.map((value) => (
-                <option key={value} value={value}>
-                  {t(`job.${value}` as MessageKey)}
-                </option>
-              ))}
-            </FilterSelect>
+              options={[
+                { value: "", label: t("marketplaces.allJobStatuses") },
+                ...jobStatusKeys.map((value) => ({ value, label: t(`job.${value}` as MessageKey) })),
+              ]}
+            />
           </div>
         </div>
 
