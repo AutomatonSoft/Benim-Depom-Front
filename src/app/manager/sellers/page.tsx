@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelectMenu } from "@/components/ui/filter-select";
 import { authorizedFetch, apiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
@@ -240,19 +240,20 @@ export default function SellersPage() {
               placeholder={isManagers ? t("sellers.managersSearchPlaceholder") : t("sellers.searchPlaceholder")}
             />
             {isManagers ? null : (
-              <FilterSelect
+              <FilterSelectMenu
                 className="w-[200px]"
                 aria-label={t("sellers.filterAria")}
                 value={activity}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   setPage(1);
-                  setActivity(event.target.value as SellerFilter);
+                  setActivity(value as SellerFilter);
                 }}
-              >
-                <option value="">{t("sellers.all")}</option>
-                <option value="active">{t("common.active")}</option>
-                <option value="pending">{t("sellers.pendingEmail")}</option>
-              </FilterSelect>
+                options={[
+                  { value: "", label: t("sellers.all") },
+                  { value: "active", label: t("common.active") },
+                  { value: "pending", label: t("sellers.pendingEmail") },
+                ]}
+              />
             )}
             <Button type="submit">{t("common.search")}</Button>
           </form>

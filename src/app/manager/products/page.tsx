@@ -7,7 +7,7 @@ import { Package } from "lucide-react";
 import { EmptyState, Feedback, PageContainer, PageHeader, PaginationBar, SectionCard, SectionToolbar, StatusBadge } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelectMenu } from "@/components/ui/filter-select";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate, formatTime } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
@@ -154,22 +154,19 @@ export default function ProductsPage() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t("products.searchPlaceholder")}
             />
-            <FilterSelect
+            <FilterSelectMenu
               className="w-[180px]"
               aria-label={t("products.statusAria")}
               value={status}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setPage(1);
-                setStatus(event.target.value);
+                setStatus(value);
               }}
-            >
-              <option value="">{t("products.allStatuses")}</option>
-              {statusFilterOptions.map((value) => (
-                <option key={value} value={value}>
-                  {t(`status.${value}` as MessageKey)}
-                </option>
-              ))}
-            </FilterSelect>
+              options={[
+                { value: "", label: t("products.allStatuses") },
+                ...statusFilterOptions.map((value) => ({ value, label: t(`status.${value}` as MessageKey) })),
+              ]}
+            />
             <Button type="submit">{t("common.search")}</Button>
           </form>
         </SectionToolbar>
