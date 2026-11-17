@@ -8,7 +8,7 @@ import { Feedback, PageContainer, PageHeader, SectionCard, SectionCardHeader } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelectMenu } from "@/components/ui/filter-select";
 import { apiErrorMessage, authorizedFetch, logoutSession } from "@/lib/api";
 import { TIMEZONE_STORAGE_KEY } from "@/lib/date";
 import { localeLabels, useI18n, type Locale } from "@/i18n";
@@ -206,23 +206,22 @@ export default function SettingsPage() {
               <h3 className="mb-1 text-sm font-extrabold text-primary">{t("settings.timezone")}</h3>
               <p className="mb-3 text-sm text-muted-foreground">{t("settings.timezoneCopy")}</p>
               <Label htmlFor="settings-timezone">{t("settings.timezone")}</Label>
-              <FilterSelect id="settings-timezone" value={timezone} onChange={(event) => changeTimezone(event.target.value)}>
-                {timezones.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </FilterSelect>
+              <FilterSelectMenu id="settings-timezone" value={timezone} onValueChange={changeTimezone} options={timezones} />
               <p className="mt-2 text-xs font-semibold text-[var(--ui-success)]">{t("settings.timezoneSaved", { tz: timezone })}</p>
             </div>
             <div>
               <h3 className="mb-1 text-sm font-extrabold text-primary">{t("settings.language")}</h3>
               <p className="mb-3 text-sm text-muted-foreground">{t("settings.languageCopy")}</p>
               <Label htmlFor="settings-language">{t("settings.language")}</Label>
-              <FilterSelect id="settings-language" value={locale} onChange={(event) => setLocale(event.target.value as Locale)}>
-                <option value="en">{localeLabels.en}</option>
-                <option value="ru">{localeLabels.ru}</option>
-              </FilterSelect>
+              <FilterSelectMenu
+                id="settings-language"
+                value={locale}
+                onValueChange={(value) => setLocale(value as Locale)}
+                options={[
+                  { value: "en", label: localeLabels.en },
+                  { value: "ru", label: localeLabels.ru },
+                ]}
+              />
               <p className="mt-2 text-xs font-semibold text-[var(--ui-success)]">{t("settings.languageSaved", { language: localeLabels[locale] })}</p>
             </div>
           </div>

@@ -7,7 +7,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { EmptyState, Feedback, PageFrame, PageHeader, PaginationBar, Panel, PanelToolbar, StatusBadge } from "@/components/manager/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelectMenu } from "@/components/ui/filter-select";
 import { authorizedFetch } from "@/lib/api";
 import { formatDate, formatTime } from "@/lib/date";
 import { useI18n, type MessageKey } from "@/i18n";
@@ -151,12 +151,6 @@ export default function SellerProductsPage() {
     }).format(Number(product.listing_price_eur));
   }
 
-  function eanCountLabel(product: Product) {
-    const eanCount = [product.ean_jv, product.ean_xl].filter((code) => Boolean(code?.trim())).length;
-    if (eanCount === 0) return "—";
-    return t("products.eanCount", { count: eanCount });
-  }
-
   const loadError = sellerIdValid ? error : t("sellerProducts.loadError");
   const subtitle = sellerName
     ? t("sellerProducts.namedSubtitle", { name: sellerName, count })
@@ -194,19 +188,20 @@ export default function SellerProductsPage() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t("sellerProducts.searchPlaceholder")}
             />
-            <FilterSelect
+            <FilterSelectMenu
               className="w-[180px]"
               aria-label={t("sellerProducts.filterAria")}
               value={availability}
-              onChange={(event) => {
+              onValueChange={(value) => {
                 setPage(1);
-                setAvailability(event.target.value);
+                setAvailability(value);
               }}
-            >
-              <option value="">{t("sellerProducts.all")}</option>
-              <option value="true">{t("common.active")}</option>
-              <option value="false">{t("common.inactive")}</option>
-            </FilterSelect>
+              options={[
+                { value: "", label: t("sellerProducts.all") },
+                { value: "true", label: t("common.active") },
+                { value: "false", label: t("common.inactive") },
+              ]}
+            />
             <Button type="submit">{t("common.search")}</Button>
           </form>
         </PanelToolbar>
@@ -229,7 +224,7 @@ export default function SellerProductsPage() {
               pageLabel={t("common.page", { page })}
             />
             <div className="overflow-x-auto">
-            <div className="grid min-w-[1160px] grid-cols-[minmax(260px,2fr)_140px_110px_90px_90px_140px_120px_140px] gap-3 border-b border-border bg-[#f8fafc] px-4 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+            <div className="grid min-w-[1160px] grid-cols-[minmax(260px,2fr)_140px_110px_110px_90px_140px_120px_140px] gap-3 border-b border-border bg-[#f8fafc] px-4 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
               <span>{t("products.col.product")}</span>
               <span>{t("products.col.status")}</span>
               <span>{t("sellerProducts.col.availability")}</span>
@@ -247,7 +242,11 @@ export default function SellerProductsPage() {
                 <Link
                   key={product.id}
                   href={`/manager/products/${product.id}`}
-                  className="grid min-w-[1160px] grid-cols-[minmax(260px,2fr)_140px_110px_90px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-4 py-3.5 transition-colors hover:bg-[#f8fafc]"
+                  draggable={false}
+                  onClick={(event) => {
+                    if (window.getSelection()?.toString()) event.preventDefault();
+                  }}
+                  className="grid min-w-[1160px] select-text grid-cols-[minmax(260px,2fr)_140px_110px_110px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-4 py-3.5 transition-colors hover:bg-[#f8fafc]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-muted-foreground">
@@ -271,7 +270,12 @@ export default function SellerProductsPage() {
                   <StatusBadge status={available ? "available" : "unavailable"}>
                     {available ? t("sellerProducts.available") : t("sellerProducts.unavailable")}
                   </StatusBadge>
-                  <strong className="text-sm font-bold text-primary">{eanCountLabel(product)}</strong>
+                  <strong className="text-[11px] font-bold tabular-nums tracking-tight text-primary">
+                    <span className="block">{product.ean_jv?.trim() || "—"}</span>
+                    {product.ean_jv?.trim() || product.ean_xl?.trim() ? (
+                      <span className="block">{product.ean_xl?.trim() || "—"}</span>
+                    ) : null}
+                  </strong>
                   <strong className="text-sm font-bold text-primary">{t("products.pcs", { count: product.total_quantity })}</strong>
                   <strong className="text-sm font-bold text-primary">
                     <span className="block">{formatPrice(product)}</span>
