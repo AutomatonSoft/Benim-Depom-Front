@@ -125,12 +125,6 @@ export default function ProductsPage() {
     }).format(Number(product.listing_price_eur));
   }
 
-  function eanCountLabel(product: Product) {
-    const count = [product.ean_jv, product.ean_xl].filter((code) => Boolean(code?.trim())).length;
-    if (count === 0) return "—";
-    return t("products.eanCount", { count });
-  }
-
   return (
     <PageContainer>
       <PageHeader
@@ -205,7 +199,11 @@ export default function ProductsPage() {
                 <Link
                   key={product.id}
                   href={`/manager/products/${product.id}`}
-                  className="grid min-w-[1100px] grid-cols-[minmax(280px,2fr)_140px_90px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-5 py-2.5 transition-colors hover:bg-[#f8fafc]"
+                  draggable={false}
+                  onClick={(event) => {
+                    if (window.getSelection()?.toString()) event.preventDefault();
+                  }}
+                  className="grid min-w-[1100px] select-text grid-cols-[minmax(280px,2fr)_140px_90px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-5 py-2.5 transition-colors hover:bg-[#f8fafc]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-secondary text-muted-foreground">
@@ -233,7 +231,12 @@ export default function ProductsPage() {
                     <StatusBadge status={product.status}>{t(`status.${product.status}` as MessageKey)}</StatusBadge>
                     {showPreviousReject ? <small className="text-[11px] font-bold text-[var(--ui-danger)]">{t("products.previouslyRejected")}</small> : null}
                   </div>
-                  <strong className="text-right text-sm font-bold tabular-nums text-primary">{eanCountLabel(product)}</strong>
+                  <strong className="text-right text-[11px] font-bold tabular-nums tracking-tight text-primary">
+                    <span className="block">{product.ean_jv?.trim() || "—"}</span>
+                    {product.ean_jv?.trim() || product.ean_xl?.trim() ? (
+                      <span className="block">{product.ean_xl?.trim() || "—"}</span>
+                    ) : null}
+                  </strong>
                   <strong className="text-right text-sm font-bold tabular-nums text-primary">{t("products.pcs", { count: product.total_quantity })}</strong>
                   <strong className="text-right text-sm font-bold tabular-nums text-primary">
                     <span className="block">{formatPrice(product)}</span>
