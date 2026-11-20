@@ -33,14 +33,19 @@ const nextConfig: NextConfig = {
       source: "/privacy_policy",
       destination: "/privacy_policy.html",
     };
+    const termsRewrite = {
+      source: "/terms_of_service",
+      destination: "/terms_of_service.html",
+    };
     // Dev only: browser calls /api/v1 on :3000, Next forwards to local Django.
     // Stage/prod builds use NODE_ENV=production, so this block stays empty and nginx keeps owning /api.
     // Two rules: Next strips trailing slashes from :path* unless the source/destination
     // explicitly keep them — Django APPEND_SLASH then 500s POSTs like /auth/login/.
-    if (!useLocalApiProxy) return [privacyRewrite];
+    if (!useLocalApiProxy) return [privacyRewrite, termsRewrite];
     const base = localBackend.replace(/\/$/, "");
     return [
       privacyRewrite,
+      termsRewrite,
       {
         source: "/api/:path*/",
         destination: `${base}/api/:path*/`,

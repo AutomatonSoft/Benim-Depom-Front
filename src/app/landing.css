@@ -149,6 +149,12 @@
 .bd-landing .privacy-nav-btn svg { width: 18px; height: 18px; }
 .bd-landing .btn-privacy { background: #fff; color: var(--blue); border-color: transparent; }
 .bd-landing .btn-privacy:hover { background: #f3f5f8; color: var(--blue-mid); }
+.bd-landing .terms-nav-btn { background: var(--blue); border-color: var(--blue); color: #fff; }
+.bd-landing .terms-nav-btn:hover { background: var(--blue-mid); border-color: var(--blue-mid); }
+.bd-landing .btn-terms { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,0.7); }
+.bd-landing .btn-terms:hover { background: rgba(255,255,255,0.14); border-color: #fff; }
+.bd-landing .mobile-nav .btn-terms { color: var(--blue); border-color: var(--blue); }
+.bd-landing .mobile-nav .btn-terms:hover { background: var(--surface-alt); }
 .bd-landing .menu-toggle { display: none; width: 42px; height: 42px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); align-items: center; justify-content: center; flex: none; }
 .bd-landing .menu-toggle svg { width: 20px; height: 20px; }
 
