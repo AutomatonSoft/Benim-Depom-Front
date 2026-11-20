@@ -55,6 +55,9 @@ export default function LandingPage() {
             <Link aria-label={t.privacyAria} className="privacy-nav-btn" href="/privacy_policy">
               <Ic name="shield" />
             </Link>
+            <Link aria-label={t.termsAria} className="privacy-nav-btn terms-nav-btn" href="/terms_of_service">
+              <Ic name="file" />
+            </Link>
             <button aria-label="Menu" className="menu-toggle" onClick={() => setMenuOpen((open) => !open)} type="button">
               <Ic name={menuOpen ? "x" : "menu"} />
             </button>
@@ -73,6 +76,9 @@ export default function LandingPage() {
           <a className="btn btn-primary btn-block" href="#download" onClick={closeMenu}><Ic name="download" />{t.nav.cta}</a>
           <Link className="btn btn-outline btn-block" href="/privacy_policy" onClick={closeMenu}>
             <span><Ic name="shield" />{t.finalcta.privacyBtn}</span>
+          </Link>
+          <Link className="btn btn-terms btn-block" href="/terms_of_service" onClick={closeMenu}>
+            <span><Ic name="file" />{t.finalcta.termsBtn}</span>
           </Link>
         </div>
       </div>
@@ -629,6 +635,7 @@ export default function LandingPage() {
                 <a className="btn btn-primary" href="#download"><Ic name="download" />{t.finalcta.btn1}</a>
                 <a className="btn btn-ghost-light" href={CONTACT.whatsappUrl} rel="noopener" target="_blank"><Ic name="whatsapp" />{t.finalcta.btn2}</a>
                 <Link className="btn btn-privacy" href="/privacy_policy"><span><Ic name="shield" />{t.finalcta.privacyBtn}</span></Link>
+                <Link className="btn btn-terms" href="/terms_of_service"><span><Ic name="file" />{t.finalcta.termsBtn}</span></Link>
               </div>
             </div>
           </div>

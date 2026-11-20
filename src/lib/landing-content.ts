@@ -28,6 +28,7 @@ export type IconName =
   | "upload"
   | "barcode"
   | "shield"
+  | "file"
   | "download"
   | "chevron"
   | "menu"
@@ -148,7 +149,7 @@ export type LandingDict = {
     mailBtn: string;
     mapNote: string;
   };
-  finalcta: { title: string; sub: string; btn1: string; btn2: string; privacyBtn: string };
+  finalcta: { title: string; sub: string; btn1: string; btn2: string; privacyBtn: string; termsBtn: string };
   impr: { eyebrow: string; title: string; company: string; address: string; back: string };
   legalDocs: { n: string; s: string; href?: string }[];
   footer: {
@@ -162,6 +163,7 @@ export type LandingDict = {
   };
   waFloat: string;
   privacyAria: string;
+  termsAria: string;
 };
 
 export const CONTACT = {
@@ -462,12 +464,13 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       btn1: "App herunterladen",
       btn2: "Über WhatsApp sprechen",
       privacyBtn: "Datenschutz",
+      termsBtn: "Nutzungsbedingungen",
     },
     impr: { eyebrow: "Rechtliches", title: "Impressum", company: "Unternehmen", address: "Adresse", back: "← Zurück zur Startseite" },
     legalDocs: [
       { n: "Datenschutz", s: "Privacy Policy", href: "/privacy_policy" },
       { n: "Cookie-Richtlinie", s: "Wird ergänzt" },
-      { n: "Nutzungsbedingungen", s: "Wird ergänzt" },
+      { n: "Nutzungsbedingungen", s: "Terms of Service", href: "/terms_of_service" },
       { n: "Widerrufs-/Verkaufsbedingungen", s: "Wird ergänzt, soweit relevant" },
     ],
     footer: {
@@ -481,6 +484,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
     },
     waFloat: "Über WhatsApp kontaktieren",
     privacyAria: "Datenschutzerklärung",
+    termsAria: "Nutzungsbedingungen",
   },
 
   /* ============================ ENGLISH ============================ */
@@ -760,12 +764,13 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       btn1: "Get the App",
       btn2: "Talk to Us on WhatsApp",
       privacyBtn: "Privacy Policy",
+      termsBtn: "Terms of Service",
     },
     impr: { eyebrow: "Legal", title: "Legal Notice", company: "Company", address: "Address", back: "← Back to home" },
     legalDocs: [
       { n: "Privacy Policy", s: "Available", href: "/privacy_policy" },
       { n: "Cookie Policy", s: "To be added" },
-      { n: "Terms of Use", s: "To be added" },
+      { n: "Terms of Service", s: "Available", href: "/terms_of_service" },
       { n: "Withdrawal / Sales Terms", s: "To be added, where relevant" },
     ],
     footer: {
@@ -779,6 +784,7 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
     },
     waFloat: "Contact us on WhatsApp",
     privacyAria: "Privacy Policy",
+    termsAria: "Terms of Service",
   },
 
   /* ============================ TÜRKÇE ============================ */
@@ -1057,12 +1063,13 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
       btn1: "Uygulamayı İndir",
       btn2: "WhatsApp'tan Bilgi Al",
       privacyBtn: "Gizlilik Politikası",
+      termsBtn: "Kullanım Şartları",
     },
     impr: { eyebrow: "Yasal Bilgiler", title: "Yasal Bildirim", company: "Şirket", address: "Adres", back: "← Ana sayfaya dön" },
     legalDocs: [
       { n: "Gizlilik Politikası", s: "Mevcut", href: "/privacy_policy" },
       { n: "Çerez Politikası", s: "Yakında eklenecek" },
-      { n: "Kullanım Şartları", s: "Yakında eklenecek" },
+      { n: "Kullanım Şartları", s: "Mevcut", href: "/terms_of_service" },
       { n: "İptal / Satış Koşulları", s: "İlgili olduğu ölçüde yakında eklenecek" },
     ],
     footer: {
@@ -1076,5 +1083,6 @@ export const LANDING_I18N: Record<LandingLang, LandingDict> = {
     },
     waFloat: "WhatsApp'tan Bilgi Al",
     privacyAria: "Gizlilik Politikası",
+    termsAria: "Kullanım Şartları",
   },
 };
