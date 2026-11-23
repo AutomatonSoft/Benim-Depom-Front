@@ -82,7 +82,17 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_DIR/docker-compose.prod.yml"
 
       - name: Deploy stage
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         run: |
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "IMAGE_TAG='$IMAGE_TAG' DEPLOY_DIR='$DEPLOY_DIR' PROJECT_NAME='$PROJECT_NAME' APP_BIND_PORT='$APP_BIND_PORT' BACKEND_URL='$BACKEND_URL' bash -s" < .github/scripts/deploy-frontend.sh
+          registry_config=$(ssh "$DEPLOY_USER@$DEPLOY_HOST" 'mktemp -d /tmp/benim-front-registry.XXXXXXXX')
+          [[ "$registry_config" =~ ^/tmp/benim-front-registry\.[a-zA-Z0-9]+$ ]]
+          cleanup_registry() {
+            ssh "$DEPLOY_USER@$DEPLOY_HOST" "rm -f '$registry_config/config.json' && rmdir '$registry_config'"
+          }
+          trap cleanup_registry EXIT
+          printf '%s' "$GHCR_TOKEN" | ssh "$DEPLOY_USER@$DEPLOY_HOST" "docker --config '$registry_config' login ghcr.io --username '$GHCR_USER' --password-stdin"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "DOCKER_CONFIG='$registry_config' IMAGE_TAG='$IMAGE_TAG' DEPLOY_DIR='$DEPLOY_DIR' PROJECT_NAME='$PROJECT_NAME' APP_BIND_PORT='$APP_BIND_PORT' BACKEND_URL='$BACKEND_URL' bash -s" < .github/scripts/deploy-frontend.sh
 
           

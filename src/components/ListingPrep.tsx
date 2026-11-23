@@ -43,6 +43,7 @@ type ConfigResponse = {
     shipping_profile_id?: string;
     category_id?: string;
     delivery?: number | string;
+    electrical_product?: boolean;
   };
 };
 
@@ -65,6 +66,7 @@ type ChannelDraft = {
   shippingProfileId: string;
   hoodCategoryId: string;
   delivery: string;
+  electrical: boolean;
 };
 
 type ChannelRecord = ChannelDraft & { error?: string };
@@ -93,6 +95,7 @@ function emptyDraft(): ChannelDraft {
     shippingProfileId: "",
     hoodCategoryId: "",
     delivery: "",
+    electrical: false,
   };
 }
 
@@ -110,6 +113,7 @@ function draftFromConfig(config: ConfigResponse["configuration"]): ChannelDraft 
     shippingProfileId: String(source.shipping_profile_id || "").trim(),
     hoodCategoryId: String(source.category_id || "").trim(),
     delivery: source.delivery == null || source.delivery === "" ? "" : String(source.delivery),
+    electrical: source.electrical_product === true,
   };
 }
 
@@ -125,7 +129,8 @@ function draftsEqual(left: ChannelDraft, right: ChannelDraft) {
     left.vat === right.vat &&
     left.shippingProfileId === right.shippingProfileId &&
     left.hoodCategoryId === right.hoodCategoryId &&
-    left.delivery === right.delivery
+    left.delivery === right.delivery &&
+    left.electrical === right.electrical
   );
 }
 
@@ -229,6 +234,7 @@ function toDraft(item: ChannelRecord | ChannelDraft): ChannelDraft {
     shippingProfileId: item.shippingProfileId,
     hoodCategoryId: item.hoodCategoryId,
     delivery: item.delivery,
+    electrical: item.electrical,
   };
 }
 
@@ -416,6 +422,7 @@ function ListingPrepFields({
               color,
               vat: vatValue,
               shipping_profile_id: shippingValue,
+              electrical_product: draft.electrical,
             }
           : channel.marketplace === "hood"
             ? {
@@ -578,7 +585,7 @@ function ListingPrepFields({
         {channel.marketplace === "otto" ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>{t("listing.ottoVat")}</Label>
+              <Label className="sm:min-h-8">{t("listing.ottoVat")}</Label>
               <FilterSelect value={vatValue} onChange={(event) => updateDraft({ vat: event.target.value })}>
                 <option value="">{t("listing.selectValue")}</option>
                 <option value="FULL">{t("listing.ottoVatFull")}</option>
@@ -588,7 +595,7 @@ function ListingPrepFields({
               <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.ottoVatHint")}</p>
             </div>
             <div>
-              <Label>{t("listing.ottoShipping")}</Label>
+              <Label className="sm:min-h-8">{t("listing.ottoShipping")}</Label>
               <FilterSelect
                 value={shippingValue}
                 onChange={(event) => updateDraft({ shippingProfileId: event.target.value })}
@@ -604,6 +611,19 @@ function ListingPrepFields({
               <p className="mt-1.5 text-xs font-semibold text-muted-foreground">{t("listing.ottoShippingHint")}</p>
             </div>
           </div>
+        ) : null}
+        {channel.marketplace === "otto" ? (
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-white px-4 py-3">
+            <input
+              type="checkbox"
+              className="size-4 shrink-0 cursor-pointer accent-[var(--accent)]"
+              checked={draft.electrical}
+              onChange={(event) => updateDraft({ electrical: event.target.checked })}
+            />
+            <span className="text-xs font-bold uppercase tracking-[0.04em] text-muted-foreground">
+              {t("listing.ottoElectrical")}
+            </span>
+          </label>
         ) : null}
         <div className="flex flex-wrap gap-3">
           <Button type="submit" variant="accent" disabled={saving || !dirty}>
