@@ -185,6 +185,11 @@ export function EbayListingPanel() {
   </div>;
 }
 
+// eBay.de "Möbel & Wohnen"; only Möbel (3197) and Beleuchtung (20697) are offered at the top level.
+const EBAY_ROOT_CATEGORY = "11700";
+const EBAY_TOP_CATEGORIES = ["3197", "20697"];
+const topCategories = (categories: EbayCategory[] = []) => categories.filter((item) => EBAY_TOP_CATEGORIES.includes(item.id));
+
 export function EbayCategoryPicker() {
   const { t, locale } = useI18n();
   const state = useEbay();
@@ -230,10 +235,10 @@ export function EbayCategoryPicker() {
       setLoading(true);
       try {
         const [tree, aspects] = await Promise.all([
-          request<{ categories: EbayCategory[] }>(`/api/v1/ebay/catalog/categories/?parent_id=3197&language=${language}`, fallback.current, { signal: controller.signal }),
+          request<{ categories: EbayCategory[] }>(`/api/v1/ebay/catalog/categories/?parent_id=${EBAY_ROOT_CATEGORY}&language=${language}`, fallback.current, { signal: controller.signal }),
           categoryId ? request<EbayAspectSchema>(`/api/v1/ebay/catalog/categories/${categoryId}/aspects/?language=${language}`, fallback.current, { signal: controller.signal }) : null,
         ]);
-        if (!controller.signal.aborted) { setCategories(tree?.categories || []); setSchema(aspects); setPath([]); setError(""); }
+        if (!controller.signal.aborted) { setCategories(topCategories(tree?.categories)); setSchema(aspects); setPath([]); setError(""); }
       } catch (failure) {
         if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : fallback.current);
       } finally { if (!controller.signal.aborted) setLoading(false); }
@@ -251,8 +256,8 @@ export function EbayCategoryPicker() {
         if (category.id !== categoryId) setSchema(null);
         setSheet(null);
       } else {
-        const result = await request<{ categories: EbayCategory[] }>(`/api/v1/ebay/catalog/categories/?language=${language}&parent_id=${category?.id || "3197"}`, t("ebay.error"));
-        setCategories(result?.categories || []); setPath(nextPath);
+        const result = await request<{ categories: EbayCategory[] }>(`/api/v1/ebay/catalog/categories/?language=${language}&parent_id=${category?.id || EBAY_ROOT_CATEGORY}`, t("ebay.error"));
+        setCategories(category ? result?.categories || [] : topCategories(result?.categories)); setPath(nextPath);
         setQuery("");
       }
     } catch (failure) { setError(failure instanceof Error ? failure.message : t("ebay.error")); }
@@ -323,7 +328,7 @@ export function EbayCategoryPicker() {
         <fieldset disabled={loading || state.locked} className="grid min-w-0 gap-1 p-3">
         {sheet === "category" && <>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void select()}>{t("ebay.furniture")}</Button>
+          <Button variant="secondary" onClick={() => void select()}>{t("ebay.allCategories")}</Button>
           {path.map((node, index) => <Button key={node.id} variant="secondary" onClick={() => void select(node, path.slice(0, index + 1))}>{node.label || node.name}</Button>)}
         </div>
         {categories.filter((item) => matchesQuery(item.name, item.label)).map((item) => <button type="button" className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-extrabold text-primary hover:bg-secondary" key={item.id} onClick={() => void select(item, [...path, item])}>{item.label || item.name}{!item.is_leaf && <ChevronRight className="size-4" aria-hidden />}</button>)}
