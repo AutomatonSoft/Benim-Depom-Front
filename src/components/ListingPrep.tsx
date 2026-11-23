@@ -9,7 +9,7 @@ import { EbayListingPanel } from "@/components/EbayListingPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FilterSelect } from "@/components/ui/filter-select";
+import { FilterSelect, FilterSelectMenu } from "@/components/ui/filter-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/i18n";
@@ -28,6 +28,14 @@ import {
   type ListingTarget,
 } from "@/lib/listings";
 import { materialPair, materialsPayload } from "@/lib/materials";
+import {
+  DANGEROUS_GOODS_ATTRIBUTE,
+  DANGEROUS_GOODS_RELEVANCE,
+  DEFAULT_DANGEROUS_GOODS_RELEVANCE,
+  DEFAULT_ELEKTROG_DEVICE_TYPE,
+  ELEKTROG_ATTRIBUTE,
+  ELEKTROG_DEVICE_TYPES,
+} from "@/lib/otto-compliance";
 import { cn } from "@/lib/utils";
 
 type ConfigResponse = {
@@ -44,6 +52,8 @@ type ConfigResponse = {
     category_id?: string;
     delivery?: number | string;
     electrical_product?: boolean;
+    elektrog_device_type?: string;
+    dangerous_goods_relevance?: string;
   };
 };
 
@@ -67,6 +77,8 @@ type ChannelDraft = {
   hoodCategoryId: string;
   delivery: string;
   electrical: boolean;
+  elektrogType: string;
+  dangerousGoods: string;
 };
 
 type ChannelRecord = ChannelDraft & { error?: string };
@@ -96,6 +108,8 @@ function emptyDraft(): ChannelDraft {
     hoodCategoryId: "",
     delivery: "",
     electrical: false,
+    elektrogType: DEFAULT_ELEKTROG_DEVICE_TYPE,
+    dangerousGoods: DEFAULT_DANGEROUS_GOODS_RELEVANCE,
   };
 }
 
@@ -114,6 +128,8 @@ function draftFromConfig(config: ConfigResponse["configuration"]): ChannelDraft 
     hoodCategoryId: String(source.category_id || "").trim(),
     delivery: source.delivery == null || source.delivery === "" ? "" : String(source.delivery),
     electrical: source.electrical_product === true,
+    elektrogType: source.elektrog_device_type || DEFAULT_ELEKTROG_DEVICE_TYPE,
+    dangerousGoods: source.dangerous_goods_relevance || DEFAULT_DANGEROUS_GOODS_RELEVANCE,
   };
 }
 
@@ -130,9 +146,25 @@ function draftsEqual(left: ChannelDraft, right: ChannelDraft) {
     left.shippingProfileId === right.shippingProfileId &&
     left.hoodCategoryId === right.hoodCategoryId &&
     left.delivery === right.delivery &&
-    left.electrical === right.electrical
+    left.electrical === right.electrical &&
+    left.elektrogType === right.elektrogType &&
+    left.dangerousGoods === right.dangerousGoods
   );
 }
+
+/** Fields that describe the product itself, so both OTTO accounts always share them. */
+const OTTO_SHARED_FIELDS = ["electrical", "elektrogType", "dangerousGoods"] as const;
+type OttoSharedPatch = Pick<ChannelDraft, (typeof OTTO_SHARED_FIELDS)[number]>;
+
+function pickShared(source: Partial<ChannelDraft>): Partial<OttoSharedPatch> {
+  const shared: Partial<OttoSharedPatch> = {};
+  for (const field of OTTO_SHARED_FIELDS) {
+    if (field in source) Object.assign(shared, { [field]: source[field] });
+  }
+  return shared;
+}
+
+const ottoTargets = listingTargets.filter((target) => target.marketplace === "otto");
 
 function kauflandMode(publications: Publication[], account: Account): "create" | "update" {
   const live = publications.some(
@@ -235,6 +267,8 @@ function toDraft(item: ChannelRecord | ChannelDraft): ChannelDraft {
     hoodCategoryId: item.hoodCategoryId,
     delivery: item.delivery,
     electrical: item.electrical,
+    elektrogType: item.elektrogType,
+    dangerousGoods: item.dangerousGoods,
   };
 }
 
@@ -393,7 +427,17 @@ function ListingPrepFields({
   }
 
   function updateDraft(patch: Partial<ChannelDraft>) {
-    setDrafts((current) => ({ ...current, [key]: { ...draft, ...patch } }));
+    const shared = channel.marketplace === "otto" ? pickShared(patch) : {};
+    setDrafts((current) => {
+      const next = { ...current, [key]: { ...draft, ...patch } };
+      if (Object.keys(shared).length) {
+        for (const target of ottoTargets) {
+          const otherKey = listingTargetKey(target);
+          if (otherKey !== key) next[otherKey] = { ...(current[otherKey] || emptyDraft()), ...shared };
+        }
+      }
+      return next;
+    });
     setNotice("");
   }
 
@@ -423,6 +467,8 @@ function ListingPrepFields({
               vat: vatValue,
               shipping_profile_id: shippingValue,
               electrical_product: draft.electrical,
+              elektrog_device_type: draft.elektrogType,
+              dangerous_goods_relevance: draft.dangerousGoods,
             }
           : channel.marketplace === "hood"
             ? {
@@ -445,6 +491,31 @@ function ListingPrepFields({
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(apiErrorMessage(data, t("listing.saveFailed")));
+      const sharedBaseline: Record<string, Partial<OttoSharedPatch>> = {};
+      if (channel.marketplace === "otto") {
+        const shared = {
+          electrical: draft.electrical,
+          elektrogType: draft.elektrogType,
+          dangerousGoods: draft.dangerousGoods,
+        };
+        for (const target of ottoTargets) {
+          const otherKey = listingTargetKey(target);
+          if (otherKey === key) continue;
+          const sibling = await authorizedFetch(listingConfigPath(productId, target), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              electrical_product: shared.electrical,
+              elektrog_device_type: shared.elektrogType,
+              dangerous_goods_relevance: shared.dangerousGoods,
+            }),
+          });
+          if (!sibling.ok) {
+            throw new Error(apiErrorMessage(await sibling.json().catch(() => null), t("listing.saveFailed")));
+          }
+          sharedBaseline[otherKey] = shared;
+        }
+      }
       const next = {
         ...draft,
         title,
@@ -453,7 +524,13 @@ function ListingPrepFields({
           : {}),
       };
       setDrafts((current) => ({ ...current, [key]: next }));
-      setBaselines((current) => ({ ...current, [key]: next }));
+      setBaselines((current) => {
+        const updated = { ...current, [key]: next };
+        for (const [otherKey, shared] of Object.entries(sharedBaseline)) {
+          updated[otherKey] = { ...(current[otherKey] || emptyDraft()), ...shared };
+        }
+        return updated;
+      });
       if (channel.marketplace === "otto") {
         await ensureOttoListingDefaults(productId, authorizedFetch);
       }
@@ -624,6 +701,34 @@ function ListingPrepFields({
               {t("listing.ottoElectrical")}
             </span>
           </label>
+        ) : null}
+        {channel.marketplace === "otto" && draft.electrical ? (
+          <div className="grid gap-4 rounded-xl border border-border bg-[#f8fafc] p-4">
+            <div>
+              <strong className="text-sm font-extrabold text-primary">{t("listing.ottoComplianceTitle")}</strong>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">{t("listing.ottoComplianceHint")}</p>
+            </div>
+            <div>
+              <Label htmlFor="otto-elektrog">{ELEKTROG_ATTRIBUTE}</Label>
+              <FilterSelectMenu
+                id="otto-elektrog"
+                wrap
+                value={draft.elektrogType}
+                onValueChange={(value) => updateDraft({ elektrogType: value })}
+                options={ELEKTROG_DEVICE_TYPES}
+              />
+            </div>
+            <div>
+              <Label htmlFor="otto-gefahrgut">{DANGEROUS_GOODS_ATTRIBUTE}</Label>
+              <FilterSelectMenu
+                id="otto-gefahrgut"
+                wrap
+                value={draft.dangerousGoods}
+                onValueChange={(value) => updateDraft({ dangerousGoods: value })}
+                options={DANGEROUS_GOODS_RELEVANCE}
+              />
+            </div>
+          </div>
         ) : null}
         <div className="flex flex-wrap gap-3">
           <Button type="submit" variant="accent" disabled={saving || !dirty}>
