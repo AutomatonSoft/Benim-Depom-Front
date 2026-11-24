@@ -75,7 +75,15 @@ type ProductImage = {
     status?: string;
     payload?: { product_id?: string };
   } | null;
-  generated_images: Array<{ id: number; image: string; preview?: string | null; thumbnail?: string | null; mode: string }>;
+  generated_images: Array<{
+    id: number;
+    image: string;
+    preview?: string | null;
+    thumbnail?: string | null;
+    mode: string;
+    regen_status?: string;
+    regen_error?: string;
+  }>;
 };
 
 type PricingFormula = {
@@ -234,9 +242,19 @@ function isGenerationInProgress(status?: string) {
   return status === "queued" || status === "running";
 }
 
-function isImageGenerationInProgress(image?: Pick<ProductImage, "processing_status" | "xl_cover_status">) {
-  const active = new Set(["pending", "processing", "result_received"]);
-  return Boolean(image && (active.has(image.processing_status) || active.has(image.xl_cover_status ?? "")));
+const ACTIVE_IMAGE_STATUSES = new Set(["pending", "processing", "result_received"]);
+
+function isSlotRegenerating(generated?: ProductImage["generated_images"][number]) {
+  return ACTIVE_IMAGE_STATUSES.has(generated?.regen_status ?? "");
+}
+
+function isImageGenerationInProgress(image?: Pick<ProductImage, "processing_status" | "xl_cover_status" | "generated_images">) {
+  return Boolean(
+    image &&
+      (ACTIVE_IMAGE_STATUSES.has(image.processing_status) ||
+        ACTIVE_IMAGE_STATUSES.has(image.xl_cover_status ?? "") ||
+        image.generated_images?.some(isSlotRegenerating)),
+  );
 }
 
 function BackgroundProgress({ label, status, readyLabel = "Ready", failedLabel = "Failed" }: { label: string; status: string; readyLabel?: string; failedLabel?: string }) {
@@ -277,6 +295,8 @@ function MarketplaceGeneratedImageSlot({
   onAdd,
   onDelete,
   onRegenerate,
+  onRefresh,
+  refreshDisabled,
   disabled,
   replacing,
   adding,
@@ -297,6 +317,9 @@ function MarketplaceGeneratedImageSlot({
   onAdd?: (event: ChangeEvent<HTMLInputElement>) => void;
   onDelete?: () => void;
   onRegenerate?: () => void;
+  /** Regenerate only this filled slot; shown as a small icon on the photo. */
+  onRefresh?: () => void;
+  refreshDisabled?: boolean;
   disabled?: boolean;
   replacing?: boolean;
   adding?: boolean;
@@ -309,16 +332,43 @@ function MarketplaceGeneratedImageSlot({
   emptyActionLabel?: string;
 }) {
   const { t } = useI18n();
-  const inProgress = ["pending", "processing", "result_received"].includes(status);
+  const inProgress = ACTIVE_IMAGE_STATUSES.has(status);
+  const regenerating = isSlotRegenerating(image);
   const actionClassName = "inline-flex min-h-9 w-full min-w-0 items-center justify-center gap-2 whitespace-normal rounded-lg border border-border px-3 py-2 text-center text-xs font-bold leading-snug text-primary transition-colors hover:bg-secondary focus-within:ring-2 focus-within:ring-ring disabled:opacity-50 [&_svg]:shrink-0";
   return (
     <article className="grid min-w-0 content-start gap-2 rounded-xl border border-border bg-card p-3">
       <strong className="text-sm font-extrabold text-primary">{title}</strong>
       {image ? (
-        <button type="button" className="relative aspect-square w-full overflow-hidden rounded-lg border border-border" onClick={onOpen}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.preview || image.image} alt={title} loading="lazy" decoding="async" className="size-full object-cover" />
-        </button>
+        <div className="relative">
+          <button type="button" className="relative block aspect-square w-full overflow-hidden rounded-lg border border-border" onClick={onOpen}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image.preview || image.image}
+              alt={title}
+              loading="lazy"
+              decoding="async"
+              className={cn("size-full object-cover transition-[filter,opacity] duration-300", regenerating && "opacity-60 blur-[2px]")}
+            />
+          </button>
+          {onRefresh ? (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshDisabled || regenerating}
+              aria-label={regenerating ? t("product.photoRegenerating") : t("product.regeneratePhoto")}
+              title={regenerating ? t("product.photoRegenerating") : t("product.regeneratePhoto")}
+              className={cn(
+                "absolute right-2 top-2 grid size-8 place-items-center rounded-full border border-border/60 bg-card/85 text-primary shadow-sm backdrop-blur-sm",
+                "transition-[transform,background-color,opacity] duration-200 hover:scale-105 hover:bg-card active:scale-95",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "disabled:cursor-not-allowed disabled:hover:scale-100",
+                refreshDisabled && !regenerating && "opacity-50",
+              )}
+            >
+              <RefreshCw className={cn("size-3.5", regenerating && "animate-spin")} />
+            </button>
+          ) : null}
+        </div>
       ) : inProgress ? (
         <div className="aspect-square animate-pulse rounded-lg bg-secondary" aria-label={status} />
       ) : (
@@ -966,10 +1016,15 @@ export default function ProductWorkspacePage() {
   );
   const activeImage = product?.images.find((image) => isImageGenerationInProgress(image));
   const activeImageGenerationStatus = activeImage
-    ? ["pending", "processing", "result_received"].includes(activeImage.processing_status)
+    ? ACTIVE_IMAGE_STATUSES.has(activeImage.processing_status)
       ? activeImage.processing_status
-      : activeImage.xl_cover_status
+      : ACTIVE_IMAGE_STATUSES.has(activeImage.xl_cover_status ?? "")
+        ? activeImage.xl_cover_status
+        : activeImage.generated_images.find(isSlotRegenerating)?.regen_status
     : undefined;
+  // Single-slot regeneration only waits for the 3-photo batch, so different
+  // slots can be regenerated in parallel.
+  const coverBatchInProgress = ACTIVE_IMAGE_STATUSES.has(coverImage?.processing_status ?? "");
   const descriptionGenerationInProgress = isGenerationInProgress(generation?.status);
   const generationContent = generation?.status === "succeeded" ? generation.result?.universal?.content : undefined;
 
@@ -1015,6 +1070,22 @@ export default function ProductWorkspacePage() {
   function openGeneratedImage(mode: string) {
     const generated = generatedCoverByMode.get(mode);
     if (generated) setSelectedImageKey(`generated-${generated.id}`);
+  }
+
+  /** Props for the small ↻ button on a filled JV cover / interior / human slot. */
+  function slotRefreshProps(mode: "white" | "interior" | "human") {
+    const generated = generatedCoverByMode.get(mode);
+    if (!generated || !coverImage || product?.status !== "approved") return {};
+    return {
+      onRefresh: () => void regenerateGeneratedPhoto(coverImage.id, generated.id),
+      refreshDisabled: saving || coverBatchInProgress,
+    };
+  }
+
+  /** A failed single-slot regeneration shows its own error under the photo. */
+  function slotError(mode: "white" | "interior" | "human", fallback?: string) {
+    const generated = generatedCoverByMode.get(mode);
+    return generated?.regen_status === "failed" ? generated.regen_error : fallback;
   }
 
   // Sync the editable draft with the latest generation result during render,
@@ -1749,6 +1820,21 @@ export default function ProductWorkspacePage() {
       if (!response.ok) throw new Error(data.detail || "Image generation could not be started.");
       setFeedback(t(mode === "xl_cover" ? "product.xlCoverStarted" : "product.imageGenStarted")); await loadProduct();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Image generation could not be started."); }
+    finally { setSaving(false); }
+  }
+
+  /** Regenerate one JV cover / interior / human photo with Gemini. */
+  async function regenerateGeneratedPhoto(imageId: number, generatedId: number) {
+    setSaving(true); setError(""); setFeedback("");
+    try {
+      const response = await authorizedFetch(
+        `/api/v2/products/${productId}/images/${imageId}/generated/${generatedId}/regenerate/`,
+        { method: "POST" },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || t("product.imageGenFailed"));
+      setFeedback(t("product.photoRegenStarted")); await loadProduct({ silent: true });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : t("product.imageGenFailed")); }
     finally { setSaving(false); }
   }
 
@@ -2509,7 +2595,8 @@ export default function ProductWorkspacePage() {
                       title={t("product.jvCover")}
                       image={generatedCoverByMode.get("white")}
                       status={coverImage.processing_status}
-                      error={coverImage.processing_error}
+                      error={slotError("white", coverImage.processing_error)}
+                      {...slotRefreshProps("white")}
                       onOpen={() => openGeneratedImage("white")}
                       onAdd={(event) => void addGeneratedPhoto("white", event)}
                       adding={replacingPhotoKey === "add-white"}
@@ -2556,6 +2643,8 @@ export default function ProductWorkspacePage() {
                         title={t("product.interiorPhoto")}
                         image={generatedCoverByMode.get("interior")}
                         status={coverImage.processing_status}
+                        error={slotError("interior")}
+                        {...slotRefreshProps("interior")}
                         onOpen={() => openGeneratedImage("interior")}
                         onAdd={(event) => void addGeneratedPhoto("interior", event)}
                         adding={replacingPhotoKey === "add-interior"}
@@ -2574,7 +2663,8 @@ export default function ProductWorkspacePage() {
                         title={t("product.humanPhoto")}
                         image={generatedCoverByMode.get("human")}
                         status={coverImage.processing_status}
-                        error={undefined}
+                        error={slotError("human")}
+                        {...slotRefreshProps("human")}
                         onOpen={() => openGeneratedImage("human")}
                         onAdd={(event) => void addGeneratedPhoto("human", event)}
                         adding={replacingPhotoKey === "add-human"}
