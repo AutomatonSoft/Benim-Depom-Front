@@ -15,7 +15,7 @@ import { makeSellerPhotoPrimary, reorderSellerPhoto } from "@/lib/seller-product
 import { Input } from "@/components/ui/input";
 import { sellerMaterialInputs, sellerMaterials, sellerProductFormData, sellerProductReviewFields, sellerProductTypeLabel, sellerProductTypes, sellerProductVariant, sellerSetPartsPayload } from "@/lib/seller-product-form";
 
-const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"]] as const;
+const cities = [["IST", "Istanbul"], ["ANK", "Ankara"], ["IZM", "Izmir"], ["BUR", "Bursa"], ["KSY", "Kars"], ["INE", "Inegol"], ["ITA", "Italy"], ["POL", "Poland"]] as const;
 type Fields = {
   title: string;
   description: string;
@@ -543,8 +543,8 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
             {heading("Stock and warehouse", Warehouse, "orange")}
             <div className="seller-form-grid">
               {field("quantity", "Stock quantity", "number")}
-              <div className="seller-field seller-warehouse-city-field"><span>{t("Warehouse city (required)")}</span>
-                <SellerSelect ariaLabel={t("Warehouse city")} aria-required aria-invalid={Boolean(fieldErrors.warehouse_city)} aria-describedby={fieldErrors.warehouse_city ? "seller-warehouse-city-error" : undefined} value={fields.warehouse_city} onValueChange={value => set("warehouse_city", value)} placeholder={t("Choose a warehouse city")} options={cities.map(([value, label]) => ({ value, label: t(label) }))} />
+              <div className="seller-field seller-warehouse-city-field"><span>{t("Warehouse location (required)")}</span>
+                <SellerSelect ariaLabel={t("Warehouse location")} aria-required aria-invalid={Boolean(fieldErrors.warehouse_city)} aria-describedby={fieldErrors.warehouse_city ? "seller-warehouse-city-error" : undefined} value={fields.warehouse_city} onValueChange={value => set("warehouse_city", value)} placeholder={t("Choose a warehouse location")} options={cities.map(([value, label]) => ({ value, label: t(label) }))} />
                 {fieldErrors.warehouse_city && <small id="seller-warehouse-city-error" className="seller-field-error">{fieldErrors.warehouse_city}</small>}
               </div>
             </div>

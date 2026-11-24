@@ -100,7 +100,7 @@ type Product = {
   product_type: string;
   unit_price: string;
   currency: "TRY" | "EUR" | "USD";
-  warehouse_city?: "IST" | "ANK" | "IZM" | "BUR" | "KSY" | "INE";
+  warehouse_city?: "IST" | "ANK" | "IZM" | "BUR" | "KSY" | "INE" | "ITA" | "POL";
   listing_price_eur?: string | null;
   listing_price_eur_override?: string | null;
   pricing_overrides?: Record<string, unknown>;
@@ -365,6 +365,8 @@ const warehouseLabels: Record<string, string> = {
   BUR: "Bursa",
   KSY: "Kars",
   INE: "Inegol",
+  ITA: "Italy",
+  POL: "Poland",
 };
 
 function formatMoney(amount: string, currency: string) {
@@ -385,7 +387,10 @@ function sellerPriceEur(product: Product) {
   return formatMoney(String(amount / rate), "EUR");
 }
 
-const cityOrder = ["IST", "ANK", "IZM", "BUR", "KSY", "INE"] as const;
+const warehouseGroups = [
+  { titleKey: "formula.warehousesTurkey", cities: ["IST", "ANK", "IZM", "BUR", "KSY", "INE"] },
+  { titleKey: "formula.warehousesEurope", cities: ["ITA", "POL"] },
+] as const;
 
 function FormulaEditorDialog({
   product,
@@ -514,14 +519,19 @@ function FormulaEditorDialog({
           </section>
           <section className="grid gap-3">
             <h3 className="text-sm font-extrabold text-primary">{t("formula.cityTariffs")}</h3>
-            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-              {cityOrder.map((city) => (
-                <div key={city}>
-                  <Label>{warehouseLabels[city]}</Label>
-                  <Input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} />
+            {warehouseGroups.map((group) => (
+              <div className="grid gap-2" key={group.titleKey}>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{t(group.titleKey)}</p>
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  {group.cities.map((city) => (
+                    <div key={city}>
+                      <Label>{warehouseLabels[city]}</Label>
+                      <Input required step="0.01" min="0" type="number" value={String(draft.city_tariffs_eur_per_cbm[city] ?? "")} onChange={(event) => setCity(city, event.target.value)} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </section>
           <section className="grid gap-3">
             <h3 className="text-sm font-extrabold text-primary">{t("formula.deDelivery")}</h3>
