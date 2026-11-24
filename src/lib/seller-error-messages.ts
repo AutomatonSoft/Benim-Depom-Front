@@ -120,7 +120,7 @@ const fieldLabels: Record<string, string> = {
   password: "Password", password_confirm: "Confirm password", current_password: "Current password",
   new_password: "New password", new_password_confirm: "Confirm new password", preferred_language: "Preferred language",
   language: "Preferred language", title: "Product title", product_type: "Product type", unit_price: "Unit price",
-  currency: "Currency", warehouse_city: "Warehouse city", color: "Color", materials: "Materials",
+  currency: "Currency", warehouse_city: "Warehouse location", color: "Color", materials: "Materials",
   material_composition: "Material composition", length_cm: "Length (cm)", width_cm: "Width (cm)", height_cm: "Height (cm)",
   quantity: "Stock quantity", description: "Part description", images: "Product photos", image: "Product photos", image_ids: "Product photos",
   change_comment: "Comment for reviewer", comment: "Comment", seller_comment: "Comment", code: "Verification code",
