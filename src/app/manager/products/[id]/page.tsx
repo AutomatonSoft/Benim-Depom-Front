@@ -109,6 +109,9 @@ type Product = {
   unit_price: string;
   currency: "TRY" | "EUR" | "USD";
   warehouse_city?: "IST" | "ANK" | "IZM" | "BUR" | "KSY" | "INE" | "ITA" | "POL";
+  cbm?: string | null;
+  cbm_calculated?: string | null;
+  cbm_override?: string | null;
   listing_price_eur?: string | null;
   listing_price_eur_override?: string | null;
   pricing_overrides?: Record<string, unknown>;
@@ -2446,6 +2449,19 @@ export default function ProductWorkspacePage() {
               <p className="text-base font-bold text-primary">
                 {t("product.warehouse", { city: product.warehouse_city ? (warehouseLabels[product.warehouse_city] ?? product.warehouse_city) : "—" })}
               </p>
+              {product.cbm ? (
+                <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-primary">
+                  {t("product.volume", { cbm: product.cbm })}
+                  {product.cbm_override ? (
+                    <span className="rounded-md bg-[var(--ui-orange-soft)] px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[var(--ui-orange-2)]">
+                      {t("shortDesc.manual")}
+                    </span>
+                  ) : null}
+                  {product.cbm_override && product.cbm_calculated ? (
+                    <span className="text-xs font-semibold text-muted-foreground">{t("shortDesc.calculated", { cbm: product.cbm_calculated })}</span>
+                  ) : null}
+                </p>
+              ) : null}
               <h3 className="text-base font-extrabold text-primary">{t("product.variants", { count: totalQuantity })}</h3>
               <p className="text-xs font-semibold text-muted-foreground">{t("product.oneColorHint")}</p>
               {form.variants.map((variant, index) => (

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { FormEvent, MouseEvent, useEffect, useState } from "react";
 
 import { EmptyState, Feedback, PageFrame, PageHeader, PaginationBar, Panel, PanelToolbar, StatusBadge } from "@/components/manager/ui";
+import { ProductShortDescriptionCell } from "@/components/manager/product-short-description";
+import { DEFAULT_PRODUCT_ORDERING, SortableHeader } from "@/components/manager/sortable-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterSelectMenu } from "@/components/ui/filter-select";
@@ -35,6 +37,10 @@ type Product = {
   last_moderation_decision?: "approved" | "rejected" | "returned_to_review" | "withdrawn" | null;
   ean_jv?: string | null;
   ean_xl?: string | null;
+  warehouse_city?: string | null;
+  cbm?: string | null;
+  cbm_calculated?: string | null;
+  cbm_override?: string | null;
 };
 
 type ProductListResponse = {
@@ -54,6 +60,7 @@ function sellerLabel(product: Product) {
 
 export default function SellerProductsPage() {
   const { t } = useI18n();
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const sellerId = Number(params.id);
   const sellerIdValid = Number.isInteger(sellerId) && sellerId > 0;
@@ -63,6 +70,7 @@ export default function SellerProductsPage() {
   const [page, setPage] = useState(1);
   const [availability, setAvailability] = useState("");
   const [search, setSearch] = useState("");
+  const [ordering, setOrdering] = useState(DEFAULT_PRODUCT_ORDERING);
   const [appliedSearch, setAppliedSearch] = useState("");
   const [sellerName, setSellerName] = useState("");
   const [hasNext, setHasNext] = useState(false);
@@ -86,6 +94,7 @@ export default function SellerProductsPage() {
     });
     if (availability) query.set("is_available", availability);
     if (appliedSearch) query.set("search", appliedSearch);
+    if (ordering !== DEFAULT_PRODUCT_ORDERING) query.set("ordering", ordering);
 
     let cancelled = false;
 
@@ -126,7 +135,25 @@ export default function SellerProductsPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, availability, appliedSearch, sellerId, sellerIdValid, t]);
+  }, [page, availability, appliedSearch, ordering, sellerId, sellerIdValid, t]);
+
+  function openProduct(event: MouseEvent, href: string) {
+    if (window.getSelection()?.toString()) return;
+    if (event.metaKey || event.ctrlKey) {
+      window.open(href, "_blank", "noopener");
+      return;
+    }
+    router.push(href);
+  }
+
+  function handleProductSaved(updated: Partial<Product> & { id: number }) {
+    setProducts((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)));
+  }
+
+  function changeOrdering(next: string) {
+    setPage(1);
+    setOrdering(next);
+  }
 
   function applySearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -224,29 +251,26 @@ export default function SellerProductsPage() {
               pageLabel={t("common.page", { page })}
             />
             <div className="overflow-x-auto">
-            <div className="grid min-w-[1160px] grid-cols-[minmax(260px,2fr)_140px_110px_110px_90px_140px_120px_140px] gap-3 border-b border-border bg-[#f8fafc] px-4 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
+            <div className="grid min-w-[1390px] grid-cols-[minmax(240px,2fr)_210px_140px_110px_110px_90px_140px_120px_140px] gap-3 border-b border-border bg-[#f8fafc] items-center px-4 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.04em] text-muted-foreground">
               <span>{t("products.col.product")}</span>
+              <span>{t("products.col.shortDescription")}</span>
               <span>{t("products.col.status")}</span>
-              <span>{t("sellerProducts.col.availability")}</span>
+              <SortableHeader label={t("sellerProducts.col.availability")} sortKey="available" ordering={ordering} onOrderingChange={changeOrdering} />
               <span>{t("products.col.ean")}</span>
-              <span>{t("products.col.stock")}</span>
-              <span>{t("products.col.sellerListing")}</span>
-              <span className="text-center">{t("products.col.activeListings")}</span>
-              <span>{t("products.col.created")}</span>
+              <SortableHeader label={t("products.col.stock")} sortKey="stock" ordering={ordering} onOrderingChange={changeOrdering} />
+              <SortableHeader label={t("products.col.sellerListing")} sortKey="price" ordering={ordering} onOrderingChange={changeOrdering} />
+              <SortableHeader label={t("products.col.activeListings")} sortKey="active_listings" align="center" ordering={ordering} onOrderingChange={changeOrdering} />
+              <SortableHeader label={t("products.col.created")} sortKey="created_at" ordering={ordering} onOrderingChange={changeOrdering} />
             </div>
             {products.map((product) => {
               const primaryImage = product.images.find((image) => image.is_primary) ?? product.images[0];
               const showPreviousReject = product.status === "submitted" && product.last_moderation_decision === "rejected";
               const available = product.is_available !== false;
               return (
-                <Link
+                <div
                   key={product.id}
-                  href={`/manager/products/${product.id}`}
-                  draggable={false}
-                  onClick={(event) => {
-                    if (window.getSelection()?.toString()) event.preventDefault();
-                  }}
-                  className="grid min-w-[1160px] select-text grid-cols-[minmax(260px,2fr)_140px_110px_110px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-4 py-3.5 transition-colors hover:bg-[#f8fafc]"
+                  onClick={(event) => openProduct(event, `/manager/products/${product.id}`)}
+                  className="grid cursor-pointer min-w-[1390px] select-text grid-cols-[minmax(240px,2fr)_210px_140px_110px_110px_90px_140px_120px_140px] items-center gap-3 border-b border-border px-4 py-3.5 transition-colors hover:bg-[#f8fafc]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-secondary text-muted-foreground">
@@ -259,10 +283,20 @@ export default function SellerProductsPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[11px] font-bold uppercase tracking-[0.04em] text-muted-foreground">{product.product_type}</p>
-                      <h2 className="truncate text-sm font-extrabold text-primary">{product.title}</h2>
+                      <h2 className="truncate text-sm font-extrabold text-primary">
+                        <Link
+                          href={`/manager/products/${product.id}`}
+                          draggable={false}
+                          onClick={(event) => event.stopPropagation()}
+                          className="outline-none hover:underline focus-visible:underline"
+                        >
+                          {product.title}
+                        </Link>
+                      </h2>
                       <small className="text-xs font-semibold text-muted-foreground">#{product.id}</small>
                     </div>
                   </div>
+                  <ProductShortDescriptionCell product={product} onSaved={handleProductSaved} />
                   <div className="flex flex-col gap-1">
                     <StatusBadge status={product.status}>{t(`status.${product.status}` as MessageKey)}</StatusBadge>
                     {showPreviousReject ? <small className="text-[11px] font-bold text-[var(--ui-danger)]">{t("products.previouslyRejected")}</small> : null}
@@ -290,7 +324,7 @@ export default function SellerProductsPage() {
                     <span className="block whitespace-nowrap">{formatDate(product.created_at)}</span>
                     <span className="mt-1 block text-[11px] font-normal tabular-nums">{formatTime(product.created_at)}</span>
                   </time>
-                </Link>
+                </div>
               );
             })}
           </div>
