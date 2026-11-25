@@ -6,6 +6,8 @@ type MarginProduct = {
   warehouse_city?: string;
   variants: Dimensions[];
   set_parts?: Dimensions[];
+  /** Manager-entered volume in m³; replaces the volume from dimensions. */
+  cbm_override?: string | null;
 };
 
 type MarginFormula = {
@@ -40,7 +42,8 @@ export function calculateMarginEur(product: MarginProduct, formula: MarginFormul
     if (!(rate > 0)) return null;
     purchase = Math.round((purchase / rate + Number.EPSILON) * 100) / 100;
   }
-  const cbm = Number((Math.max(...product.variants.map(volume))
+  const manualCbm = nonNegativeNumber(product.cbm_override);
+  const cbm = Number.isFinite(manualCbm) ? manualCbm : Number((Math.max(...product.variants.map(volume))
     + (product.set_parts ?? []).reduce((sum, part) => sum + volume(part), 0)).toFixed(12));
   const tariff = nonNegativeNumber(formula.city_tariffs_eur_per_cbm[product.warehouse_city]);
   const tier = formula.de_size_tiers.find((item) => {
