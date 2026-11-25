@@ -37,3 +37,8 @@ test("missing or invalid data cannot produce a misleading amount", () => {
   assert.equal(calculateMarginEur(product, { ...formula, de_size_tiers: [] }), null);
   assert.equal(calculateMarginEur({ ...product, currency: "TRY" }, { ...formula, eur_to_try: "0" }), null);
 });
+
+test("manual volume override replaces the volume from dimensions", () => {
+  assert.equal(calculateMarginEur({ ...product, cbm_override: "2" }, formula), 328.5);
+  assert.equal(calculateMarginEur({ ...product, cbm_override: null }, formula), 265.5);
+});
