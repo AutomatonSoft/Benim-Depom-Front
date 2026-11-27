@@ -92,6 +92,9 @@ export function sellerErrorMessage(text: string, locale?: SellerLocale): string 
   const maximum = text.match(/^Ensure this field has no more than (\d+) characters\.$/);
   if (maximum) return translate("Use no more than {count} characters.", { count: maximum[1] });
   if (/^The password is too similar to the (?:username|email address|first name|last name)\.$/.test(text)) return translate("Your password is too similar to your personal details.");
+  const setPrice = text.match(/^Set price is too low\. Minimum price for this set: ([\d.]+) ([A-Z]{3})\.$/);
+  if (setPrice) return translate("Set price is too low. Minimum price for this set: {amount} {currency}.", { amount: setPrice[1], currency: setPrice[2] });
+  if (text === "Set price is too low.") return translate(text);
   const throttled = text.match(/^Request was throttled\. Expected available in (\d+) seconds?\.$/);
   if (throttled) return translate("Too many requests. Try again in {count} seconds.", { count: throttled[1] });
   for (const [pattern, template] of [
