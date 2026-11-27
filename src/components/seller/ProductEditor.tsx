@@ -46,6 +46,13 @@ const empty: Fields = {
   length_cm: "", quantity: "", comment: "", description: "",
 };
 
+// Whole numbers only: "120.00" from the API shows as "120"; typed or pasted decimals are cut off.
+const trimZeros = (value: string) => value.replace(/[.,]0+$/, "");
+const wholeNumber = (value: string) => value.split(/[.,]/)[0].replace(/\D/g, "");
+const blockDecimalKeys = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  if ([".", ",", "e", "E", "-", "+"].includes(event.key)) event.preventDefault();
+};
+
 function fieldsFor(product: SellerProduct): Fields {
   const variant = product.variants[0];
   return {
@@ -53,15 +60,15 @@ function fieldsFor(product: SellerProduct): Fields {
     description: product.description || "",
     model: product.model || "",
     product_type: sellerProductTypeLabel(product.product_type),
-    unit_price: product.unit_price,
+    unit_price: trimZeros(product.unit_price),
     currency: product.currency,
     warehouse_city: product.warehouse_city,
     color: variant?.color || "",
     ...sellerMaterialInputs(variant?.materials),
     material_composition: variant?.material_composition || "",
-    width_cm: variant?.width_cm || "",
-    height_cm: variant?.height_cm || "",
-    length_cm: variant?.length_cm || "",
+    width_cm: trimZeros(variant?.width_cm || ""),
+    height_cm: trimZeros(variant?.height_cm || ""),
+    length_cm: trimZeros(variant?.length_cm || ""),
     quantity: String(variant?.quantity ?? 1),
     comment: "",
   };
@@ -71,7 +78,12 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
   const { t } = useSellerI18n();
   const initialProduct = product ? { ...product, ...product.pending_changes, images: product.images } as SellerProduct : undefined;
   const [fields, setFields] = useState<Fields>(initialProduct ? () => fieldsFor(initialProduct) : empty);
-  const [setParts, setSetParts] = useState<SetPart[]>(() => initialProduct?.set_parts || []);
+  const [setParts, setSetParts] = useState<SetPart[]>(() => (initialProduct?.set_parts || []).map(part => ({
+    ...part,
+    width_cm: trimZeros(part.width_cm),
+    height_cm: trimZeros(part.height_cm),
+    length_cm: trimZeros(part.length_cm),
+  })));
   const [photos, setPhotos] = useState<EditorPhoto[]>(() => [...(product?.images || [])]
     .sort((first, second) => Number(second.is_primary) - Number(first.is_primary))
     .map(image => ({ key: `saved-${image.id}`, kind: "saved", image })));
@@ -318,10 +330,12 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
       maxLength={name === "model" ? 200 : undefined}
       type={type}
       aria-invalid={Boolean(fieldErrors[name])}
-      step={type === "number" ? name === "quantity" ? "1" : "0.01" : undefined}
-      min={type === "number" ? name === "quantity" ? "1" : "0.01" : undefined}
+      step={type === "number" ? "1" : undefined}
+      min={type === "number" ? "1" : undefined}
+      inputMode={type === "number" ? "numeric" : undefined}
+      onKeyDown={type === "number" ? blockDecimalKeys : undefined}
       value={fields[name]}
-      onChange={event => set(name, event.target.value as Fields[typeof name])}
+      onChange={event => set(name, (type === "number" ? wholeNumber(event.target.value) : event.target.value) as Fields[typeof name])}
     />
     {fieldErrors[name] && <small className="seller-field-error">{fieldErrors[name]}</small>}
   </label>;
@@ -501,7 +515,7 @@ export default function ProductEditor({ product, onSavingChange, readOnly = fals
               </label>
               <div className="seller-dimensions-row">
                 {(["length_cm", "width_cm", "height_cm"] as const).map(key => <label key={key} className="seller-field">{t(key === "width_cm" ? "Width (cm)" : key === "height_cm" ? "Height (cm)" : "Length (cm)")}
-                  <Input name={`set_part_${index}_${key}`} required type="number" min="0.01" step="0.01" value={part[key]} aria-invalid={Boolean(fieldErrors[`set_part_${index}_${key}`])} onChange={event => updateSetPart(index, key, event.target.value)} />
+                  <Input name={`set_part_${index}_${key}`} required type="number" min="1" step="1" inputMode="numeric" onKeyDown={blockDecimalKeys} value={part[key]} aria-invalid={Boolean(fieldErrors[`set_part_${index}_${key}`])} onChange={event => updateSetPart(index, key, wholeNumber(event.target.value))} />
                   {fieldErrors[`set_part_${index}_${key}`] && <small className="seller-field-error">{fieldErrors[`set_part_${index}_${key}`]}</small>}
                 </label>)}
               </div>

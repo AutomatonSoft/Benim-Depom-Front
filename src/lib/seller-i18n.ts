@@ -33,6 +33,8 @@ const messages = Object.fromEntries([
   ["Only the product owner can submit it for review.",["Отправить товар на проверку может только его владелец.","Ürünü yalnızca sahibi incelemeye gönderebilir.","Nur der Eigentümer kann das Produkt zur Prüfung einreichen."]],
   ["Enter your email and password.",["Введите почту и пароль.","E-posta adresinizi ve şifrenizi girin.","Geben Sie E-Mail-Adresse und Passwort ein."]],
   ["Enter a value of at least {count}.",["Введите значение не меньше {count}.","En az {count} değerini girin.","Geben Sie einen Wert von mindestens {count} ein."]],
+  ["Set price is too low. Minimum price for this set: {amount} {currency}.",["Слишком низкая цена комплекта. Минимальная цена: {amount} {currency}.","Set fiyatı çok düşük. Minimum fiyat: {amount} {currency}.","Der Preis für das Set ist zu niedrig. Mindestpreis: {amount} {currency}."]],
+  ["Set price is too low.",["Слишком низкая цена комплекта.","Set fiyatı çok düşük.","Der Preis für das Set ist zu niedrig."]],
   ["Enter a value no greater than {count}.",["Введите значение не больше {count}.","En fazla {count} değerini girin.","Geben Sie einen Wert von höchstens {count} ein."]],
   ["Use no more than {count} decimal places.",["Укажите не более {count} знаков после запятой.","Virgülden sonra en fazla {count} basamak kullanın.","Verwenden Sie höchstens {count} Nachkommastellen."]],
   ["Use no more than {count} digits in total.",["Число должно содержать не более {count} цифр.","Toplam en fazla {count} rakam kullanın.","Verwenden Sie insgesamt höchstens {count} Ziffern."]],
